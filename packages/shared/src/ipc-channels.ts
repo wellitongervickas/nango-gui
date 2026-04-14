@@ -11,6 +11,13 @@ export const IPC_CHANNELS = {
   NANGO_LIST_PROVIDERS: "nango:listProviders",
   NANGO_GET_PROVIDER: "nango:getProvider",
 
+  // Sync operations
+  NANGO_LIST_SYNCS: "nango:listSyncs",
+  NANGO_GET_SYNC_STATUS: "nango:getSyncStatus",
+  NANGO_TRIGGER_SYNC: "nango:triggerSync",
+  NANGO_PAUSE_SYNC: "nango:pauseSync",
+  NANGO_START_SYNC: "nango:startSync",
+
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
   CREDENTIALS_EXISTS: "credentials:exists",
@@ -147,4 +154,58 @@ export interface AppSettings {
 export interface AppUpdateSettingsRequest {
   environment?: NangoEnvironment;
   theme?: AppTheme;
+}
+
+// ── Sync types ────────────────────────────────────────────────────────────
+
+export type NangoSyncStatus =
+  | "RUNNING"
+  | "PAUSED"
+  | "STOPPED"
+  | "ERROR"
+  | "SUCCESS";
+
+export interface NangoSyncRecord {
+  id: string;
+  name: string;
+  status: NangoSyncStatus;
+  type: string;
+  frequency: string | null;
+  finishedAt: string | null;
+  nextScheduledSyncAt: string | null;
+  latestResult: {
+    added: number;
+    updated: number;
+    deleted: number;
+  } | null;
+}
+
+export interface NangoListSyncsRequest {
+  connectionId: string;
+  providerConfigKey: string;
+}
+
+export interface NangoGetSyncStatusRequest {
+  providerConfigKey: string;
+  syncs: string[];
+  connectionId?: string;
+}
+
+export interface NangoTriggerSyncRequest {
+  providerConfigKey: string;
+  syncs: string[];
+  connectionId?: string;
+  fullResync?: boolean;
+}
+
+export interface NangoPauseSyncRequest {
+  providerConfigKey: string;
+  syncs: string[];
+  connectionId?: string;
+}
+
+export interface NangoStartSyncRequest {
+  providerConfigKey: string;
+  syncs: string[];
+  connectionId?: string;
 }

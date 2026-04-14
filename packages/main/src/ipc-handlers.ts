@@ -14,6 +14,12 @@ import {
   type NangoListProvidersRequest,
   type NangoProvider,
   type NangoGetProviderRequest,
+  type NangoListSyncsRequest,
+  type NangoGetSyncStatusRequest,
+  type NangoTriggerSyncRequest,
+  type NangoPauseSyncRequest,
+  type NangoStartSyncRequest,
+  type NangoSyncRecord,
   type CredentialsSaveRequest,
   type CredentialsExistsResult,
   type AppGetEnvironmentResult,
@@ -39,6 +45,29 @@ async function wrap<T>(fn: () => Promise<T>): Promise<IpcResponse<T>> {
       err instanceof Error ? err.message : "Unknown error occurred";
     return { status: "error", data: null, error: message };
   }
+}
+
+/** Map a raw Nango sync status object to our typed record. */
+function mapSyncRecord(raw: unknown): NangoSyncRecord {
+  const s = raw as Record<string, unknown>;
+  const result = s.latestResult as Record<string, unknown> | null | undefined;
+  return {
+    id: String(s.id ?? ""),
+    name: String(s.name ?? ""),
+    status: String(s.status ?? "STOPPED") as NangoSyncRecord["status"],
+    type: String(s.type ?? "INCREMENTAL"),
+    frequency: s.frequency != null ? String(s.frequency) : null,
+    finishedAt: s.finishedAt != null ? String(s.finishedAt) : null,
+    nextScheduledSyncAt:
+      s.nextScheduledSyncAt != null ? String(s.nextScheduledSyncAt) : null,
+    latestResult: result
+      ? {
+          added: Number(result.added ?? 0),
+          updated: Number(result.updated ?? 0),
+          deleted: Number(result.deleted ?? 0),
+        }
+      : null,
+  };
 }
 
 /**
@@ -189,6 +218,93 @@ export function registerIpcHandlers(): void {
           categories: p.categories,
           docs: p.docs,
         };
+      })
+  );
+
+  // ── Sync handlers ───────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LIST_SYNCS,
+    async (
+      _event,
+      args: NangoListSyncsRequest
+    ): Promise<IpcResponse<NangoSyncRecord[]>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.syncStatus(
+          args.providerConfigKey,
+          [],
+          args.connectionId
+        );
+        const syncs = (result as { syncs?: unknown[] }).syncs ?? [];
+        return syncs.map(mapSyncRecord);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_SYNC_STATUS,
+    async (
+      _event,
+      args: NangoGetSyncStatusRequest
+    ): Promise<IpcResponse<NangoSyncRecord[]>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.syncStatus(
+          args.providerConfigKey,
+          args.syncs,
+          args.connectionId
+        );
+        const syncs = (result as { syncs?: unknown[] }).syncs ?? [];
+        return syncs.map(mapSyncRecord);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_TRIGGER_SYNC,
+    async (
+      _event,
+      args: NangoTriggerSyncRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.triggerSync(
+          args.providerConfigKey,
+          args.syncs,
+          args.connectionId,
+          args.fullResync
+        );
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_PAUSE_SYNC,
+    async (
+      _event,
+      args: NangoPauseSyncRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.pauseSync(
+          args.providerConfigKey,
+          args.syncs,
+          args.connectionId
+        );
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_START_SYNC,
+    async (
+      _event,
+      args: NangoStartSyncRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.startSync(
+          args.providerConfigKey,
+          args.syncs,
+          args.connectionId
+        );
       })
   );
 

@@ -12,6 +12,12 @@ import type {
   NangoValidateKeyResult,
   NangoCreateConnectSessionRequest,
   NangoCreateConnectSessionResult,
+  NangoListSyncsRequest,
+  NangoGetSyncStatusRequest,
+  NangoTriggerSyncRequest,
+  NangoPauseSyncRequest,
+  NangoStartSyncRequest,
+  NangoSyncRecord,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -44,6 +50,21 @@ declare global {
       getProvider(
         args: NangoGetProviderRequest
       ): Promise<IpcResponse<NangoProvider>>;
+      listSyncs(
+        args: NangoListSyncsRequest
+      ): Promise<IpcResponse<NangoSyncRecord[]>>;
+      getSyncStatus(
+        args: NangoGetSyncStatusRequest
+      ): Promise<IpcResponse<NangoSyncRecord[]>>;
+      triggerSync(
+        args: NangoTriggerSyncRequest
+      ): Promise<IpcResponse<void>>;
+      pauseSync(
+        args: NangoPauseSyncRequest
+      ): Promise<IpcResponse<void>>;
+      startSync(
+        args: NangoStartSyncRequest
+      ): Promise<IpcResponse<void>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;
