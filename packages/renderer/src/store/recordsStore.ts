@@ -41,6 +41,23 @@ const INITIAL_STATE = {
   modifiedAfter: null as string | null,
 };
 
+function buildListRecordsParams(
+  providerConfigKey: string,
+  connectionId: string,
+  model: string,
+  opts: { filter?: NangoRecordFilterAction | null; modifiedAfter?: string | null; cursor?: string | null },
+) {
+  return {
+    providerConfigKey,
+    connectionId,
+    model,
+    limit: 100,
+    ...(opts.filter ? { filter: opts.filter } : {}),
+    ...(opts.modifiedAfter ? { modifiedAfter: opts.modifiedAfter } : {}),
+    ...(opts.cursor ? { cursor: opts.cursor } : {}),
+  };
+}
+
 export const useRecordsStore = create<RecordsState>((set, get) => ({
   ...INITIAL_STATE,
 
@@ -61,14 +78,9 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     });
 
     try {
-      const res = await window.nango.listRecords({
-        providerConfigKey,
-        connectionId,
-        model,
-        limit: 100,
-        ...(filter ? { filter } : {}),
-        ...(modifiedAfter ? { modifiedAfter } : {}),
-      });
+      const res = await window.nango.listRecords(
+        buildListRecordsParams(providerConfigKey, connectionId, model, { filter, modifiedAfter }),
+      );
 
       if (res.status === "error") {
         set({ error: res.error, isLoading: false });
@@ -95,15 +107,9 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     set({ isLoadingMore: true });
 
     try {
-      const res = await window.nango.listRecords({
-        providerConfigKey,
-        connectionId,
-        model,
-        cursor: nextCursor,
-        limit: 100,
-        ...(filter ? { filter } : {}),
-        ...(modifiedAfter ? { modifiedAfter } : {}),
-      });
+      const res = await window.nango.listRecords(
+        buildListRecordsParams(providerConfigKey, connectionId, model, { filter, modifiedAfter, cursor: nextCursor }),
+      );
 
       if (res.status === "error") {
         set({ error: res.error, isLoadingMore: false });
