@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NangoConnectionSummary } from "@nango-gui/shared";
+import { notifyIpcError } from "./notifyError";
 
 interface ConnectionsState {
   connections: NangoConnectionSummary[];
@@ -23,6 +24,7 @@ export const useConnectionsStore = create<ConnectionsState>((set) => ({
         integrationId ? { integrationId } : undefined
       );
       if (res.status === "error") {
+        notifyIpcError(res);
         set({ error: res.error, isLoading: false });
         return;
       }

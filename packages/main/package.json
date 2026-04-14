@@ -8,11 +8,13 @@
     ".": "./src/index.ts",
     "./ipc-handlers.js": "./src/ipc-handlers.ts",
     "./credential-store.js": "./src/credential-store.ts",
-    "./nango-client.js": "./src/nango-client.ts"
+    "./nango-client.js": "./src/nango-client.ts",
+    "./logger.js": "./src/logger.ts"
   },
   "dependencies": {
     "@nango-gui/shared": "workspace:*",
-    "@nangohq/node": "^0.69.49"
+    "@nangohq/node": "^0.69.49",
+    "electron-log": "^5.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

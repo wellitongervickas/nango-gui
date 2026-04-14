@@ -107,7 +107,7 @@ describe("fetchSettings", () => {
   });
 
   it("sets error on IPC error response", async () => {
-    mockGetSettings.mockResolvedValueOnce({ status: "error", data: null, error: "IPC failed" } as IpcResponse<AppSettings>);
+    mockGetSettings.mockResolvedValueOnce({ status: "error", data: null, error: "IPC failed", errorCode: "UNKNOWN" } as IpcResponse<AppSettings>);
     await useSettingsStore.getState().fetchSettings();
     const state = useSettingsStore.getState();
     expect(state.error).toBe("IPC failed");
@@ -135,7 +135,7 @@ describe("updateTheme", () => {
 
   it("rolls back to previous theme on IPC error", async () => {
     useSettingsStore.setState({ theme: "system" });
-    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed" } as IpcResponse<void>);
+    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed", errorCode: "UNKNOWN" } as IpcResponse<void>);
     await expect(useSettingsStore.getState().updateTheme("dark")).rejects.toThrow(
       "Save failed"
     );
@@ -162,7 +162,7 @@ describe("updateEnvironment", () => {
 
   it("rolls back to previous environment on IPC error", async () => {
     useSettingsStore.setState({ environment: "development" });
-    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed" } as IpcResponse<void>);
+    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed", errorCode: "UNKNOWN" } as IpcResponse<void>);
     await expect(
       useSettingsStore.getState().updateEnvironment("production")
     ).rejects.toThrow("Save failed");

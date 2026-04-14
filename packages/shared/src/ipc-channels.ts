@@ -45,11 +45,22 @@ export const IPC_CHANNELS = {
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 
+// Categorized error codes returned from IPC handlers.
+// Renderer logic can branch on these to show targeted UX (re-auth prompt,
+// cooldown message, offline banner, etc.).
+export type IpcErrorCode =
+  | "AUTH_INVALID"      // 401/403 — key expired or revoked
+  | "RATE_LIMITED"      // 429 — API rate limit hit
+  | "SERVER_ERROR"      // 5xx — Nango server error
+  | "NETWORK_ERROR"     // fetch/DNS/timeout failure
+  | "CLIENT_NOT_READY"  // Nango SDK not yet initialized
+  | "UNKNOWN";          // catch-all
+
 // Standard response envelope — all IPC handlers return this shape.
 // Errors are always wrapped; never throw raw across IPC.
 export type IpcResponse<T> =
   | { status: "ok"; data: T; error: null }
-  | { status: "error"; data: null; error: string };
+  | { status: "error"; data: null; error: string; errorCode: IpcErrorCode };
 
 export type NangoEnvironment = "development" | "production";
 

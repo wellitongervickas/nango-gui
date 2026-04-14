@@ -101,6 +101,7 @@ describe("nango:createConnectSession IPC handler", () => {
       status: "error",
       data: null,
       error: "Nango API error",
+      errorCode: "UNKNOWN",
     });
   });
 

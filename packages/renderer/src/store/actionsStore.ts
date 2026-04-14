@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NangoProxyMethod } from "@nango-gui/shared";
+import { notifyIpcError } from "./notifyError";
 
 // ── History entry types ────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export const useActionsStore = create<ActionsState>((set) => ({
       const durationMs = Date.now() - start;
 
       if (res.status === "error") {
+        notifyIpcError(res);
         const entry: ActionHistoryEntry = {
           id: String(_nextId++),
           type: "action",
@@ -200,6 +202,7 @@ export const useActionsStore = create<ActionsState>((set) => ({
       const durationMs = Date.now() - start;
 
       if (res.status === "error") {
+        notifyIpcError(res);
         const entry: ProxyHistoryEntry = {
           id: String(_nextId++),
           type: "proxy",
