@@ -1,0 +1,24 @@
+{
+  "name": "@nango-gui/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:main": "tsup src/main.ts src/preload.ts --format cjs --outDir dist --no-splitting",
+    "dev": "pnpm build:main && wait-on tcp:5173 && cross-env NODE_ENV=development electron dist/main.js",
+    "build": "pnpm build:main"
+  },
+  "dependencies": {
+    "@nango-gui/main": "workspace:*",
+    "@nango-gui/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "cross-env": "^7.0.3",
+    "electron": "^35.3.0",
+    "electron-builder": "^25.1.8",
+    "tsup": "^8.4.0",
+    "typescript": "~5.8.3",
+    "wait-on": "^8.0.3"
+  }
+}

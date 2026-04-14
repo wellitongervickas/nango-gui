@@ -1,0 +1,22 @@
+{
+  "name": "@nango-gui/main",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ipc-handlers.js": "./src/ipc-handlers.ts",
+    "./credential-store.js": "./src/credential-store.ts",
+    "./nango-client.js": "./src/nango-client.ts"
+  },
+  "dependencies": {
+    "@nango-gui/shared": "workspace:*",
+    "@nangohq/node": "^0.69.49"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "~5.8.3",
+    "vitest": "^3.2.0"
+  }
+}

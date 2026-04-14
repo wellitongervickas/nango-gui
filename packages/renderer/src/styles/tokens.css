@@ -1,0 +1,46 @@
+:root {
+  /* Brand */
+  --color-brand-500: #7C3AED;
+  --color-brand-400: #8B5CF6;
+  --color-brand-600: #6D28D9;
+
+  /* Background */
+  --color-bg-base:    #0F0F11;
+  --color-bg-surface: #1A1A1F;
+  --color-bg-raised:  #242429;
+  --color-bg-overlay: #2E2E35;
+
+  /* Border */
+  --color-border-subtle: #2E2E35;
+  --color-border-base:   #3A3A42;
+  --color-border-focus:  #7C3AED;
+
+  /* Text */
+  --color-text-primary:   #F5F5F7;
+  --color-text-secondary: #9999A8;
+  --color-text-disabled:  #555560;
+  --color-text-inverse:   #0F0F11;
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-error:   #EF4444;
+  --color-info:    #3B82F6;
+
+  /* Node types (canvas) */
+  --color-node-provider: #7C3AED;
+  --color-node-sync:     #2563EB;
+  --color-node-action:   #059669;
+  --color-node-model:    #D97706;
+
+  /* Legacy aliases — keep existing component references working */
+  --color-bg:         var(--color-bg-base);
+  --color-surface:    var(--color-bg-surface);
+  --color-border:     var(--color-border-base);
+  --color-text:       var(--color-text-primary);
+  --color-text-muted: var(--color-text-secondary);
+  --color-primary:    var(--color-brand-500);
+  --color-sync:       var(--color-node-sync);
+  --color-action:     var(--color-node-action);
+  --color-model:      var(--color-node-model);
+}
