@@ -50,7 +50,8 @@ export function Toolbar() {
   const isDirty = useProjectStore((s) => s.isDirty);
   const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
 
-  const isCanvas = !currentRoute || currentRoute === "/" || currentRoute === "canvas";
+  const isDashboard = currentRoute === "/" || currentRoute === "dashboard";
+  const isCanvas = currentRoute === "canvas";
 
   function navigate(route: string) {
     window.location.hash = route === "/" ? "/" : `/${route}`;
@@ -65,9 +66,14 @@ export function Toolbar() {
       {/* Nav */}
       <nav className="flex items-center gap-0.5">
         <NavButton
+          label="Dashboard"
+          active={isDashboard}
+          onClick={() => navigate("/")}
+        />
+        <NavButton
           label="Canvas"
           active={isCanvas}
-          onClick={() => navigate("/")}
+          onClick={() => navigate("canvas")}
         />
         <NavButton
           label="Connections"

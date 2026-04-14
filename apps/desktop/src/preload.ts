@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_TRIGGER_ACTION, args),
   proxyRequest: (args: NangoProxyRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_PROXY_REQUEST, args),
+  getDashboard: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_DASHBOARD),
 });
 
 // Expose window.credentials — secure credential storage

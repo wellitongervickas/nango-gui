@@ -31,6 +31,9 @@ export const IPC_CHANNELS = {
   // Records
   NANGO_LIST_RECORDS: "nango:listRecords",
 
+  // Dashboard
+  NANGO_GET_DASHBOARD: "nango:getDashboard",
+
   // Actions & Proxy
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
@@ -279,4 +282,33 @@ export interface NangoProxyResult {
   status: number;
   headers: Record<string, string>;
   data: unknown;
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+
+export interface NangoDashboardRecentError {
+  syncName: string;
+  connectionId: string;
+  providerConfigKey: string;
+  timestamp: string | null;
+}
+
+export interface NangoDashboardTopConnection {
+  id: number;
+  connectionId: string;
+  provider: string;
+  providerConfigKey: string;
+  syncCount: number;
+  lastActivity: string | null;
+}
+
+export interface NangoDashboardData {
+  totalConnections: number;
+  activeConnections: number;
+  totalSyncs: number;
+  runningSyncs: number;
+  pausedSyncs: number;
+  errorSyncs: number;
+  recentErrors: NangoDashboardRecentError[];
+  topConnections: NangoDashboardTopConnection[];
 }

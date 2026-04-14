@@ -22,6 +22,7 @@ import {
   type NangoSyncRecord,
   type NangoListRecordsRequest,
   type NangoListRecordsResult,
+  type NangoDashboardData,
   type NangoTriggerActionRequest,
   type NangoTriggerActionResult,
   type NangoProxyRequest,
@@ -393,6 +394,137 @@ export function registerIpcHandlers(): void {
           status: response.status,
           headers,
           data: response.data,
+        };
+      })
+  );
+
+  // ── Dashboard handler ──────────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_DASHBOARD,
+    async (): Promise<IpcResponse<NangoDashboardData>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+
+        // Fetch all connections
+        const connResult = await client.listConnections();
+        const connections =
+          connResult.connections as unknown as Array<{
+            id: number;
+            connection_id: string;
+            provider: string;
+            provider_config_key: string;
+            created: string;
+          }>;
+
+        const totalConnections = connections.length;
+        let totalSyncs = 0;
+        let runningSyncs = 0;
+        let pausedSyncs = 0;
+        let errorSyncs = 0;
+        const recentErrors: NangoDashboardData["recentErrors"] = [];
+        const connectionSyncCounts = new Map<
+          string,
+          { syncCount: number; lastActivity: string | null }
+        >();
+
+        // Fetch sync status per connection
+        const activeConnectionIds = new Set<string>();
+        for (const conn of connections) {
+          const key = `${conn.provider_config_key}:${conn.connection_id}`;
+          try {
+            const result = await client.syncStatus(
+              conn.provider_config_key,
+              [],
+              conn.connection_id
+            );
+            const syncs = ((result as { syncs?: unknown[] }).syncs ??
+              []) as Array<{
+              name?: string;
+              status?: string;
+              finishedAt?: string;
+            }>;
+
+            let connLastActivity: string | null = null;
+            for (const s of syncs) {
+              totalSyncs++;
+              const status = String(s.status ?? "STOPPED");
+              if (status === "RUNNING" || status === "SUCCESS") {
+                activeConnectionIds.add(key);
+                if (status === "RUNNING") runningSyncs++;
+              }
+              if (status === "PAUSED") pausedSyncs++;
+              if (status === "ERROR") {
+                errorSyncs++;
+                recentErrors.push({
+                  syncName: String(s.name ?? "unknown"),
+                  connectionId: conn.connection_id,
+                  providerConfigKey: conn.provider_config_key,
+                  timestamp: s.finishedAt ?? null,
+                });
+              }
+              if (
+                s.finishedAt &&
+                (!connLastActivity || s.finishedAt > connLastActivity)
+              ) {
+                connLastActivity = s.finishedAt;
+              }
+            }
+            connectionSyncCounts.set(key, {
+              syncCount: syncs.length,
+              lastActivity: connLastActivity,
+            });
+          } catch {
+            // Connection may not have syncs — skip silently
+            connectionSyncCounts.set(key, {
+              syncCount: 0,
+              lastActivity: null,
+            });
+          }
+        }
+
+        // Sort errors by timestamp (most recent first), take top 5
+        recentErrors.sort((a, b) => {
+          if (!a.timestamp) return 1;
+          if (!b.timestamp) return -1;
+          return b.timestamp.localeCompare(a.timestamp);
+        });
+        const topErrors = recentErrors.slice(0, 5);
+
+        // Top connections by sync count, then by most recent activity
+        const topConnections: NangoDashboardData["topConnections"] = connections
+          .map((conn) => {
+            const key = `${conn.provider_config_key}:${conn.connection_id}`;
+            const stats = connectionSyncCounts.get(key) ?? {
+              syncCount: 0,
+              lastActivity: null,
+            };
+            return {
+              id: conn.id,
+              connectionId: conn.connection_id,
+              provider: conn.provider,
+              providerConfigKey: conn.provider_config_key,
+              syncCount: stats.syncCount,
+              lastActivity: stats.lastActivity,
+            };
+          })
+          .sort((a, b) => {
+            if (b.syncCount !== a.syncCount) return b.syncCount - a.syncCount;
+            if (!a.lastActivity) return 1;
+            if (!b.lastActivity) return -1;
+            return b.lastActivity.localeCompare(a.lastActivity);
+          })
+          .slice(0, 5);
+
+        return {
+          totalConnections,
+          activeConnections: activeConnectionIds.size,
+          totalSyncs,
+          runningSyncs,
+          pausedSyncs,
+          errorSyncs,
+          recentErrors: topErrors,
+          topConnections,
         };
       })
   );

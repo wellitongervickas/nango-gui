@@ -24,6 +24,7 @@ import type {
   NangoTriggerActionResult,
   NangoProxyRequest,
   NangoProxyResult,
+  NangoDashboardData,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -80,6 +81,7 @@ declare global {
       proxyRequest(
         args: NangoProxyRequest
       ): Promise<IpcResponse<NangoProxyResult>>;
+      getDashboard(): Promise<IpcResponse<NangoDashboardData>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

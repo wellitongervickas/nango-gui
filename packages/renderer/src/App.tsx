@@ -12,6 +12,7 @@ import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { SyncsPage } from "./pages/SyncsPage";
 import { RecordsPage } from "./pages/RecordsPage";
 import { ActionsPage } from "./pages/ActionsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { applyTheme } from "./store/settingsStore";
 import "./index.css";
 
@@ -34,6 +35,20 @@ function App() {
 
   if (route === "setup") {
     return <SetupWizard />;
+  }
+
+  if (route === "/" || route === "dashboard") {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <Toolbar />
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 relative overflow-hidden">
+            <DashboardPage />
+          </main>
+        </div>
+        <StatusBar />
+      </div>
+    );
   }
 
   if (route === "settings") {
