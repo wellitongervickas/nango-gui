@@ -98,6 +98,7 @@ describe("useSyncsStore", () => {
         status: "error",
         data: null,
         error: "Unauthorized",
+        errorCode: "UNKNOWN",
       });
       await useSyncsStore.getState().fetchSyncs("user-1", "github");
       expect(useSyncsStore.getState().error).toBe("Unauthorized");
@@ -146,6 +147,7 @@ describe("useSyncsStore", () => {
         status: "error",
         data: null,
         error: "Sync failed",
+        errorCode: "UNKNOWN",
       });
       useSyncsStore.setState({ syncs: [...mockSyncs] });
       await expect(
@@ -177,6 +179,7 @@ describe("useSyncsStore", () => {
         status: "error",
         data: null,
         error: "Pause failed",
+        errorCode: "UNKNOWN",
       });
       useSyncsStore.setState({
         syncs: [...mockSyncs],
@@ -214,6 +217,7 @@ describe("useSyncsStore", () => {
         status: "error",
         data: null,
         error: "Start failed",
+        errorCode: "UNKNOWN",
       });
       useSyncsStore.setState({
         syncs: [...mockSyncs],

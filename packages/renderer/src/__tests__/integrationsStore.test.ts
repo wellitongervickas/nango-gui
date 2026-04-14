@@ -65,6 +65,7 @@ describe("useIntegrationsStore", () => {
         status: "error",
         data: null,
         error: "Unauthorized",
+        errorCode: "UNKNOWN",
       });
       await useIntegrationsStore.getState().fetchProviders();
       expect(useIntegrationsStore.getState().error).toBe("Unauthorized");

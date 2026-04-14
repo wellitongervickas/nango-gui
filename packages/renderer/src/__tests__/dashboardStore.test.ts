@@ -99,6 +99,7 @@ describe("useDashboardStore", () => {
         status: "error",
         data: null,
         error: "No credentials configured",
+        errorCode: "UNKNOWN",
       });
       await useDashboardStore.getState().fetchDashboard();
       const state = useDashboardStore.getState();
@@ -138,6 +139,7 @@ describe("useDashboardStore", () => {
         status: "error",
         data: null,
         error: "Unauthorized",
+        errorCode: "UNKNOWN",
       });
       await useDashboardStore.getState().fetchDashboard();
       expect(useDashboardStore.getState().lastRefreshedAt).toBeNull();

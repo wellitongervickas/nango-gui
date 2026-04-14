@@ -139,6 +139,7 @@ describe("useRecordsStore", () => {
         status: "error",
         data: null,
         error: "Unauthorized",
+        errorCode: "UNKNOWN",
       });
 
       await useRecordsStore.getState().fetchRecords("github", "user-1", "Contact");

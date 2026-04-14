@@ -72,6 +72,7 @@ describe("useConnectionsStore", () => {
         status: "error",
         data: null,
         error: "Unauthorized",
+        errorCode: "UNKNOWN",
       });
       await useConnectionsStore.getState().fetchConnections();
       expect(useConnectionsStore.getState().error).toBe("Unauthorized");
@@ -132,6 +133,7 @@ describe("useConnectionsStore", () => {
         status: "error",
         data: null,
         error: "Not found",
+        errorCode: "UNKNOWN",
       });
       useConnectionsStore.setState({ connections: [...mockConnections] });
       await expect(

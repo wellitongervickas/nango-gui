@@ -117,6 +117,7 @@ describe("useActionsStore", () => {
         status: "error",
         data: null,
         error: "Action not found",
+        errorCode: "UNKNOWN",
       });
 
       await useActionsStore
@@ -206,6 +207,7 @@ describe("useActionsStore", () => {
         status: "error",
         data: null,
         error: "Connection not found",
+        errorCode: "UNKNOWN",
       });
 
       await useActionsStore
