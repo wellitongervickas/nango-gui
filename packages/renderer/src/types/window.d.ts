@@ -18,6 +18,8 @@ import type {
   NangoPauseSyncRequest,
   NangoStartSyncRequest,
   NangoSyncRecord,
+  NangoListRecordsRequest,
+  NangoListRecordsResult,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -65,6 +67,9 @@ declare global {
       startSync(
         args: NangoStartSyncRequest
       ): Promise<IpcResponse<void>>;
+      listRecords(
+        args: NangoListRecordsRequest
+      ): Promise<IpcResponse<NangoListRecordsResult>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

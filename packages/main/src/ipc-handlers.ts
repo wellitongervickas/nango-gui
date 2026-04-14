@@ -20,6 +20,8 @@ import {
   type NangoPauseSyncRequest,
   type NangoStartSyncRequest,
   type NangoSyncRecord,
+  type NangoListRecordsRequest,
+  type NangoListRecordsResult,
   type CredentialsSaveRequest,
   type CredentialsExistsResult,
   type AppGetEnvironmentResult,
@@ -305,6 +307,36 @@ export function registerIpcHandlers(): void {
           args.syncs,
           args.connectionId
         );
+      })
+  );
+
+  // ── Records handler ──────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LIST_RECORDS,
+    async (
+      _event,
+      args: NangoListRecordsRequest
+    ): Promise<IpcResponse<NangoListRecordsResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.listRecords({
+          providerConfigKey: args.providerConfigKey,
+          connectionId: args.connectionId,
+          model: args.model,
+          ...(args.cursor ? { cursor: args.cursor } : {}),
+          ...(args.limit ? { limit: args.limit } : {}),
+          ...(args.filter ? { filter: args.filter } : {}),
+          ...(args.modifiedAfter ? { modifiedAfter: args.modifiedAfter } : {}),
+        });
+        return {
+          records: result.records.map((r) => ({
+            ...r,
+            id: r.id,
+            _nango_metadata: r._nango_metadata,
+          })),
+          next_cursor: result.next_cursor,
+        };
       })
   );
 

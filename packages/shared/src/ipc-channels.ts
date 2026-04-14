@@ -28,6 +28,9 @@ export const IPC_CHANNELS = {
   APP_GET_ENVIRONMENT: "app:getEnvironment",
   APP_SET_ENVIRONMENT: "app:setEnvironment",
 
+  // Records
+  NANGO_LIST_RECORDS: "nango:listRecords",
+
   // App settings (env + theme + version info)
   APP_GET_SETTINGS: "app:getSettings",
   APP_UPDATE_SETTINGS: "app:updateSettings",
@@ -208,4 +211,37 @@ export interface NangoStartSyncRequest {
   providerConfigKey: string;
   syncs: string[];
   connectionId?: string;
+}
+
+// ── Records ─────────────────────────────────────────────────────────────────
+
+export type NangoRecordFilterAction = "added" | "updated" | "deleted";
+
+export interface NangoListRecordsRequest {
+  providerConfigKey: string;
+  connectionId: string;
+  model: string;
+  cursor?: string | null;
+  limit?: number;
+  filter?: NangoRecordFilterAction;
+  modifiedAfter?: string;
+}
+
+export interface NangoRecordMetadata {
+  first_seen_at: string;
+  last_modified_at: string;
+  last_action: string;
+  deleted_at: string | null;
+  cursor: string;
+}
+
+export interface NangoRecord {
+  id: string | number;
+  _nango_metadata: NangoRecordMetadata;
+  [key: string]: unknown;
+}
+
+export interface NangoListRecordsResult {
+  records: NangoRecord[];
+  next_cursor: string | null;
 }

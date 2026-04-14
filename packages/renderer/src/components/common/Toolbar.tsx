@@ -80,6 +80,11 @@ export function Toolbar() {
           onClick={() => navigate("syncs")}
         />
         <NavButton
+          label="Records"
+          active={currentRoute === "records"}
+          onClick={() => navigate("records")}
+        />
+        <NavButton
           label="Integrations"
           active={currentRoute === "integrations"}
           onClick={() => navigate("integrations")}

@@ -13,6 +13,7 @@ import type {
   NangoTriggerSyncRequest,
   NangoPauseSyncRequest,
   NangoStartSyncRequest,
+  NangoListRecordsRequest,
   CredentialsSaveRequest,
   AppSetEnvironmentRequest,
   AppUpdateSettingsRequest,
@@ -44,6 +45,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_PAUSE_SYNC, args),
   startSync: (args: NangoStartSyncRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_START_SYNC, args),
+  listRecords: (args: NangoListRecordsRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_RECORDS, args),
 });
 
 // Expose window.credentials — secure credential storage
