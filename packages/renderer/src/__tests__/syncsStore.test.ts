@@ -64,8 +64,10 @@ beforeEach(() => {
     syncs: [],
     isLoading: false,
     error: null,
+    syncActionLoading: {},
     selectedConnectionId: null,
     selectedProviderConfigKey: null,
+    fetchErrorCount: 0,
   });
   vi.clearAllMocks();
 });
@@ -93,7 +95,7 @@ describe("useSyncsStore", () => {
       });
     });
 
-    it("sets error on API failure", async () => {
+    it("sets error and increments fetchErrorCount on API failure", async () => {
       mockListSyncs.mockResolvedValueOnce({
         status: "error",
         data: null,
@@ -102,12 +104,20 @@ describe("useSyncsStore", () => {
       await useSyncsStore.getState().fetchSyncs("user-1", "github");
       expect(useSyncsStore.getState().error).toBe("Unauthorized");
       expect(useSyncsStore.getState().syncs).toEqual([]);
+      expect(useSyncsStore.getState().fetchErrorCount).toBe(1);
     });
 
-    it("sets error on thrown exception", async () => {
+    it("resets fetchErrorCount on success", async () => {
+      useSyncsStore.setState({ fetchErrorCount: 3 });
+      await useSyncsStore.getState().fetchSyncs("user-1", "github");
+      expect(useSyncsStore.getState().fetchErrorCount).toBe(0);
+    });
+
+    it("increments fetchErrorCount on thrown exception", async () => {
       mockListSyncs.mockRejectedValueOnce(new Error("Network error"));
       await useSyncsStore.getState().fetchSyncs("user-1", "github");
       expect(useSyncsStore.getState().error).toBe("Network error");
+      expect(useSyncsStore.getState().fetchErrorCount).toBe(1);
     });
   });
 
@@ -141,7 +151,7 @@ describe("useSyncsStore", () => {
       });
     });
 
-    it("throws on API error", async () => {
+    it("rolls back to previous status on API error", async () => {
       mockTriggerSync.mockResolvedValueOnce({
         status: "error",
         data: null,
@@ -151,6 +161,24 @@ describe("useSyncsStore", () => {
       await expect(
         useSyncsStore.getState().triggerSync("github", "github-issues", "user-1")
       ).rejects.toThrow("Sync failed");
+      // Should roll back to original status
+      const sync = useSyncsStore.getState().syncs.find((s) => s.name === "github-issues");
+      expect(sync?.status).toBe("SUCCESS");
+    });
+
+    it("clears syncActionLoading after completion", async () => {
+      useSyncsStore.setState({ syncs: [...mockSyncs] });
+      await useSyncsStore.getState().triggerSync("github", "github-issues", "user-1");
+      expect(useSyncsStore.getState().syncActionLoading["github-issues"]).toBeUndefined();
+    });
+
+    it("skips if sync already has action loading", async () => {
+      useSyncsStore.setState({
+        syncs: [...mockSyncs],
+        syncActionLoading: { "github-issues": true },
+      });
+      await useSyncsStore.getState().triggerSync("github", "github-issues", "user-1");
+      expect(mockTriggerSync).not.toHaveBeenCalled();
     });
   });
 
@@ -172,22 +200,18 @@ describe("useSyncsStore", () => {
       });
     });
 
-    it("rolls back on API error by refetching", async () => {
+    it("rolls back to previous status on API error", async () => {
       mockPauseSync.mockResolvedValueOnce({
         status: "error",
         data: null,
         error: "Pause failed",
       });
-      useSyncsStore.setState({
-        syncs: [...mockSyncs],
-        selectedConnectionId: "user-1",
-        selectedProviderConfigKey: "github",
-      });
+      useSyncsStore.setState({ syncs: [...mockSyncs] });
       await expect(
         useSyncsStore.getState().pauseSync("github", "github-issues", "user-1")
       ).rejects.toThrow("Pause failed");
-      // Should have called listSyncs to refetch
-      expect(mockListSyncs).toHaveBeenCalled();
+      const sync = useSyncsStore.getState().syncs.find((s) => s.name === "github-issues");
+      expect(sync?.status).toBe("SUCCESS");
     });
   });
 
@@ -209,21 +233,18 @@ describe("useSyncsStore", () => {
       });
     });
 
-    it("rolls back on API error by refetching", async () => {
+    it("rolls back to previous status on API error", async () => {
       mockStartSync.mockResolvedValueOnce({
         status: "error",
         data: null,
         error: "Start failed",
       });
-      useSyncsStore.setState({
-        syncs: [...mockSyncs],
-        selectedConnectionId: "user-1",
-        selectedProviderConfigKey: "github",
-      });
+      useSyncsStore.setState({ syncs: [...mockSyncs] });
       await expect(
         useSyncsStore.getState().startSync("github", "github-pull-requests", "user-1")
       ).rejects.toThrow("Start failed");
-      expect(mockListSyncs).toHaveBeenCalled();
+      const sync = useSyncsStore.getState().syncs.find((s) => s.name === "github-pull-requests");
+      expect(sync?.status).toBe("PAUSED");
     });
   });
 
@@ -233,16 +254,20 @@ describe("useSyncsStore", () => {
         syncs: [...mockSyncs],
         isLoading: true,
         error: "some error",
+        syncActionLoading: { "github-issues": true },
         selectedConnectionId: "user-1",
         selectedProviderConfigKey: "github",
+        fetchErrorCount: 3,
       });
       useSyncsStore.getState().reset();
       const state = useSyncsStore.getState();
       expect(state.syncs).toEqual([]);
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
+      expect(state.syncActionLoading).toEqual({});
       expect(state.selectedConnectionId).toBeNull();
       expect(state.selectedProviderConfigKey).toBeNull();
+      expect(state.fetchErrorCount).toBe(0);
     });
   });
 });

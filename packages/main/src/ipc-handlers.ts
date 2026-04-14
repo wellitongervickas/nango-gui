@@ -54,24 +54,58 @@ async function wrap<T>(fn: () => Promise<T>): Promise<IpcResponse<T>> {
   }
 }
 
-/** Map a raw Nango sync status object to our typed record. */
+const VALID_SYNC_STATUSES = new Set([
+  "RUNNING",
+  "PAUSED",
+  "STOPPED",
+  "ERROR",
+  "SUCCESS",
+]);
+
+/** Map a raw Nango sync status object to our typed record with field validation. */
 function mapSyncRecord(raw: unknown): NangoSyncRecord {
+  if (raw == null || typeof raw !== "object") {
+    throw new Error("Invalid sync record: expected an object");
+  }
   const s = raw as Record<string, unknown>;
-  const result = s.latestResult as Record<string, unknown> | null | undefined;
+
+  if (!s.id && !s.name) {
+    throw new Error("Invalid sync record: missing both id and name");
+  }
+
+  const rawStatus = typeof s.status === "string" ? s.status : "STOPPED";
+  const status = VALID_SYNC_STATUSES.has(rawStatus)
+    ? (rawStatus as NangoSyncRecord["status"])
+    : "STOPPED";
+
+  const result =
+    s.latestResult != null && typeof s.latestResult === "object"
+      ? (s.latestResult as Record<string, unknown>)
+      : null;
+
   return {
     id: String(s.id ?? ""),
     name: String(s.name ?? ""),
-    status: String(s.status ?? "STOPPED") as NangoSyncRecord["status"],
-    type: String(s.type ?? "INCREMENTAL"),
-    frequency: s.frequency != null ? String(s.frequency) : null,
-    finishedAt: s.finishedAt != null ? String(s.finishedAt) : null,
+    status,
+    type: typeof s.type === "string" ? s.type : "INCREMENTAL",
+    frequency:
+      s.frequency != null && typeof s.frequency === "string"
+        ? s.frequency
+        : null,
+    finishedAt:
+      s.finishedAt != null && typeof s.finishedAt === "string"
+        ? s.finishedAt
+        : null,
     nextScheduledSyncAt:
-      s.nextScheduledSyncAt != null ? String(s.nextScheduledSyncAt) : null,
+      s.nextScheduledSyncAt != null &&
+      typeof s.nextScheduledSyncAt === "string"
+        ? s.nextScheduledSyncAt
+        : null,
     latestResult: result
       ? {
-          added: Number(result.added ?? 0),
-          updated: Number(result.updated ?? 0),
-          deleted: Number(result.deleted ?? 0),
+          added: typeof result.added === "number" ? result.added : 0,
+          updated: typeof result.updated === "number" ? result.updated : 0,
+          deleted: typeof result.deleted === "number" ? result.deleted : 0,
         }
       : null,
   };
@@ -237,6 +271,9 @@ export function registerIpcHandlers(): void {
       args: NangoListSyncsRequest
     ): Promise<IpcResponse<NangoSyncRecord[]>> =>
       wrap(async () => {
+        if (!args?.providerConfigKey || !args?.connectionId) {
+          throw new Error("providerConfigKey and connectionId are required");
+        }
         const client = getNangoClient();
         const result = await client.syncStatus(
           args.providerConfigKey,
@@ -255,6 +292,9 @@ export function registerIpcHandlers(): void {
       args: NangoGetSyncStatusRequest
     ): Promise<IpcResponse<NangoSyncRecord[]>> =>
       wrap(async () => {
+        if (!args?.providerConfigKey || !Array.isArray(args?.syncs)) {
+          throw new Error("providerConfigKey and syncs array are required");
+        }
         const client = getNangoClient();
         const result = await client.syncStatus(
           args.providerConfigKey,
@@ -273,6 +313,9 @@ export function registerIpcHandlers(): void {
       args: NangoTriggerSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
+        if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
+          throw new Error("providerConfigKey and at least one sync name are required");
+        }
         const client = getNangoClient();
         await client.triggerSync(
           args.providerConfigKey,
@@ -290,6 +333,9 @@ export function registerIpcHandlers(): void {
       args: NangoPauseSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
+        if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
+          throw new Error("providerConfigKey and at least one sync name are required");
+        }
         const client = getNangoClient();
         await client.pauseSync(
           args.providerConfigKey,
@@ -306,6 +352,9 @@ export function registerIpcHandlers(): void {
       args: NangoStartSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
+        if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
+          throw new Error("providerConfigKey and at least one sync name are required");
+        }
         const client = getNangoClient();
         await client.startSync(
           args.providerConfigKey,
