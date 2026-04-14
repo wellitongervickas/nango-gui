@@ -9,12 +9,14 @@
     "./ipc-handlers.js": "./src/ipc-handlers.ts",
     "./credential-store.js": "./src/credential-store.ts",
     "./nango-client.js": "./src/nango-client.ts",
-    "./logger.js": "./src/logger.ts"
+    "./logger.js": "./src/logger.ts",
+    "./auto-updater.js": "./src/auto-updater.ts"
   },
   "dependencies": {
     "@nango-gui/shared": "workspace:*",
     "@nangohq/node": "^0.69.49",
-    "electron-log": "^5.4.3"
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

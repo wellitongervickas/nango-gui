@@ -4,6 +4,8 @@ import log from "@nango-gui/main/logger.js";
 import { registerIpcHandlers } from "@nango-gui/main/ipc-handlers.js";
 import { credentialStore } from "@nango-gui/main/credential-store.js";
 import { initNangoClient } from "@nango-gui/main/nango-client.js";
+import { initAutoUpdater, downloadUpdate, installUpdate } from "@nango-gui/main/auto-updater.js";
+import { IPC_CHANNELS } from "@nango-gui/shared";
 
 // Catch-all handlers — no unhandled rejections or exceptions should crash the app.
 process.on("uncaughtException", (err) => {
@@ -68,6 +70,13 @@ async function bootstrap(): Promise<void> {
   }
 
   createWindow(startRoute);
+
+  // Auto-updater (skip in dev)
+  if (!isDev && mainWindow) {
+    initAutoUpdater(mainWindow);
+    ipcMain.handle(IPC_CHANNELS.APP_UPDATE_DOWNLOAD, () => { downloadUpdate(); });
+    ipcMain.handle(IPC_CHANNELS.APP_UPDATE_INSTALL, () => { installUpdate(); });
+  }
 }
 
 app.whenReady().then(bootstrap);
