@@ -77,6 +77,31 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
   };
 }
 
+function toConnectionSummary(raw: unknown): NangoConnectionSummary {
+  const conn = raw as Record<string, unknown>;
+  return {
+    id: Number(conn.id ?? 0),
+    connection_id: String(conn.connection_id ?? ""),
+    provider: String(conn.provider ?? ""),
+    provider_config_key: String(conn.provider_config_key ?? ""),
+    created: String(conn.created ?? ""),
+    metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
+  };
+}
+
+function toConnectionDetail(raw: unknown): NangoConnectionDetail {
+  const conn = raw as Record<string, unknown>;
+  return {
+    id: Number(conn.id ?? 0),
+    connection_id: String(conn.connection_id ?? ""),
+    provider_config_key: String(conn.provider_config_key ?? ""),
+    provider: String(conn.provider ?? ""),
+    credentials: (conn.credentials as Record<string, unknown>) ?? {},
+    created: String(conn.created ?? ""),
+    ...(conn.updated_at != null ? { updated_at: String(conn.updated_at) } : {}),
+  };
+}
+
 /**
  * Register all IPC handlers. Call once from the main process after app ready.
  */
@@ -96,7 +121,7 @@ export function registerIpcHandlers(): void {
             ? { integrationId: args.integrationId }
             : undefined
         );
-        return result.connections as unknown as NangoConnectionSummary[];
+        return result.connections.map(toConnectionSummary);
       })
   );
 
@@ -112,7 +137,7 @@ export function registerIpcHandlers(): void {
           args.providerConfigKey,
           args.connectionId
         );
-        return result as unknown as NangoConnectionDetail;
+        return toConnectionDetail(result);
       })
   );
 

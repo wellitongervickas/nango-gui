@@ -101,20 +101,24 @@ function downloadFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function escapeCell(s: string): string {
+  return s.includes(",") || s.includes('"') || s.includes("\n")
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+
 function exportCsv(records: NangoRecord[], columns: string[]) {
   const allCols = [...columns, "first_seen_at", "last_modified_at", "last_action"];
-  const header = allCols.join(",");
+  const header = allCols.map(escapeCell).join(",");
   const rows = records.map((r) =>
     allCols
       .map((col) => {
-        if (col === "first_seen_at") return r._nango_metadata.first_seen_at;
-        if (col === "last_modified_at") return r._nango_metadata.last_modified_at;
-        if (col === "last_action") return r._nango_metadata.last_action;
+        if (col === "first_seen_at") return escapeCell(String(r._nango_metadata.first_seen_at));
+        if (col === "last_modified_at") return escapeCell(String(r._nango_metadata.last_modified_at));
+        if (col === "last_action") return escapeCell(String(r._nango_metadata.last_action));
         const v = r[col];
         const s = v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
-        return s.includes(",") || s.includes('"') || s.includes("\n")
-          ? `"${s.replace(/"/g, '""')}"`
-          : s;
+        return escapeCell(s);
       })
       .join(",")
   );
