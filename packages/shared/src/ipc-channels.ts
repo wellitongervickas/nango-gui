@@ -41,6 +41,10 @@ export const IPC_CHANNELS = {
   // App settings (env + theme + version info)
   APP_GET_SETTINGS: "app:getSettings",
   APP_UPDATE_SETTINGS: "app:updateSettings",
+
+  // Auto-updater
+  APP_UPDATE_DOWNLOAD: "app:updateDownload",
+  APP_UPDATE_INSTALL: "app:updateInstall",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

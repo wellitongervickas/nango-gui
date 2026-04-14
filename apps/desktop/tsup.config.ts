@@ -5,6 +5,6 @@ export default defineConfig({
   format: ['cjs'],
   outDir: 'dist',
   splitting: false,
-  external: ['electron'],
+  external: ['electron', 'electron-updater'],
   noExternal: ['@nango-gui/main', '@nango-gui/shared'],
 })

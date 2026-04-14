@@ -6,7 +6,12 @@
   "scripts": {
     "build:main": "tsup",
     "dev": "pnpm build:main && wait-on tcp:5173 && cross-env NODE_ENV=development electron dist/main.js",
-    "build": "pnpm build:main"
+    "build": "pnpm build:main",
+    "pack": "electron-builder --dir -c electron-builder.json",
+    "dist": "electron-builder -c electron-builder.json",
+    "dist:mac": "electron-builder --mac -c electron-builder.json",
+    "dist:win": "electron-builder --win -c electron-builder.json",
+    "dist:linux": "electron-builder --linux -c electron-builder.json"
   },
   "dependencies": {
     "@nango-gui/main": "workspace:*",
