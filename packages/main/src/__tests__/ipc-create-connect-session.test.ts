@@ -21,9 +21,10 @@ async function captureHandler(channel: string) {
   const { ipcMain } = await import("electron");
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   vi.mocked(ipcMain.handle).mockImplementation(
-    (ch: string, fn: (...args: unknown[]) => unknown) => {
+    ((ch: string, fn: (...args: unknown[]) => unknown) => {
       handlers.set(ch, fn);
-    }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any,
   );
   const { registerIpcHandlers } = await import("../ipc-handlers.js");
   registerIpcHandlers();

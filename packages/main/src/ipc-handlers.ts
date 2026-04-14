@@ -191,7 +191,7 @@ export function registerIpcHandlers(): void {
         const result = await client.listConnections(
           args?.integrationId
             ? { integrationId: args.integrationId }
-            : undefined
+            : {}
         );
         return result.connections.map(toConnectionSummary);
       })

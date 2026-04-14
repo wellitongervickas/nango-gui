@@ -2,7 +2,6 @@ import type {
   IpcResponse,
   NangoConnectionDetail,
   NangoConnectionSummary,
-  NangoEnvironment,
   NangoGetConnectionRequest,
   NangoDeleteConnectionRequest,
   NangoListConnectionsRequest,

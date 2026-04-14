@@ -3,7 +3,6 @@ import type { Nango } from "@nangohq/node";
 // Lazily-initialized singleton. The secret key is injected at runtime by the
 // credential store (M1.3) — never hard-coded.
 let _instance: Nango | null = null;
-let _secretKey: string | null = null;
 
 /**
  * Initialize (or re-initialize) the Nango SDK client with a secret key.
@@ -12,7 +11,6 @@ let _secretKey: string | null = null;
 export async function initNangoClient(secretKey: string): Promise<Nango> {
   const { Nango } = await import("@nangohq/node");
   _instance = new Nango({ secretKey });
-  _secretKey = secretKey;
   return _instance;
 }
 
@@ -40,7 +38,6 @@ export function isNangoClientReady(): boolean {
  */
 export function resetNangoClient(): void {
   _instance = null;
-  _secretKey = null;
 }
 
 /**

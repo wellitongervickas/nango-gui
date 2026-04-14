@@ -21,6 +21,16 @@ release/
 *.deb
 *.snap
 
+# TypeScript build info
+*.tsbuildinfo
+
+# Test results
+test-results/
+
+# Vite generated config artifacts
+packages/renderer/vite.config.d.ts
+packages/renderer/vite.config.js
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

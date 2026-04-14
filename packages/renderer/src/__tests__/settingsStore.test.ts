@@ -14,8 +14,7 @@ vi.stubGlobal("document", {
   documentElement: { classList },
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const matchMediaMock = vi.fn((_query: string) => ({ matches: false }) as any);
+const matchMediaMock = vi.fn(() => ({ matches: false }) as MediaQueryList);
 
 // ── window.electronApp mock ─────────────────────────────────────────────────
 
