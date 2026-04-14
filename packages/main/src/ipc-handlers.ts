@@ -22,6 +22,10 @@ import {
   type NangoSyncRecord,
   type NangoListRecordsRequest,
   type NangoListRecordsResult,
+  type NangoTriggerActionRequest,
+  type NangoTriggerActionResult,
+  type NangoProxyRequest,
+  type NangoProxyResult,
   type CredentialsSaveRequest,
   type CredentialsExistsResult,
   type AppGetEnvironmentResult,
@@ -336,6 +340,59 @@ export function registerIpcHandlers(): void {
             _nango_metadata: r._nango_metadata,
           })),
           next_cursor: result.next_cursor,
+        };
+      })
+  );
+
+  // ── Action trigger handler ───────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_TRIGGER_ACTION,
+    async (
+      _event,
+      args: NangoTriggerActionRequest
+    ): Promise<IpcResponse<NangoTriggerActionResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.triggerAction(
+          args.integrationId,
+          args.connectionId,
+          args.actionName,
+          args.input
+        );
+        return { result };
+      })
+  );
+
+  // ── Proxy request handler ──────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_PROXY_REQUEST,
+    async (
+      _event,
+      args: NangoProxyRequest
+    ): Promise<IpcResponse<NangoProxyResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const response = await client.proxy({
+          method: args.method,
+          endpoint: args.endpoint,
+          providerConfigKey: args.integrationId,
+          connectionId: args.connectionId,
+          ...(args.headers ? { headers: args.headers } : {}),
+          ...(args.data ? { data: args.data } : {}),
+          ...(args.params ? { params: args.params } : {}),
+        });
+        const headers: Record<string, string> = {};
+        if (response.headers) {
+          for (const [key, value] of Object.entries(response.headers)) {
+            if (typeof value === "string") headers[key] = value;
+          }
+        }
+        return {
+          status: response.status,
+          headers,
+          data: response.data,
         };
       })
   );

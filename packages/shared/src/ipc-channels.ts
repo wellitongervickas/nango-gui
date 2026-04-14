@@ -31,6 +31,10 @@ export const IPC_CHANNELS = {
   // Records
   NANGO_LIST_RECORDS: "nango:listRecords",
 
+  // Actions & Proxy
+  NANGO_TRIGGER_ACTION: "nango:triggerAction",
+  NANGO_PROXY_REQUEST: "nango:proxyRequest",
+
   // App settings (env + theme + version info)
   APP_GET_SETTINGS: "app:getSettings",
   APP_UPDATE_SETTINGS: "app:updateSettings",
@@ -244,4 +248,35 @@ export interface NangoRecord {
 export interface NangoListRecordsResult {
   records: NangoRecord[];
   next_cursor: string | null;
+}
+
+// ── Actions & Proxy ──────────────────────────────────────────────────────
+
+export interface NangoTriggerActionRequest {
+  connectionId: string;
+  integrationId: string;
+  actionName: string;
+  input: Record<string, unknown>;
+}
+
+export interface NangoTriggerActionResult {
+  result: unknown;
+}
+
+export type NangoProxyMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export interface NangoProxyRequest {
+  connectionId: string;
+  integrationId: string;
+  method: NangoProxyMethod;
+  endpoint: string;
+  headers?: Record<string, string>;
+  data?: unknown;
+  params?: Record<string, string>;
+}
+
+export interface NangoProxyResult {
+  status: number;
+  headers: Record<string, string>;
+  data: unknown;
 }

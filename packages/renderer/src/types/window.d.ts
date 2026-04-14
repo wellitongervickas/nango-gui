@@ -20,6 +20,10 @@ import type {
   NangoSyncRecord,
   NangoListRecordsRequest,
   NangoListRecordsResult,
+  NangoTriggerActionRequest,
+  NangoTriggerActionResult,
+  NangoProxyRequest,
+  NangoProxyResult,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -70,6 +74,12 @@ declare global {
       listRecords(
         args: NangoListRecordsRequest
       ): Promise<IpcResponse<NangoListRecordsResult>>;
+      triggerAction(
+        args: NangoTriggerActionRequest
+      ): Promise<IpcResponse<NangoTriggerActionResult>>;
+      proxyRequest(
+        args: NangoProxyRequest
+      ): Promise<IpcResponse<NangoProxyResult>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;
