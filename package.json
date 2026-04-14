@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n renderer,electron -c cyan,magenta \"pnpm --filter '@nango-gui/renderer' dev\" \"pnpm --filter '@nango-gui/desktop' dev\"",
-    "build": "pnpm --filter '@nango-gui/renderer' build && pnpm --filter '@nango-gui/desktop' build:main",
+    "dev": "concurrently -k -n renderer,electron -c cyan,magenta \"pnpm --filter @nango-gui/renderer dev\" \"pnpm --filter @nango-gui/desktop dev\"",
+    "build": "pnpm --filter @nango-gui/renderer build && pnpm --filter @nango-gui/desktop build:main",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
