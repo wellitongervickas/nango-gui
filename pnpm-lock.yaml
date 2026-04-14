@@ -97,6 +97,9 @@ importers:
       '@nango-gui/shared':
         specifier: workspace:*
         version: link:../shared
+      '@nangohq/frontend':
+        specifier: ^0.69.49
+        version: 0.69.49
       '@xyflow/react':
         specifier: ^12.10.2
         version: 12.10.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -722,6 +725,9 @@ packages:
   '@mswjs/interceptors@0.41.3':
     resolution: {integrity: sha512-cXu86tF4VQVfwz8W1SPbhoRyHJkti6mjH/XJIxp40jhO4j2k1m4KYrEykxqWPkFF3vrK4rgQppBh//AwyGSXPA==}
     engines: {node: '>=18'}
+
+  '@nangohq/frontend@0.69.49':
+    resolution: {integrity: sha512-3Ja9qAfExhVpLx3XVP+d92kNamNoHQfJUuH5kdiSTS8yFBnEzH2U2oOj6rJocVyCt31nAyWu5sGCk0E/2dXOWA==}
 
   '@nangohq/node@0.69.49':
     resolution: {integrity: sha512-eMg2hhiX3olKkCpCOhksGcgaWZgfQlQo8jaxe9LD09X4QGdkcyscWDg38PfQyI5X7JNV1N8QaDARc7eWakJLSQ==}
@@ -4621,6 +4627,12 @@ snapshots:
       is-node-process: 1.2.0
       outvariant: 1.4.3
       strict-event-emitter: 0.5.1
+
+  '@nangohq/frontend@0.69.49':
+    dependencies:
+      '@nangohq/types': 0.69.49
+    transitivePeerDependencies:
+      - debug
 
   '@nangohq/node@0.69.49':
     dependencies:

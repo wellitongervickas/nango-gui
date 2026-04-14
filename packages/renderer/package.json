@@ -11,10 +11,11 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@nango-gui/shared": "workspace:*",
     "@base-ui/react": "^1.4.0",
     "@fontsource-variable/geist": "^5.2.8",
     "@monaco-editor/react": "^4.7.0",
+    "@nango-gui/shared": "workspace:*",
+    "@nangohq/frontend": "^0.69.49",
     "@xyflow/react": "^12.10.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

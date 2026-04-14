@@ -4,6 +4,7 @@ import type {
   NangoListConnectionsRequest,
   NangoGetConnectionRequest,
   NangoValidateKeyRequest,
+  NangoCreateConnectSessionRequest,
   CredentialsSaveRequest,
   AppSetEnvironmentRequest,
 } from "@nango-gui/shared";
@@ -16,6 +17,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_CONNECTION, args),
   validateKey: (args: NangoValidateKeyRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_VALIDATE_KEY, args),
+  createConnectSession: (args: NangoCreateConnectSessionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_CONNECT_SESSION, args),
 });
 
 // Expose window.credentials — secure credential storage

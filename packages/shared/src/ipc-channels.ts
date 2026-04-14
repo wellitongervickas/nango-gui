@@ -6,6 +6,7 @@ export const IPC_CHANNELS = {
   NANGO_LIST_CONNECTIONS: "nango:listConnections",
   NANGO_GET_CONNECTION: "nango:getConnection",
   NANGO_VALIDATE_KEY: "nango:validateKey",
+  NANGO_CREATE_CONNECT_SESSION: "nango:createConnectSession",
 
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
@@ -84,4 +85,19 @@ export interface AppGetEnvironmentResult {
 
 export interface AppSetEnvironmentRequest {
   environment: NangoEnvironment;
+}
+
+export interface NangoCreateConnectSessionRequest {
+  /** Stable end-user identifier (e.g. app user ID). */
+  endUserId: string;
+  /** Optional display name shown in the Connect UI. */
+  endUserDisplayName?: string;
+  /** Restrict which integrations appear in the Connect UI. */
+  allowedIntegrations?: string[];
+}
+
+export interface NangoCreateConnectSessionResult {
+  /** Short-lived token to pass to @nangohq/frontend's openConnectUI. */
+  token: string;
+  expiresAt: string;
 }

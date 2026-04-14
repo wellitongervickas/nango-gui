@@ -2,7 +2,6 @@ import type {
   IpcResponse,
   NangoConnectionDetail,
   NangoConnectionSummary,
-  NangoEnvironment,
   NangoGetConnectionRequest,
   NangoListConnectionsRequest,
   NangoValidateKeyRequest,
@@ -13,7 +12,7 @@ import type {
   CredentialsExistsResult,
   AppGetEnvironmentResult,
   AppSetEnvironmentRequest,
-} from "./ipc-channels.js";
+} from "@nango-gui/shared";
 
 declare global {
   interface Window {
@@ -32,9 +31,7 @@ declare global {
       ): Promise<IpcResponse<NangoCreateConnectSessionResult>>;
     };
     credentials: {
-      save(
-        args: CredentialsSaveRequest
-      ): Promise<IpcResponse<void>>;
+      save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;
       exists(): Promise<IpcResponse<CredentialsExistsResult>>;
       clear(): Promise<IpcResponse<void>>;
       validate(
@@ -43,9 +40,7 @@ declare global {
     };
     electronApp: {
       getEnvironment(): Promise<IpcResponse<AppGetEnvironmentResult>>;
-      setEnvironment(
-        args: AppSetEnvironmentRequest
-      ): Promise<IpcResponse<void>>;
+      setEnvironment(args: AppSetEnvironmentRequest): Promise<IpcResponse<void>>;
     };
   }
 }

@@ -8,6 +8,8 @@ import {
   type NangoConnectionSummary,
   type NangoConnectionDetail,
   type NangoValidateKeyResult,
+  type NangoCreateConnectSessionRequest,
+  type NangoCreateConnectSessionResult,
   type CredentialsSaveRequest,
   type CredentialsExistsResult,
   type AppGetEnvironmentResult,
@@ -81,6 +83,32 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const valid = await validateNangoKey(args.secretKey);
         return { valid };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_CREATE_CONNECT_SESSION,
+    async (
+      _event,
+      args: NangoCreateConnectSessionRequest
+    ): Promise<IpcResponse<NangoCreateConnectSessionResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.createConnectSession({
+          end_user: {
+            id: args.endUserId,
+            ...(args.endUserDisplayName
+              ? { display_name: args.endUserDisplayName }
+              : {}),
+          },
+          ...(args.allowedIntegrations
+            ? { allowed_integrations: args.allowedIntegrations }
+            : {}),
+        });
+        return {
+          token: result.data.token,
+          expiresAt: result.data.expires_at,
+        };
       })
   );
 
