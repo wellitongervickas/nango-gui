@@ -7,6 +7,8 @@ import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { SetupWizard } from "./components/setup/SetupWizard";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ConnectionsPage } from "./pages/ConnectionsPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { applyTheme } from "./store/settingsStore";
 import "./index.css";
 
@@ -38,6 +40,34 @@ function App() {
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
             <SettingsPage />
+          </main>
+        </div>
+        <StatusBar />
+      </div>
+    );
+  }
+
+  if (route === "connections") {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <Toolbar />
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 relative overflow-hidden">
+            <ConnectionsPage />
+          </main>
+        </div>
+        <StatusBar />
+      </div>
+    );
+  }
+
+  if (route === "integrations") {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <Toolbar />
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 relative overflow-hidden">
+            <IntegrationsPage />
           </main>
         </div>
         <StatusBar />

@@ -7,6 +7,7 @@ interface ConnectionsState {
   error: string | null;
   fetchConnections: (integrationId?: string) => Promise<void>;
   addConnection: (connection: NangoConnectionSummary) => void;
+  deleteConnection: (providerConfigKey: string, connectionId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -41,6 +42,16 @@ export const useConnectionsStore = create<ConnectionsState>((set) => ({
         connection,
       ],
     })),
+
+  deleteConnection: async (providerConfigKey, connectionId) => {
+    const res = await window.nango.deleteConnection({ providerConfigKey, connectionId });
+    if (res.status === "error") throw new Error(res.error);
+    set((state) => ({
+      connections: state.connections.filter(
+        (c) => !(c.provider_config_key === providerConfigKey && c.connection_id === connectionId)
+      ),
+    }));
+  },
 
   reset: () => set({ connections: [], isLoading: false, error: null }),
 }));

@@ -1,4 +1,29 @@
 import { useProjectStore } from "../../store/projectStore";
+import { cn } from "../../lib/utils";
+
+function NavButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "px-3 py-1 text-xs rounded-md transition-colors cursor-pointer",
+        active
+          ? "bg-[var(--color-bg)] text-[var(--color-text)]"
+          : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+      )}
+    >
+      {label}
+    </button>
+  );
+}
 
 function GearIcon() {
   return (
@@ -25,27 +50,51 @@ export function Toolbar() {
   const isDirty = useProjectStore((s) => s.isDirty);
   const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
 
-  function handleSettingsClick() {
-    if (currentRoute === "settings") {
-      window.location.hash = "/";
-    } else {
-      window.location.hash = "/settings";
-    }
+  const isCanvas = !currentRoute || currentRoute === "/" || currentRoute === "canvas";
+
+  function navigate(route: string) {
+    window.location.hash = route === "/" ? "/" : `/${route}`;
   }
 
   return (
-    <header className="h-12 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center px-4 gap-4 shrink-0">
-      <h1 className="text-sm font-semibold text-[var(--color-text)]">
+    <header className="h-12 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center px-4 gap-1 shrink-0">
+      <h1 className="text-sm font-semibold text-[var(--color-text)] mr-3">
         Nango Builder
       </h1>
+
+      {/* Nav */}
+      <nav className="flex items-center gap-0.5">
+        <NavButton
+          label="Canvas"
+          active={isCanvas}
+          onClick={() => navigate("/")}
+        />
+        <NavButton
+          label="Connections"
+          active={currentRoute === "connections"}
+          onClick={() => navigate("connections")}
+        />
+        <NavButton
+          label="Integrations"
+          active={currentRoute === "integrations"}
+          onClick={() => navigate("integrations")}
+        />
+        <NavButton
+          label="Settings"
+          active={currentRoute === "settings"}
+          onClick={() => navigate("settings")}
+        />
+      </nav>
+
       {project && (
-        <span className="text-xs text-[var(--color-text-muted)]">
+        <span className="ml-3 text-xs text-[var(--color-text-muted)]">
           {project.name}
           {isDirty && " *"}
         </span>
       )}
       <div className="flex-1" />
-      {currentRoute !== "settings" && (
+
+      {isCanvas && (
         <>
           <button className="px-3 py-1.5 text-xs rounded-md bg-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-text-muted)]/20 transition-colors cursor-pointer">
             Save
@@ -55,8 +104,9 @@ export function Toolbar() {
           </button>
         </>
       )}
+
       <button
-        onClick={handleSettingsClick}
+        onClick={() => navigate("settings")}
         aria-label="Settings"
         className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
       >
