@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { Canvas } from "./components/canvas/Canvas";
 import { Sidebar } from "./components/sidebar/Sidebar";
@@ -5,6 +6,8 @@ import { Toolbar } from "./components/common/Toolbar";
 import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { SetupWizard } from "./components/setup/SetupWizard";
+import { SettingsPage } from "./pages/SettingsPage";
+import { applyTheme } from "./store/settingsStore";
 import "./index.css";
 
 function useHashRoute(): string {
@@ -14,8 +17,32 @@ function useHashRoute(): string {
 function App() {
   const route = useHashRoute();
 
+  // Apply persisted theme preference as early as possible.
+  useEffect(() => {
+    window.electronApp
+      ?.getSettings()
+      .then((res) => {
+        if (res.status === "ok") applyTheme(res.data.theme);
+      })
+      .catch(() => {/* ignore — falls back to system */});
+  }, []);
+
   if (route === "setup") {
     return <SetupWizard />;
+  }
+
+  if (route === "settings") {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <Toolbar />
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 relative overflow-hidden">
+            <SettingsPage />
+          </main>
+        </div>
+        <StatusBar />
+      </div>
+    );
   }
 
   return (

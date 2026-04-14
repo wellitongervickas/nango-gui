@@ -1,10 +1,11 @@
 import { safeStorage, app } from "electron";
 import { join } from "path";
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
-import type { NangoEnvironment } from "@nango-gui/shared";
+import type { NangoEnvironment, AppTheme } from "@nango-gui/shared";
 
 const CREDENTIALS_FILE = "credentials.enc";
 const ENVIRONMENT_FILE = "environment.json";
+const SETTINGS_FILE = "settings.json";
 
 function credentialsPath(): string {
   return join(app.getPath("userData"), CREDENTIALS_FILE);
@@ -12,6 +13,10 @@ function credentialsPath(): string {
 
 function environmentPath(): string {
   return join(app.getPath("userData"), ENVIRONMENT_FILE);
+}
+
+function settingsPath(): string {
+  return join(app.getPath("userData"), SETTINGS_FILE);
 }
 
 export const credentialStore = {
@@ -86,5 +91,46 @@ export const credentialStore = {
     } catch {
       return "development";
     }
+  },
+
+  /**
+   * Persist the selected theme preference.
+   */
+  saveTheme(theme: AppTheme): void {
+    const path = settingsPath();
+    let existing: Record<string, unknown> = {};
+    if (existsSync(path)) {
+      try {
+        existing = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    writeFileSync(path, JSON.stringify({ ...existing, theme }));
+  },
+
+  /**
+   * Load the persisted theme, defaulting to "system".
+   */
+  loadTheme(): AppTheme {
+    const path = settingsPath();
+    if (!existsSync(path)) return "system";
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf-8")) as { theme?: AppTheme };
+      return raw.theme ?? "system";
+    } catch {
+      return "system";
+    }
+  },
+
+  /**
+   * Return the last 4 characters of the stored key masked for display,
+   * e.g. "••••••••abcd". Returns null if no key is stored.
+   */
+  loadMaskedKey(): string | null {
+    const key = this.load();
+    if (!key) return null;
+    const suffix = key.slice(-4);
+    return `••••••••${suffix}`;
   },
 };

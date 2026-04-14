@@ -1,19 +1,25 @@
-import { ipcMain } from "electron";
+import { ipcMain, app } from "electron";
 import {
   IPC_CHANNELS,
   type IpcResponse,
   type NangoListConnectionsRequest,
   type NangoGetConnectionRequest,
+  type NangoDeleteConnectionRequest,
   type NangoValidateKeyRequest,
   type NangoConnectionSummary,
   type NangoConnectionDetail,
   type NangoValidateKeyResult,
   type NangoCreateConnectSessionRequest,
   type NangoCreateConnectSessionResult,
+  type NangoListProvidersRequest,
+  type NangoProvider,
+  type NangoGetProviderRequest,
   type CredentialsSaveRequest,
   type CredentialsExistsResult,
   type AppGetEnvironmentResult,
   type AppSetEnvironmentRequest,
+  type AppSettings,
+  type AppUpdateSettingsRequest,
 } from "@nango-gui/shared";
 import {
   getNangoClient,
@@ -75,6 +81,18 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.NANGO_DELETE_CONNECTION,
+    async (
+      _event,
+      args: NangoDeleteConnectionRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.deleteConnection(args.providerConfigKey, args.connectionId);
+      })
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.NANGO_VALIDATE_KEY,
     async (
       _event,
@@ -108,6 +126,68 @@ export function registerIpcHandlers(): void {
         return {
           token: result.data.token,
           expiresAt: result.data.expires_at,
+        };
+      })
+  );
+
+  // ── Provider catalog handlers ───────────────────────────────────────────
+
+  // TTL cache so the 700+ provider list isn't re-fetched on every render.
+  let _providersCache: NangoProvider[] | null = null;
+  let _providersCacheAt = 0;
+  const PROVIDERS_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LIST_PROVIDERS,
+    async (
+      _event,
+      args?: NangoListProvidersRequest
+    ): Promise<IpcResponse<NangoProvider[]>> =>
+      wrap(async () => {
+        const now = Date.now();
+        // Refresh cache if stale or forced by a search term.
+        if (!_providersCache || now - _providersCacheAt > PROVIDERS_TTL_MS) {
+          const client = getNangoClient();
+          const result = await client.listProviders({ search: args?.search ?? "" });
+          _providersCache = (result.data as NangoProvider[]).map((p) => ({
+            name: p.name,
+            display_name: p.display_name,
+            logo_url: p.logo_url,
+            auth_mode: p.auth_mode,
+            categories: (p as { categories?: string[] }).categories,
+            docs: (p as { docs?: string }).docs,
+          }));
+          _providersCacheAt = now;
+        }
+        // Client-side search filter when cache is warm.
+        const search = args?.search?.toLowerCase().trim();
+        if (!search) return _providersCache;
+        return _providersCache.filter(
+          (p) =>
+            p.name.toLowerCase().includes(search) ||
+            p.display_name.toLowerCase().includes(search) ||
+            p.categories?.some((c) => c.toLowerCase().includes(search))
+        );
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_PROVIDER,
+    async (
+      _event,
+      args: NangoGetProviderRequest
+    ): Promise<IpcResponse<NangoProvider>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.getProvider({ provider: args.provider });
+        const p = result.data as NangoProvider & { categories?: string[]; docs?: string };
+        return {
+          name: p.name,
+          display_name: p.display_name,
+          logo_url: p.logo_url,
+          auth_mode: p.auth_mode,
+          categories: p.categories,
+          docs: p.docs,
         };
       })
   );
@@ -172,6 +252,37 @@ export function registerIpcHandlers(): void {
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
         credentialStore.saveEnvironment(args.environment);
+      })
+  );
+
+  // ── App settings (env + theme + version info) ───────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_GET_SETTINGS,
+    async (): Promise<IpcResponse<AppSettings>> =>
+      wrap(async () => ({
+        environment: credentialStore.loadEnvironment(),
+        theme: credentialStore.loadTheme(),
+        maskedKey: credentialStore.loadMaskedKey(),
+        appVersion: app.getVersion(),
+        electronVersion: process.versions.electron ?? "unknown",
+        nangoSdkVersion: "0.69.49",
+      }))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APP_UPDATE_SETTINGS,
+    async (
+      _event,
+      args: AppUpdateSettingsRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (args.environment !== undefined) {
+          credentialStore.saveEnvironment(args.environment);
+        }
+        if (args.theme !== undefined) {
+          credentialStore.saveTheme(args.theme);
+        }
       })
   );
 }

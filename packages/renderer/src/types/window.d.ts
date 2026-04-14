@@ -2,8 +2,12 @@ import type {
   IpcResponse,
   NangoConnectionDetail,
   NangoConnectionSummary,
+  NangoDeleteConnectionRequest,
   NangoGetConnectionRequest,
+  NangoGetProviderRequest,
   NangoListConnectionsRequest,
+  NangoListProvidersRequest,
+  NangoProvider,
   NangoValidateKeyRequest,
   NangoValidateKeyResult,
   NangoCreateConnectSessionRequest,
@@ -12,6 +16,8 @@ import type {
   CredentialsExistsResult,
   AppGetEnvironmentResult,
   AppSetEnvironmentRequest,
+  AppSettings,
+  AppUpdateSettingsRequest,
 } from "@nango-gui/shared";
 
 declare global {
@@ -23,12 +29,21 @@ declare global {
       getConnection(
         args: NangoGetConnectionRequest
       ): Promise<IpcResponse<NangoConnectionDetail>>;
+      deleteConnection(
+        args: NangoDeleteConnectionRequest
+      ): Promise<IpcResponse<void>>;
       validateKey(
         args: NangoValidateKeyRequest
       ): Promise<IpcResponse<NangoValidateKeyResult>>;
       createConnectSession(
         args: NangoCreateConnectSessionRequest
       ): Promise<IpcResponse<NangoCreateConnectSessionResult>>;
+      listProviders(
+        args?: NangoListProvidersRequest
+      ): Promise<IpcResponse<NangoProvider[]>>;
+      getProvider(
+        args: NangoGetProviderRequest
+      ): Promise<IpcResponse<NangoProvider>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;
@@ -41,6 +56,8 @@ declare global {
     electronApp: {
       getEnvironment(): Promise<IpcResponse<AppGetEnvironmentResult>>;
       setEnvironment(args: AppSetEnvironmentRequest): Promise<IpcResponse<void>>;
+      getSettings(): Promise<IpcResponse<AppSettings>>;
+      updateSettings(args: AppUpdateSettingsRequest): Promise<IpcResponse<void>>;
     };
   }
 }

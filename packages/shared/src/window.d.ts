@@ -4,15 +4,21 @@ import type {
   NangoConnectionSummary,
   NangoEnvironment,
   NangoGetConnectionRequest,
+  NangoDeleteConnectionRequest,
   NangoListConnectionsRequest,
   NangoValidateKeyRequest,
   NangoValidateKeyResult,
   NangoCreateConnectSessionRequest,
   NangoCreateConnectSessionResult,
+  NangoListProvidersRequest,
+  NangoProvider,
+  NangoGetProviderRequest,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
   AppSetEnvironmentRequest,
+  AppSettings,
+  AppUpdateSettingsRequest,
 } from "./ipc-channels.js";
 
 declare global {
@@ -24,12 +30,21 @@ declare global {
       getConnection(
         args: NangoGetConnectionRequest
       ): Promise<IpcResponse<NangoConnectionDetail>>;
+      deleteConnection(
+        args: NangoDeleteConnectionRequest
+      ): Promise<IpcResponse<void>>;
       validateKey(
         args: NangoValidateKeyRequest
       ): Promise<IpcResponse<NangoValidateKeyResult>>;
       createConnectSession(
         args: NangoCreateConnectSessionRequest
       ): Promise<IpcResponse<NangoCreateConnectSessionResult>>;
+      listProviders(
+        args?: NangoListProvidersRequest
+      ): Promise<IpcResponse<NangoProvider[]>>;
+      getProvider(
+        args: NangoGetProviderRequest
+      ): Promise<IpcResponse<NangoProvider>>;
     };
     credentials: {
       save(
@@ -46,6 +61,8 @@ declare global {
       setEnvironment(
         args: AppSetEnvironmentRequest
       ): Promise<IpcResponse<void>>;
+      getSettings(): Promise<IpcResponse<AppSettings>>;
+      updateSettings(args: AppUpdateSettingsRequest): Promise<IpcResponse<void>>;
     };
   }
 }

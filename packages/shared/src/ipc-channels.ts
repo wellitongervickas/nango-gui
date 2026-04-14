@@ -5,8 +5,11 @@ export const IPC_CHANNELS = {
   // Nango SDK operations
   NANGO_LIST_CONNECTIONS: "nango:listConnections",
   NANGO_GET_CONNECTION: "nango:getConnection",
+  NANGO_DELETE_CONNECTION: "nango:deleteConnection",
   NANGO_VALIDATE_KEY: "nango:validateKey",
   NANGO_CREATE_CONNECT_SESSION: "nango:createConnectSession",
+  NANGO_LIST_PROVIDERS: "nango:listProviders",
+  NANGO_GET_PROVIDER: "nango:getProvider",
 
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
@@ -17,6 +20,10 @@ export const IPC_CHANNELS = {
   // App environment
   APP_GET_ENVIRONMENT: "app:getEnvironment",
   APP_SET_ENVIRONMENT: "app:setEnvironment",
+
+  // App settings (env + theme + version info)
+  APP_GET_SETTINGS: "app:getSettings",
+  APP_UPDATE_SETTINGS: "app:updateSettings",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -100,4 +107,44 @@ export interface NangoCreateConnectSessionResult {
   /** Short-lived token to pass to @nangohq/frontend's openConnectUI. */
   token: string;
   expiresAt: string;
+}
+
+export interface NangoDeleteConnectionRequest {
+  providerConfigKey: string;
+  connectionId: string;
+}
+
+export interface NangoListProvidersRequest {
+  search?: string;
+}
+
+export interface NangoProvider {
+  /** Unique provider key (e.g. "github", "slack"). */
+  name: string;
+  display_name: string;
+  logo_url: string;
+  auth_mode: string;
+  categories?: string[];
+  docs?: string;
+}
+
+export interface NangoGetProviderRequest {
+  provider: string;
+}
+
+export type AppTheme = "light" | "dark" | "system";
+
+export interface AppSettings {
+  environment: NangoEnvironment;
+  theme: AppTheme;
+  /** Last 4 chars of the stored key, prefixed with bullets. Null if no key stored. */
+  maskedKey: string | null;
+  appVersion: string;
+  electronVersion: string;
+  nangoSdkVersion: string;
+}
+
+export interface AppUpdateSettingsRequest {
+  environment?: NangoEnvironment;
+  theme?: AppTheme;
 }
