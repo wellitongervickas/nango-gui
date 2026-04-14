@@ -1,6 +1,21 @@
 # Nango GUI
 
+[![CI](https://github.com/wellitongervickas/nango-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/wellitongervickas/nango-gui/actions/workflows/ci.yml)
+[![Release](https://github.com/wellitongervickas/nango-gui/releases/latest/download)](https://github.com/wellitongervickas/nango-gui/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A desktop application for managing [Nango](https://nango.dev) integrations. Browse 700+ API connectors, authenticate via OAuth or credentials, monitor syncs, inspect records, and trigger actions — all from a native desktop interface.
+
+## Download
+
+Grab the latest release for your platform from [GitHub Releases](https://github.com/wellitongervickas/nango-gui/releases/latest):
+
+| Platform | File |
+|---|---|
+| macOS (Apple Silicon) | `.dmg` (arm64) |
+| macOS (Intel) | `.dmg` (x64) |
+| Windows | `.exe` installer |
+| Linux | `.AppImage` / `.deb` |
 
 ## Features
 
@@ -60,6 +75,20 @@ The app opens an Electron window. On first launch, enter your Nango secret key i
 | `pnpm test` | Run Vitest test suite |
 | `pnpm lint` | Lint with ESLint |
 | `pnpm typecheck` | Type-check all packages |
+
+## Contributing
+
+1. Fork the repo and create your branch from `main`
+2. Install dependencies: `pnpm install`
+3. Run checks before submitting a PR:
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+```
+
+Pull requests to `main` trigger CI automatically (typecheck, lint, test with coverage).
 
 ## License
 
