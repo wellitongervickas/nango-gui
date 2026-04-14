@@ -6,6 +6,9 @@ import { Toolbar } from "./components/common/Toolbar";
 import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { SetupWizard } from "./components/setup/SetupWizard";
+import { PageErrorBoundary } from "./components/PageErrorBoundary";
+import { ErrorToasts } from "./components/ErrorToasts";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
@@ -40,13 +43,17 @@ function App() {
   if (route === "/" || route === "dashboard") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <DashboardPage />
+            <PageErrorBoundary pageName="Dashboard">
+              <DashboardPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -54,13 +61,17 @@ function App() {
   if (route === "settings") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <SettingsPage />
+            <PageErrorBoundary pageName="Settings">
+              <SettingsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -68,13 +79,17 @@ function App() {
   if (route === "connections") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <ConnectionsPage />
+            <PageErrorBoundary pageName="Connections">
+              <ConnectionsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -82,13 +97,17 @@ function App() {
   if (route === "integrations") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <IntegrationsPage />
+            <PageErrorBoundary pageName="Integrations">
+              <IntegrationsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -96,13 +115,17 @@ function App() {
   if (route === "syncs") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <SyncsPage />
+            <PageErrorBoundary pageName="Syncs">
+              <SyncsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -110,13 +133,17 @@ function App() {
   if (route === "records") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <RecordsPage />
+            <PageErrorBoundary pageName="Records">
+              <RecordsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -124,13 +151,17 @@ function App() {
   if (route === "actions") {
     return (
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 relative overflow-hidden">
-            <ActionsPage />
+            <PageErrorBoundary pageName="Actions">
+              <ActionsPage />
+            </PageErrorBoundary>
           </main>
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     );
   }
@@ -138,15 +169,19 @@ function App() {
   return (
     <ReactFlowProvider>
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           <main className="flex-1 relative overflow-hidden">
-            <Canvas />
+            <PageErrorBoundary pageName="Canvas">
+              <Canvas />
+            </PageErrorBoundary>
           </main>
           <PropertiesPanel />
         </div>
         <StatusBar />
+        <ErrorToasts />
       </div>
     </ReactFlowProvider>
   );

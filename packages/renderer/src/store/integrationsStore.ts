@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NangoProvider } from "@nango-gui/shared";
+import { notifyIpcError } from "./notifyError";
 
 interface IntegrationsState {
   providers: NangoProvider[];
@@ -25,6 +26,7 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
     try {
       const res = await window.nango.listProviders();
       if (res.status === "error") {
+        notifyIpcError(res);
         set({ error: res.error, isLoading: false });
         return;
       }

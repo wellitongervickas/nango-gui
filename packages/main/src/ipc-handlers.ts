@@ -1,7 +1,9 @@
 import { ipcMain, app } from "electron";
+import log from "./logger.js";
 import {
   IPC_CHANNELS,
   type IpcResponse,
+  type IpcErrorCode,
   type NangoListConnectionsRequest,
   type NangoGetConnectionRequest,
   type NangoDeleteConnectionRequest,
@@ -42,15 +44,51 @@ import {
 } from "./nango-client.js";
 import { credentialStore } from "./credential-store.js";
 
+/** Classify an error into an IpcErrorCode for the renderer to act on. */
+function classifyError(err: unknown): { code: IpcErrorCode; message: string } {
+  if (err instanceof Error && err.message === "Nango client not initialized. Call initNangoClient() first.") {
+    return { code: "CLIENT_NOT_READY", message: "Nango client not initialized. Please configure your API key in Settings." };
+  }
+
+  const status = (err as { status?: number })?.status;
+  if (status === 401 || status === 403) {
+    return { code: "AUTH_INVALID", message: "Your Nango API key is invalid or expired. Please update it in Settings." };
+  }
+  if (status === 429) {
+    return { code: "RATE_LIMITED", message: "Nango API rate limit reached. Please wait a moment and try again." };
+  }
+  if (status && status >= 500) {
+    return { code: "SERVER_ERROR", message: "The Nango server returned an error. Please try again later." };
+  }
+
+  // Network-level failures (fetch errors, DNS, timeouts)
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (
+      msg.includes("fetch failed") ||
+      msg.includes("econnrefused") ||
+      msg.includes("enotfound") ||
+      msg.includes("etimedout") ||
+      msg.includes("network") ||
+      msg.includes("abort")
+    ) {
+      return { code: "NETWORK_ERROR", message: "Unable to reach the Nango API. Check your internet connection." };
+    }
+  }
+
+  const message = err instanceof Error ? err.message : "Unknown error occurred";
+  return { code: "UNKNOWN", message };
+}
+
 /** Wrap a handler body in the standard IpcResponse envelope. */
 async function wrap<T>(fn: () => Promise<T>): Promise<IpcResponse<T>> {
   try {
     const data = await fn();
     return { status: "ok", data, error: null };
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Unknown error occurred";
-    return { status: "error", data: null, error: message };
+    const { code, message } = classifyError(err);
+    log.error(`[IPC] ${code}: ${message}`, err instanceof Error ? err.stack : "");
+    return { status: "error", data: null, error: message, errorCode: code };
   }
 }
 

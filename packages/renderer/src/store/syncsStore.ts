@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { NangoSyncRecord, NangoSyncStatus } from "@nango-gui/shared";
+import { notifyIpcError } from "./notifyError";
 
 interface SyncsState {
   syncs: NangoSyncRecord[];
@@ -86,6 +87,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
         providerConfigKey,
       });
       if (res.status === "error") {
+        notifyIpcError(res);
         set((state) => ({
           error: res.error,
           isLoading: false,

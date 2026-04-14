@@ -1,8 +1,17 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
+import log from "@nango-gui/main/logger.js";
 import { registerIpcHandlers } from "@nango-gui/main/ipc-handlers.js";
 import { credentialStore } from "@nango-gui/main/credential-store.js";
 import { initNangoClient } from "@nango-gui/main/nango-client.js";
+
+// Catch-all handlers — no unhandled rejections or exceptions should crash the app.
+process.on("uncaughtException", (err) => {
+  log.error("[Main] Uncaught exception:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  log.error("[Main] Unhandled rejection:", reason);
+});
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -51,8 +60,8 @@ async function bootstrap(): Promise<void> {
       try {
         await initNangoClient(storedKey);
         startRoute = "/";
-      } catch {
-        // Key exists but client failed to init — show setup so user can re-enter
+      } catch (err) {
+        log.warn("[Bootstrap] Stored key failed validation, redirecting to setup:", err);
         startRoute = "/setup";
       }
     }

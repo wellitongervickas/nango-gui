@@ -3,6 +3,7 @@ import type {
   NangoRecord,
   NangoRecordFilterAction,
 } from "@nango-gui/shared";
+import { notifyIpcError } from "./notifyError";
 
 interface RecordsState {
   records: NangoRecord[];
@@ -83,6 +84,7 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
       );
 
       if (res.status === "error") {
+        notifyIpcError(res);
         set({ error: res.error, isLoading: false });
         return;
       }
@@ -112,6 +114,7 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
       );
 
       if (res.status === "error") {
+        notifyIpcError(res);
         set({ error: res.error, isLoadingMore: false });
         return;
       }
