@@ -59,6 +59,10 @@ export function spawnCli(
 
   proc.stdout!.on("data", (chunk: Buffer) => emitLines("stdout", chunk));
   proc.stderr!.on("data", (chunk: Buffer) => emitLines("stderr", chunk));
+  proc.on("error", (err) => {
+    onLine({ stream: "stderr", line: `Error: ${err.message}` });
+    onExit({ code: 1, signal: null });
+  });
   proc.on("close", (code, signal) => onExit({ code, signal }));
 
   return {

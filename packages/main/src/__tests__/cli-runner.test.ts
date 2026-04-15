@@ -158,4 +158,19 @@ describe("spawnCli", () => {
 
     expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
   });
+
+  it("emits error line and exits with code 1 when spawn emits an error (e.g. ENOENT)", () => {
+    const proc = makeMockProcess();
+    vi.mocked(spawn).mockReturnValue(proc as never);
+
+    const lines: { stream: string; line: string }[] = [];
+    const exits: { code: number | null; signal: string | null }[] = [];
+    spawnCli({ command: "nango", args: [] }, (e) => lines.push(e), (e) => exits.push(e));
+
+    const enoent = Object.assign(new Error("spawn nango ENOENT"), { code: "ENOENT" });
+    proc.emit("error", enoent);
+
+    expect(lines).toEqual([{ stream: "stderr", line: "Error: spawn nango ENOENT" }]);
+    expect(exits).toEqual([{ code: 1, signal: null }]);
+  });
 });
