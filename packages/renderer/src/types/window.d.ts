@@ -41,6 +41,11 @@ import type {
   ProjectReadFileRequest,
   ProjectReadFileResult,
   ProjectWriteFileRequest,
+  CliRunRequest,
+  CliRunResult,
+  CliAbortRequest,
+  CliOutputEvent,
+  CliExitEvent,
 } from "@nango-gui/shared";
 
 declare global {
@@ -106,6 +111,14 @@ declare global {
       setEnvironment(args: AppSetEnvironmentRequest): Promise<IpcResponse<void>>;
       getSettings(): Promise<IpcResponse<AppSettings>>;
       updateSettings(args: AppUpdateSettingsRequest): Promise<IpcResponse<void>>;
+    };
+    cli: {
+      run(args: CliRunRequest): Promise<IpcResponse<CliRunResult>>;
+      abort(args: CliAbortRequest): Promise<IpcResponse<void>>;
+      onOutput(listener: (event: CliOutputEvent) => void): void;
+      onExit(listener: (event: CliExitEvent) => void): void;
+      removeAllOutputListeners(): void;
+      removeAllExitListeners(): void;
     };
     deploy: {
       saveSnapshot(args: DeploySaveSnapshotRequest): Promise<IpcResponse<DeploySnapshot>>;

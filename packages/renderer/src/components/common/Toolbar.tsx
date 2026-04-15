@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { useFlowStore } from "../../store/flowStore";
 import { useCodePanelStore } from "../../store/codePanelStore";
+import { useDryrunPanelStore } from "../../store/dryrunPanelStore";
 import { cn } from "../../lib/utils";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 
@@ -114,6 +115,8 @@ export function Toolbar() {
   const markClean = useProjectStore((s) => s.markClean);
   const codePanelOpen = useCodePanelStore((s) => s.isOpen);
   const toggleCodePanel = useCodePanelStore((s) => s.toggle);
+  const dryrunPanelOpen = useDryrunPanelStore((s) => s.isOpen);
+  const toggleDryrunPanel = useDryrunPanelStore((s) => s.toggle);
   const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
@@ -302,6 +305,17 @@ export function Toolbar() {
             )}
           >
             Code
+          </button>
+          <button
+            onClick={toggleDryrunPanel}
+            className={cn(
+              "px-3 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
+              dryrunPanelOpen
+                ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+                : "bg-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-text-muted)]/20"
+            )}
+          >
+            Dryrun
           </button>
         </>
       )}

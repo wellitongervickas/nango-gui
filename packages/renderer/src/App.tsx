@@ -6,7 +6,9 @@ import { Toolbar } from "./components/common/Toolbar";
 import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { CodePreviewPanel } from "./components/canvas/CodePreviewPanel";
+import { DryrunPanel } from "./components/canvas/DryrunPanel";
 import { useCodePanelStore } from "./store/codePanelStore";
+import { useDryrunPanelStore } from "./store/dryrunPanelStore";
 import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
@@ -38,6 +40,8 @@ function App() {
   const route = useHashRoute();
   const codePanelOpen = useCodePanelStore((s) => s.isOpen);
   const closeCodePanel = useCodePanelStore((s) => s.close);
+  const dryrunPanelOpen = useDryrunPanelStore((s) => s.isOpen);
+  const closeDryrunPanel = useDryrunPanelStore((s) => s.close);
 
   // Apply persisted theme preference as early as possible.
   useEffect(() => {
@@ -188,14 +192,19 @@ function App() {
           <Sidebar />
           <main className="flex-1 relative overflow-hidden">
             <PageErrorBoundary pageName="Canvas">
-              <div className="flex h-full">
-                <div className={codePanelOpen ? "flex-1 min-w-0" : "w-full"}>
-                  <Canvas />
-                </div>
-                {codePanelOpen && (
-                  <div className="w-[420px] shrink-0">
-                    <CodePreviewPanel onClose={closeCodePanel} />
+              <div className="flex flex-col h-full">
+                <div className="flex flex-1 min-h-0">
+                  <div className={codePanelOpen ? "flex-1 min-w-0" : "w-full"}>
+                    <Canvas />
                   </div>
+                  {codePanelOpen && (
+                    <div className="w-[420px] shrink-0">
+                      <CodePreviewPanel onClose={closeCodePanel} />
+                    </div>
+                  )}
+                </div>
+                {dryrunPanelOpen && (
+                  <DryrunPanel onClose={closeDryrunPanel} />
                 )}
               </div>
             </PageErrorBoundary>
