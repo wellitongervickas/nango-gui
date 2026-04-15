@@ -129,6 +129,7 @@ declare global {
     project: {
       showOpenDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
       showSaveDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
+      showDirectoryDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
       readFile(args: ProjectReadFileRequest): Promise<IpcResponse<ProjectReadFileResult>>;
       writeFile(args: ProjectWriteFileRequest): Promise<IpcResponse<void>>;
     };

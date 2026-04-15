@@ -894,6 +894,21 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.PROJECT_SHOW_DIRECTORY_DIALOG,
+    async (): Promise<IpcResponse<ProjectFileDialogResult>> =>
+      wrap(async () => {
+        const opts: Electron.OpenDialogOptions = {
+          properties: ["openDirectory", "createDirectory"],
+        };
+        const win = BrowserWindow.getFocusedWindow();
+        const result = win
+          ? await dialog.showOpenDialog(win, opts)
+          : await dialog.showOpenDialog(opts);
+        return { filePath: result.canceled ? null : (result.filePaths[0] ?? null) };
+      })
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.PROJECT_SHOW_SAVE_DIALOG,
     async (): Promise<IpcResponse<ProjectFileDialogResult>> =>
       wrap(async () => {

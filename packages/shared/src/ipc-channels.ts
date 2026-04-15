@@ -63,6 +63,7 @@ export const IPC_CHANNELS = {
   // Project file I/O
   PROJECT_SHOW_OPEN_DIALOG: "project:showOpenDialog",
   PROJECT_SHOW_SAVE_DIALOG: "project:showSaveDialog",
+  PROJECT_SHOW_DIRECTORY_DIALOG: "project:showDirectoryDialog",
   PROJECT_READ_FILE: "project:readFile",
   PROJECT_WRITE_FILE: "project:writeFile",
 } as const;

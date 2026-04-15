@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { useFlowStore } from "../../store/flowStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -62,6 +62,33 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
 
   const language = activeTab === "yaml" ? "yaml" : "typescript";
 
+  const [exporting, setExporting] = useState(false);
+
+  const exportFiles = useCallback(async () => {
+    const res = await window.project.showDirectoryDialog();
+    if (res.status !== "ok" || !res.data.filePath) return;
+    const dir = res.data.filePath;
+
+    setExporting(true);
+    try {
+      // Write nango.yaml
+      await window.project.writeFile({
+        filePath: `${dir}/nango.yaml`,
+        data: yamlCode,
+      });
+
+      // Write TypeScript files
+      for (const file of tsFiles) {
+        await window.project.writeFile({
+          filePath: `${dir}/${file.path}`,
+          data: file.content,
+        });
+      }
+    } finally {
+      setExporting(false);
+    }
+  }, [yamlCode, tsFiles]);
+
   return (
     <div className="flex flex-col h-full border-l border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Header */}
@@ -78,13 +105,22 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
             onClick={() => setActiveTab("typescript")}
           />
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close code preview"
-          className="flex items-center justify-center w-6 h-6 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
-        >
-          <CloseIcon />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={exportFiles}
+            disabled={exporting}
+            className="px-2 py-0.5 text-[10px] rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {exporting ? "Exporting..." : "Export"}
+          </button>
+          <button
+            onClick={onClose}
+            aria-label="Close code preview"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
+          >
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
       {/* TypeScript file selector */}

@@ -128,6 +128,8 @@ contextBridge.exposeInMainWorld("project", {
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SHOW_OPEN_DIALOG),
   showSaveDialog: () =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SHOW_SAVE_DIALOG),
+  showDirectoryDialog: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SHOW_DIRECTORY_DIALOG),
   readFile: (args: ProjectReadFileRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_READ_FILE, args),
   writeFile: (args: ProjectWriteFileRequest) =>
