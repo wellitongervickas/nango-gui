@@ -2,10 +2,14 @@ import { useFlowStore } from "../../store/flowStore";
 import { SyncProperties } from "./SyncProperties";
 import { ActionProperties } from "./ActionProperties";
 import { ModelProperties } from "./ModelProperties";
+import { TriggerProperties } from "./TriggerProperties";
+import { WebhookProperties } from "./WebhookProperties";
 import type {
   SyncNodeData,
   ActionNodeData,
   ModelNodeData,
+  TriggerNodeData,
+  WebhookNodeData,
 } from "../../types/flow";
 
 export function PropertiesPanel() {
@@ -59,6 +63,18 @@ export function PropertiesPanel() {
         {node.type === "model" && (
           <ModelProperties
             data={node.data as unknown as ModelNodeData}
+            onUpdate={handleUpdate}
+          />
+        )}
+        {node.type === "trigger" && (
+          <TriggerProperties
+            data={node.data as unknown as TriggerNodeData}
+            onUpdate={handleUpdate}
+          />
+        )}
+        {node.type === "webhook" && (
+          <WebhookProperties
+            data={node.data as unknown as WebhookNodeData}
             onUpdate={handleUpdate}
           />
         )}

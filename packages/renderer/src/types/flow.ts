@@ -1,4 +1,4 @@
-export type NangoNodeType = "sync" | "action" | "model";
+export type NangoNodeType = "sync" | "action" | "model" | "trigger" | "webhook";
 
 export interface SyncNodeData {
   label: string;
@@ -27,6 +27,21 @@ export interface ModelField {
 export interface ModelNodeData {
   label: string;
   fields: ModelField[];
+}
+
+export interface TriggerNodeData {
+  label: string;
+  description: string;
+  frequency: string;
+  modelRef: string;
+}
+
+export interface WebhookNodeData {
+  label: string;
+  description: string;
+  endpoint: string;
+  method: string;
+  modelRef: string;
 }
 
 export interface NangoProject {

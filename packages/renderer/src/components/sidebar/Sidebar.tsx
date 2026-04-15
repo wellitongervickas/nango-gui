@@ -25,6 +25,18 @@ const NODE_TEMPLATES: {
     color: "var(--color-model)",
     description: "Data schema",
   },
+  {
+    type: "trigger",
+    label: "Trigger",
+    color: "var(--color-trigger)",
+    description: "Schedule-based entry point",
+  },
+  {
+    type: "webhook",
+    label: "Webhook",
+    color: "var(--color-webhook)",
+    description: "HTTP-event entry point",
+  },
 ];
 
 export function Sidebar() {

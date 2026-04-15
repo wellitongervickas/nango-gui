@@ -32,6 +32,8 @@
   --color-node-sync:     #2563EB;
   --color-node-action:   #059669;
   --color-node-model:    #D97706;
+  --color-node-trigger:  #0891B2;
+  --color-node-webhook:  #DC2626;
 
   /* Legacy aliases — keep existing component references working */
   --color-bg:         var(--color-bg-base);
@@ -43,4 +45,6 @@
   --color-sync:       var(--color-node-sync);
   --color-action:     var(--color-node-action);
   --color-model:      var(--color-node-model);
+  --color-trigger:    var(--color-node-trigger);
+  --color-webhook:    var(--color-node-webhook);
 }

@@ -15,12 +15,16 @@ import { useFlowStore } from "../../store/flowStore";
 import { SyncNode } from "./nodes/SyncNode";
 import { ActionNode } from "./nodes/ActionNode";
 import { ModelNode } from "./nodes/ModelNode";
+import { TriggerNode } from "./nodes/TriggerNode";
+import { WebhookNode } from "./nodes/WebhookNode";
 import type { NangoNodeType } from "../../types/flow";
 
 const nodeTypes: NodeTypes = {
   sync: SyncNode,
   action: ActionNode,
   model: ModelNode,
+  trigger: TriggerNode,
+  webhook: WebhookNode,
 };
 
 interface ContextMenu {
