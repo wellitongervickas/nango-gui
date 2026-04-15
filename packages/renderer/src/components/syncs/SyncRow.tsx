@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { NangoSyncRecord } from "@nango-gui/shared";
 import { useSyncsStore } from "@/store/syncsStore";
 import { PlayIcon, PauseIcon, SpinnerIcon } from "@/components/icons";
@@ -23,9 +23,50 @@ export function SyncRow({
   providerConfigKey: string;
   connectionId: string;
 }) {
-  const { triggerSync, pauseSync, startSync, syncActionLoading } = useSyncsStore();
+  const { triggerSync, pauseSync, startSync, updateSyncFrequency, syncActionLoading } = useSyncsStore();
   const isBusy = !!syncActionLoading[sync.name];
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editingFrequency, setEditingFrequency] = useState(false);
+  const [frequencyDraft, setFrequencyDraft] = useState("");
+  const frequencyInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingFrequency) {
+      frequencyInputRef.current?.focus();
+      frequencyInputRef.current?.select();
+    }
+  }, [editingFrequency]);
+
+  function handleFrequencyClick() {
+    if (isBusy) return;
+    setFrequencyDraft(sync.frequency ?? "");
+    setEditingFrequency(true);
+  }
+
+  async function commitFrequency() {
+    setEditingFrequency(false);
+    const trimmed = frequencyDraft.trim();
+    if (trimmed === (sync.frequency ?? "")) return;
+    setActionError(null);
+    try {
+      await updateSyncFrequency(
+        providerConfigKey,
+        sync.name,
+        connectionId,
+        trimmed || null
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Frequency update failed");
+    }
+  }
+
+  function handleFrequencyKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      commitFrequency();
+    } else if (e.key === "Escape") {
+      setEditingFrequency(false);
+    }
+  }
 
   async function handleTrigger() {
     setActionError(null);
@@ -70,7 +111,28 @@ export function SyncRow({
       </div>
 
       <div className="w-28 text-xs text-[var(--color-text-secondary)] truncate">
-        {sync.frequency ?? "\u2014"}
+        {editingFrequency ? (
+          <input
+            ref={frequencyInputRef}
+            type="text"
+            value={frequencyDraft}
+            onChange={(e) => setFrequencyDraft(e.target.value)}
+            onBlur={commitFrequency}
+            onKeyDown={handleFrequencyKeyDown}
+            className="w-full bg-[var(--color-bg-input)] border border-[var(--color-border)] rounded px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] outline-none focus:border-[var(--color-brand-500)]"
+            placeholder="e.g. every 5m"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={handleFrequencyClick}
+            disabled={isBusy}
+            className="text-left truncate w-full hover:text-[var(--color-brand-500)] hover:underline cursor-pointer disabled:cursor-default disabled:hover:no-underline disabled:hover:text-[var(--color-text-secondary)]"
+            title="Click to edit frequency"
+          >
+            {sync.frequency ?? "\u2014"}
+          </button>
+        )}
       </div>
 
       <div className="w-40 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">

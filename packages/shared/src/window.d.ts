@@ -17,6 +17,8 @@ import type {
   NangoTriggerSyncRequest,
   NangoPauseSyncRequest,
   NangoStartSyncRequest,
+  NangoUpdateSyncFrequencyRequest,
+  NangoUpdateSyncFrequencyResult,
   NangoSyncRecord,
   CredentialsSaveRequest,
   CredentialsExistsResult,
@@ -85,6 +87,9 @@ declare global {
       startSync(
         args: NangoStartSyncRequest
       ): Promise<IpcResponse<void>>;
+      updateSyncFrequency(
+        args: NangoUpdateSyncFrequencyRequest
+      ): Promise<IpcResponse<NangoUpdateSyncFrequencyResult>>;
     };
     credentials: {
       save(

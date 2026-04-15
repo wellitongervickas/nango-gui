@@ -17,6 +17,8 @@ import type {
   NangoTriggerSyncRequest,
   NangoPauseSyncRequest,
   NangoStartSyncRequest,
+  NangoUpdateSyncFrequencyRequest,
+  NangoUpdateSyncFrequencyResult,
   NangoSyncRecord,
   NangoListRecordsRequest,
   NangoListRecordsResult,
@@ -92,6 +94,9 @@ declare global {
       startSync(
         args: NangoStartSyncRequest
       ): Promise<IpcResponse<void>>;
+      updateSyncFrequency(
+        args: NangoUpdateSyncFrequencyRequest
+      ): Promise<IpcResponse<NangoUpdateSyncFrequencyResult>>;
       listRecords(
         args: NangoListRecordsRequest
       ): Promise<IpcResponse<NangoListRecordsResult>>;

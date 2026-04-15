@@ -13,6 +13,7 @@ import type {
   NangoTriggerSyncRequest,
   NangoPauseSyncRequest,
   NangoStartSyncRequest,
+  NangoUpdateSyncFrequencyRequest,
   NangoListRecordsRequest,
   NangoTriggerActionRequest,
   NangoProxyRequest,
@@ -58,6 +59,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_PAUSE_SYNC, args),
   startSync: (args: NangoStartSyncRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_START_SYNC, args),
+  updateSyncFrequency: (args: NangoUpdateSyncFrequencyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_UPDATE_SYNC_FREQUENCY, args),
   listRecords: (args: NangoListRecordsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_RECORDS, args),
   triggerAction: (args: NangoTriggerActionRequest) =>

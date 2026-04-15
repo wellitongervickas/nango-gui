@@ -24,6 +24,8 @@ import {
   type NangoTriggerSyncRequest,
   type NangoPauseSyncRequest,
   type NangoStartSyncRequest,
+  type NangoUpdateSyncFrequencyRequest,
+  type NangoUpdateSyncFrequencyResult,
   type NangoSyncRecord,
   type NangoListRecordsRequest,
   type NangoListRecordsResult,
@@ -447,6 +449,27 @@ export function registerIpcHandlers(): void {
           args.syncs,
           args.connectionId
         );
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_UPDATE_SYNC_FREQUENCY,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoUpdateSyncFrequencyRequest
+    ): Promise<IpcResponse<NangoUpdateSyncFrequencyResult>> =>
+      wrap(async () => {
+        if (!args?.providerConfigKey || !args?.syncName || !args?.connectionId) {
+          throw new Error("providerConfigKey, syncName, and connectionId are required");
+        }
+        const client = getNangoClient();
+        const result = await client.updateSyncConnectionFrequency(
+          args.providerConfigKey,
+          args.syncName,
+          args.connectionId,
+          args.frequency
+        );
+        return { frequency: result.frequency };
       })
   );
 

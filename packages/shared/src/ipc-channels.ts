@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   NANGO_TRIGGER_SYNC: "nango:triggerSync",
   NANGO_PAUSE_SYNC: "nango:pauseSync",
   NANGO_START_SYNC: "nango:startSync",
+  NANGO_UPDATE_SYNC_FREQUENCY: "nango:updateSyncFrequency",
 
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
@@ -263,6 +264,19 @@ export interface NangoStartSyncRequest {
   providerConfigKey: string;
   syncs: string[];
   connectionId?: string;
+}
+
+export interface NangoUpdateSyncFrequencyRequest {
+  providerConfigKey: string;
+  syncName: string;
+  connectionId: string;
+  /** Frequency string (e.g. "every 5m", "every 1h") or null to reset to default. */
+  frequency: string | null;
+}
+
+export interface NangoUpdateSyncFrequencyResult {
+  /** The applied frequency string returned by the Nango API. */
+  frequency: string;
 }
 
 // ── Records ─────────────────────────────────────────────────────────────────

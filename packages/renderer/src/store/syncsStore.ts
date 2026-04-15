@@ -29,6 +29,12 @@ interface SyncsState {
     syncName: string,
     connectionId: string
   ) => Promise<void>;
+  updateSyncFrequency: (
+    providerConfigKey: string,
+    syncName: string,
+    connectionId: string,
+    frequency: string | null
+  ) => Promise<void>;
   reset: () => void;
 }
 
@@ -182,6 +188,54 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
       }
     } catch (err) {
       rollback(set, syncName, previousStatus);
+      throw err;
+    } finally {
+      set((state) => {
+        const next = { ...state.syncActionLoading };
+        delete next[syncName];
+        return { syncActionLoading: next };
+      });
+    }
+  },
+
+  updateSyncFrequency: async (providerConfigKey, syncName, connectionId, frequency) => {
+    if (get().syncActionLoading[syncName]) return;
+    set((state) => ({
+      syncActionLoading: { ...state.syncActionLoading, [syncName]: true },
+    }));
+    const previousFrequency = get().syncs.find((s) => s.name === syncName)?.frequency ?? null;
+    set((state) => ({
+      syncs: state.syncs.map((s) =>
+        s.name === syncName ? { ...s, frequency } : s
+      ),
+    }));
+    try {
+      const res = await window.nango.updateSyncFrequency({
+        providerConfigKey,
+        syncName,
+        connectionId,
+        frequency,
+      });
+      if (res.status === "error") {
+        set((state) => ({
+          syncs: state.syncs.map((s) =>
+            s.name === syncName ? { ...s, frequency: previousFrequency } : s
+          ),
+        }));
+        notifyIpcError(res);
+        throw new Error(res.error);
+      }
+      set((state) => ({
+        syncs: state.syncs.map((s) =>
+          s.name === syncName ? { ...s, frequency: res.data.frequency } : s
+        ),
+      }));
+    } catch (err) {
+      set((state) => ({
+        syncs: state.syncs.map((s) =>
+          s.name === syncName ? { ...s, frequency: previousFrequency } : s
+        ),
+      }));
       throw err;
     } finally {
       set((state) => {
