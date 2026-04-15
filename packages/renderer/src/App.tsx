@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { Canvas } from "./components/canvas/Canvas";
 import { Sidebar } from "./components/sidebar/Sidebar";
@@ -19,8 +19,17 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { applyTheme } from "./store/settingsStore";
 import "./index.css";
 
-function useHashRoute(): string {
+function parseHash(): string {
   return window.location.hash.replace(/^#\/?/, "") || "/";
+}
+
+function subscribeToHash(callback: () => void): () => void {
+  window.addEventListener("hashchange", callback);
+  return () => window.removeEventListener("hashchange", callback);
+}
+
+function useHashRoute(): string {
+  return useSyncExternalStore(subscribeToHash, parseHash);
 }
 
 function App() {
