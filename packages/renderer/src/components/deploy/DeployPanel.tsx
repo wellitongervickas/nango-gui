@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSettingsStore } from "../../store/settingsStore";
 import { cn } from "../../lib/utils";
 
 type DeployStatus = "idle" | "running" | "success" | "error";
@@ -72,6 +73,8 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
   const [lines, setLines] = useState<LogLine[]>([]);
   const [runId, setRunId] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const environment = useSettingsStore((s) => s.environment);
+  const updateEnvironment = useSettingsStore((s) => s.updateEnvironment);
 
   // Auto-scroll to bottom on new output
   useEffect(() => {
@@ -109,13 +112,12 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
   }, []);
 
   const startDeploy = useCallback(async () => {
+    const envLabel = environment === "production" ? "production" : "development";
     setStatus("running");
-    setLines([{ stream: "stdout", text: "Starting nango deploy...", ts: Date.now() }]);
+    setLines([{ stream: "stdout", text: `Starting nango deploy (${envLabel})...`, ts: Date.now() }]);
 
-    const result = await window.cli.run({
-      command: "nango",
-      args: ["deploy"],
-    });
+    const args = ["deploy", envLabel];
+    const result = await window.cli.run({ command: "nango", args });
 
     if (result.status === "ok") {
       setRunId(result.data.runId);
@@ -126,7 +128,7 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
         { stream: "stderr", text: `Failed to start deploy: ${result.error}`, ts: Date.now() },
       ]);
     }
-  }, []);
+  }, [environment]);
 
   const stopDeploy = useCallback(async () => {
     if (runId) {
@@ -153,6 +155,15 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
           <span className="text-xs font-semibold text-[var(--color-text)]">
             Deploy
           </span>
+          <select
+            value={environment}
+            onChange={(e) => updateEnvironment(e.target.value as "development" | "production")}
+            disabled={status === "running"}
+            className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] cursor-pointer disabled:opacity-50"
+          >
+            <option value="development">Development</option>
+            <option value="production">Production</option>
+          </select>
           <StatusBadge status={status} />
         </div>
         <div className="flex items-center gap-1">
