@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n renderer,electron -c cyan,magenta \"pnpm --filter @nango-gui/renderer dev\" \"pnpm --filter @nango-gui/desktop dev\"",
+    "dev": "kill-port 5173 --silent && concurrently -k -n renderer,electron -c cyan,magenta \"pnpm --filter @nango-gui/renderer dev\" \"pnpm --filter @nango-gui/desktop dev\"",
     "build": "pnpm --filter @nango-gui/renderer build && pnpm --filter @nango-gui/desktop build:main",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -27,6 +27,7 @@
     "concurrently": "^9.1.2",
     "eslint": "^9.26.0",
     "eslint-config-prettier": "^10.1.8",
+    "kill-port": "^2.0.1",
     "playwright": "^1.59.1",
     "prettier": "^3.8.2",
     "typescript": "~5.8.3",
