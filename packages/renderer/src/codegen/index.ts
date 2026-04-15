@@ -9,3 +9,4 @@ export type {
   NangoYamlModelField,
   NangoYamlIntegration,
 } from "./yaml-schema";
+export { inferSchemaFromJson } from "./infer-schema";
