@@ -44,6 +44,16 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
     };
   }, []);
 
+  // ESC key to close the modal.
+  useEffect(() => {
+    if (state.kind !== "loading" && state.kind !== "open") return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") forceClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [state.kind, forceClose]);
+
   const handleEvent = useCallback(
     async (event: ConnectUIEvent) => {
       switch (event.type) {
@@ -90,14 +100,26 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
   );
 
   const open = useCallback(async () => {
+    if (!window.nango) {
+      setState({ kind: "error", message: "Nango API not available" });
+      return;
+    }
     closedRef.current = false;
     setState({ kind: "loading" });
 
     try {
-      const res = await window.nango.createConnectSession({
+      const sessionPromise = window.nango.createConnectSession({
         endUserId: "local-user",
         endUserDisplayName: "Local User",
       });
+
+      // Timeout after 15s so loading doesn't hang forever.
+      const res = await Promise.race([
+        sessionPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Connection timed out. Check that your Nango server is reachable.")), 15_000)
+        ),
+      ]);
 
       if (res.status === "error") {
         setState({ kind: "error", message: res.error });
@@ -130,12 +152,15 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
 
       {/* Cancel overlay — visible during loading & open states */}
       {(state.kind === "loading" || state.kind === "open") && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-6 pointer-events-none">
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-center pb-6"
+          onClick={forceClose}
+        >
           <button
-            onClick={forceClose}
-            className="pointer-events-auto px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] text-[var(--color-text-primary)] shadow-lg hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); forceClose(); }}
+            className="px-5 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] text-[var(--color-text)] shadow-xl hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
           >
-            Cancel connection
+            {state.kind === "loading" ? "Cancel" : "Close"}
           </button>
         </div>
       )}
@@ -143,13 +168,13 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
       {state.kind === "error" && (
         <div
           role="alert"
-          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive shadow-lg"
+          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shadow-lg"
         >
           <div className="flex items-start gap-2">
             <span className="flex-1">{state.message}</span>
             <button
               onClick={() => setState({ kind: "idle" })}
-              className="shrink-0 text-destructive/70 hover:text-destructive"
+              className="shrink-0 text-[var(--color-error)]/70 hover:text-[var(--color-error)] cursor-pointer"
               aria-label="Dismiss error"
             >
               ✕
