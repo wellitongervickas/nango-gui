@@ -7,8 +7,10 @@ import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { CodePreviewPanel } from "./components/canvas/CodePreviewPanel";
 import { DryrunPanel } from "./components/canvas/DryrunPanel";
+import { DeployPanel } from "./components/deploy/DeployPanel";
 import { useCodePanelStore } from "./store/codePanelStore";
 import { useDryrunPanelStore } from "./store/dryrunPanelStore";
+import { useDeployPanelStore } from "./store/deployPanelStore";
 import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
@@ -30,6 +32,8 @@ function App() {
   const closeCodePanel = useCodePanelStore((s) => s.close);
   const dryrunPanelOpen = useDryrunPanelStore((s) => s.isOpen);
   const closeDryrunPanel = useDryrunPanelStore((s) => s.close);
+  const deployPanelOpen = useDeployPanelStore((s) => s.isOpen);
+  const closeDeployPanel = useDeployPanelStore((s) => s.close);
 
   // Apply persisted theme preference as early as possible.
   useEffect(() => {
@@ -193,6 +197,9 @@ function App() {
                 </div>
                 {dryrunPanelOpen && (
                   <DryrunPanel onClose={closeDryrunPanel} />
+                )}
+                {deployPanelOpen && (
+                  <DeployPanel onClose={closeDeployPanel} />
                 )}
               </div>
             </PageErrorBoundary>

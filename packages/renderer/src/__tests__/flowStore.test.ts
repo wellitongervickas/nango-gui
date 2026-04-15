@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Node, Edge, Connection } from "@xyflow/react";
+import type { Node, Connection } from "@xyflow/react";
 import { useFlowStore } from "../store/flowStore";
 import "../../src/__tests__/../store/validationStore"; // activate subscription (side-effect import)
 

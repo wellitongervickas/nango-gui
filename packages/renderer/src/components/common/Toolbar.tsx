@@ -3,6 +3,7 @@ import { useProjectStore } from "../../store/projectStore";
 import { useFlowStore } from "../../store/flowStore";
 import { useCodePanelStore } from "../../store/codePanelStore";
 import { useDryrunPanelStore } from "../../store/dryrunPanelStore";
+import { useDeployPanelStore } from "../../store/deployPanelStore";
 import { cn } from "../../lib/utils";
 import { useHashRoute, navigate } from "../../lib/router";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
@@ -118,6 +119,8 @@ export function Toolbar() {
   const toggleCodePanel = useCodePanelStore((s) => s.toggle);
   const dryrunPanelOpen = useDryrunPanelStore((s) => s.isOpen);
   const toggleDryrunPanel = useDryrunPanelStore((s) => s.toggle);
+  const deployPanelOpen = useDeployPanelStore((s) => s.isOpen);
+  const toggleDeployPanel = useDeployPanelStore((s) => s.toggle);
   const currentRoute = useHashRoute();
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
@@ -289,7 +292,15 @@ export function Toolbar() {
           >
             Save{isDirty ? " *" : ""}
           </button>
-          <button className="px-3 py-1.5 text-xs rounded-md bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer">
+          <button
+            onClick={toggleDeployPanel}
+            className={cn(
+              "px-3 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
+              deployPanelOpen
+                ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+                : "bg-[var(--color-primary)] text-white hover:opacity-90"
+            )}
+          >
             Deploy
           </button>
           <button
