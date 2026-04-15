@@ -36,6 +36,7 @@ test.beforeAll(async () => {
   // credential check that only runs in the main process at startup.
   await page.evaluate(() => {
     window.location.hash = "/dashboard";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
 
   // Wait for React to process the hashchange and re-render
@@ -108,6 +109,7 @@ test("direct hash mutation updates view without page reload", async () => {
   // Navigate programmatically to Syncs (mirrors what navigate() in Toolbar.tsx does)
   await page.evaluate(() => {
     window.location.hash = "/syncs";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
 
   // The view must update without F5
@@ -192,7 +194,7 @@ test("Toolbar title and Open-project button are visible on all routes", async ()
 
   for (const { button, hash } of routes) {
     if (button === "Dashboard") {
-      await page.evaluate(() => { window.location.hash = "/"; });
+      await page.evaluate(() => { window.location.hash = "/"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
     } else {
       await page.click(`button:has-text("${button}")`);
     }
@@ -219,6 +221,7 @@ test("Toolbar title and Open-project button are visible on all routes", async ()
 test("unknown hash falls back to the canvas editor", async () => {
   await page.evaluate(() => {
     window.location.hash = "/does-not-exist";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
 
   // The default branch in App.tsx renders the ReactFlow canvas
