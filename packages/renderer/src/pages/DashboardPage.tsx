@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { NangoDashboardData } from "@nango-gui/shared";
 import { useDashboardStore } from "@/store/dashboardStore";
 import { cn } from "@/lib/utils";
+import { navigate } from "@/lib/router";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ function RecentErrorsPanel({ dashboard }: { dashboard: NangoDashboardData }) {
   const { recentErrors } = dashboard;
 
   function navigateToSyncs() {
-    window.location.hash = "/syncs";
+    navigate("syncs");
   }
 
   return (
@@ -348,7 +349,7 @@ function QuickActions() {
       {actions.map((action) => (
         <button
           key={action.route}
-          onClick={() => { window.location.hash = `/${action.route}`; }}
+          onClick={() => { navigate(action.route); }}
           className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-primary)] bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
         >
           {action.label}
@@ -376,13 +377,13 @@ function EmptyState() {
         </p>
         <div className="flex items-center justify-center gap-3">
           <button
-            onClick={() => { window.location.hash = "/connections"; }}
+            onClick={() => { navigate("connections"); }}
             className="px-4 py-2 text-sm rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer"
           >
             Add Connection
           </button>
           <button
-            onClick={() => { window.location.hash = "/integrations"; }}
+            onClick={() => { navigate("integrations"); }}
             className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
           >
             Browse Integrations

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, CheckCircle } from "lucide-react";
 import type { NangoEnvironment } from "@nango-gui/shared";
 import { Button } from "@/components/ui/button";
+import { navigate } from "@/lib/router";
 
 type Step = "welcome" | "api-key" | "validate" | "done";
 
@@ -60,7 +61,7 @@ export function SetupWizard() {
   }
 
   function handleDone() {
-    window.location.hash = "/";
+    navigate("/");
     window.location.reload();
   }
 

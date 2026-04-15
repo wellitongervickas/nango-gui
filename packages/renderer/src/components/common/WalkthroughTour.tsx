@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { navigate } from "../../lib/router";
 
 // ── Tour steps ────────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ export function WalkthroughTour({ onClose }: WalkthroughTourProps) {
 
   function handleCta() {
     if (current.route) {
-      window.location.hash = `/${current.route}`;
+      navigate(current.route);
     }
   }
 

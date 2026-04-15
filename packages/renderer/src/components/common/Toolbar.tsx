@@ -4,6 +4,7 @@ import { useFlowStore } from "../../store/flowStore";
 import { useCodePanelStore } from "../../store/codePanelStore";
 import { useDryrunPanelStore } from "../../store/dryrunPanelStore";
 import { cn } from "../../lib/utils";
+import { useHashRoute, navigate } from "../../lib/router";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 
 function NavButton({
@@ -117,16 +118,12 @@ export function Toolbar() {
   const toggleCodePanel = useCodePanelStore((s) => s.toggle);
   const dryrunPanelOpen = useDryrunPanelStore((s) => s.isOpen);
   const toggleDryrunPanel = useDryrunPanelStore((s) => s.toggle);
-  const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
+  const currentRoute = useHashRoute();
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
 
   const isDashboard = currentRoute === "/" || currentRoute === "dashboard";
   const isCanvas = currentRoute === "canvas";
-
-  function navigate(route: string) {
-    window.location.hash = route === "/" ? "/" : `/${route}`;
-  }
 
   const saveProject = useCallback(
     async (saveAs?: boolean) => {
@@ -193,7 +190,7 @@ export function Toolbar() {
     const edges = fileData.flow.edges ?? [];
     useFlowStore.setState({ nodes, edges: edges as typeof flowStore.edges });
 
-    window.location.hash = "/canvas";
+    navigate("canvas");
   }, [setProject]);
 
   // Ctrl+S / Cmd+S keyboard shortcut

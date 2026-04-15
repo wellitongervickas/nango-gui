@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
 import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
+import { navigate } from "@/lib/router";
 
 export function SettingsPage() {
   const {
@@ -96,7 +97,7 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
     const res = await window.credentials.clear();
     if (res.status === "error") return;
     // Redirect to setup wizard
-    window.location.hash = "/setup";
+    navigate("setup");
     window.location.reload();
   }
 
@@ -162,7 +163,7 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
           No API key configured.{" "}
           <button
             onClick={() => {
-              window.location.hash = "/setup";
+              navigate("setup");
               window.location.reload();
             }}
             className="text-[var(--color-brand-500)] hover:underline"

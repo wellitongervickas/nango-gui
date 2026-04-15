@@ -1,5 +1,6 @@
 import { useErrorStore } from "../store/errorStore";
 import type { IpcErrorCode } from "@nango-gui/shared";
+import { navigate } from "../lib/router";
 
 const ICON_MAP: Record<IpcErrorCode, string> = {
   AUTH_INVALID: "\u{1F511}",
@@ -17,7 +18,7 @@ function actionLabel(code: IpcErrorCode): string | null {
 
 function handleAction(code: IpcErrorCode): void {
   if (code === "AUTH_INVALID" || code === "CLIENT_NOT_READY") {
-    window.location.hash = "#/settings";
+    navigate("settings");
   }
 }
 
