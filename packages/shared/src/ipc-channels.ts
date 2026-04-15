@@ -59,6 +59,12 @@ export const IPC_CHANNELS = {
   DEPLOY_LIST_SNAPSHOTS: "deploy:listSnapshots",
   DEPLOY_DELETE_SNAPSHOT: "deploy:deleteSnapshot",
   DEPLOY_ROLLBACK: "deploy:rollback",
+
+  // Project file I/O
+  PROJECT_SHOW_OPEN_DIALOG: "project:showOpenDialog",
+  PROJECT_SHOW_SAVE_DIALOG: "project:showSaveDialog",
+  PROJECT_READ_FILE: "project:readFile",
+  PROJECT_WRITE_FILE: "project:writeFile",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -416,4 +422,24 @@ export interface DeployRollbackRequest {
 export interface DeployRollbackResult {
   /** runId to correlate CLI_OUTPUT / CLI_EXIT stream events. */
   runId: string;
+}
+
+// ── Project file I/O ──────────────────────────────────────────────────────
+
+export interface ProjectFileDialogResult {
+  /** null when the user cancels the dialog. */
+  filePath: string | null;
+}
+
+export interface ProjectReadFileRequest {
+  filePath: string;
+}
+
+export interface ProjectWriteFileRequest {
+  filePath: string;
+  data: string;
+}
+
+export interface ProjectReadFileResult {
+  data: string;
 }

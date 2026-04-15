@@ -37,6 +37,10 @@ import type {
   DeployDeleteSnapshotRequest,
   DeployRollbackRequest,
   DeployRollbackResult,
+  ProjectFileDialogResult,
+  ProjectReadFileRequest,
+  ProjectReadFileResult,
+  ProjectWriteFileRequest,
 } from "@nango-gui/shared";
 
 declare global {
@@ -108,6 +112,12 @@ declare global {
       listSnapshots(): Promise<IpcResponse<DeployListSnapshotsResult>>;
       deleteSnapshot(args: DeployDeleteSnapshotRequest): Promise<IpcResponse<void>>;
       rollback(args: DeployRollbackRequest): Promise<IpcResponse<DeployRollbackResult>>;
+    };
+    project: {
+      showOpenDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
+      showSaveDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
+      readFile(args: ProjectReadFileRequest): Promise<IpcResponse<ProjectReadFileResult>>;
+      writeFile(args: ProjectWriteFileRequest): Promise<IpcResponse<void>>;
     };
   }
 }

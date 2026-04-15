@@ -26,6 +26,8 @@ import type {
   DeploySaveSnapshotRequest,
   DeployDeleteSnapshotRequest,
   DeployRollbackRequest,
+  ProjectReadFileRequest,
+  ProjectWriteFileRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -118,6 +120,18 @@ contextBridge.exposeInMainWorld("deploy", {
     ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_DELETE_SNAPSHOT, args),
   rollback: (args: DeployRollbackRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_ROLLBACK, args),
+});
+
+// Expose window.project — project file save/load dialogs and I/O
+contextBridge.exposeInMainWorld("project", {
+  showOpenDialog: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SHOW_OPEN_DIALOG),
+  showSaveDialog: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_SHOW_SAVE_DIALOG),
+  readFile: (args: ProjectReadFileRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_READ_FILE, args),
+  writeFile: (args: ProjectWriteFileRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.PROJECT_WRITE_FILE, args),
 });
 
 export {};

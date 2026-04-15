@@ -1,4 +1,5 @@
-import { ipcMain, app, type IpcMainInvokeEvent } from "electron";
+import { ipcMain, app, dialog, BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawnCli, type CliRunner } from "./cli-runner.js";
 import log from "./logger.js";
@@ -46,6 +47,10 @@ import {
   type DeployDeleteSnapshotRequest,
   type DeployRollbackRequest,
   type DeployRollbackResult,
+  type ProjectFileDialogResult,
+  type ProjectReadFileRequest,
+  type ProjectReadFileResult,
+  type ProjectWriteFileRequest,
 } from "@nango-gui/shared";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import {
@@ -861,6 +866,68 @@ export function registerIpcHandlers(): void {
         _activeCliProcesses.set(runId, runner);
         log.info(`[DEPLOY] rollback run ${runId} from snapshot ${snapshot.id} — pid ${runner.pid}`);
         return { runId };
+      })
+  );
+
+  // ── Project file I/O handlers ──────────────────────────────────────────
+
+  const NANGO_PROJECT_FILTER = {
+    name: "Nango Project",
+    extensions: ["nango-project"],
+  };
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_SHOW_OPEN_DIALOG,
+    async (): Promise<IpcResponse<ProjectFileDialogResult>> =>
+      wrap(async () => {
+        const opts: Electron.OpenDialogOptions = {
+          filters: [NANGO_PROJECT_FILTER],
+          properties: ["openFile"],
+        };
+        const win = BrowserWindow.getFocusedWindow();
+        const result = win
+          ? await dialog.showOpenDialog(win, opts)
+          : await dialog.showOpenDialog(opts);
+        return { filePath: result.canceled ? null : (result.filePaths[0] ?? null) };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_SHOW_SAVE_DIALOG,
+    async (): Promise<IpcResponse<ProjectFileDialogResult>> =>
+      wrap(async () => {
+        const opts: Electron.SaveDialogOptions = {
+          filters: [NANGO_PROJECT_FILTER],
+          defaultPath: "untitled.nango-project",
+        };
+        const win = BrowserWindow.getFocusedWindow();
+        const result = win
+          ? await dialog.showSaveDialog(win, opts)
+          : await dialog.showSaveDialog(opts);
+        return { filePath: result.canceled ? null : (result.filePath ?? null) };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_READ_FILE,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: ProjectReadFileRequest
+    ): Promise<IpcResponse<ProjectReadFileResult>> =>
+      wrap(async () => {
+        const data = await readFile(args.filePath, "utf-8");
+        return { data };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROJECT_WRITE_FILE,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: ProjectWriteFileRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        await writeFile(args.filePath, args.data, "utf-8");
       })
   );
 }
