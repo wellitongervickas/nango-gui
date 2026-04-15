@@ -40,7 +40,14 @@ import {
   type CliRunRequest,
   type CliRunResult,
   type CliAbortRequest,
+  type DeploySnapshot,
+  type DeploySaveSnapshotRequest,
+  type DeployListSnapshotsResult,
+  type DeployDeleteSnapshotRequest,
+  type DeployRollbackRequest,
+  type DeployRollbackResult,
 } from "@nango-gui/shared";
+import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -792,6 +799,68 @@ export function registerIpcHandlers(): void {
           runner.kill();
           _activeCliProcesses.delete(args.runId);
         }
+      })
+  );
+
+  // ── Deploy snapshot handlers ────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.DEPLOY_SAVE_SNAPSHOT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: DeploySaveSnapshotRequest
+    ): Promise<IpcResponse<DeploySnapshot>> =>
+      wrap(async () => deploySnapshotStore.save(args))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DEPLOY_LIST_SNAPSHOTS,
+    async (): Promise<IpcResponse<DeployListSnapshotsResult>> =>
+      wrap(async () => ({ snapshots: deploySnapshotStore.load() }))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DEPLOY_DELETE_SNAPSHOT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: DeployDeleteSnapshotRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        deploySnapshotStore.delete(args.id);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DEPLOY_ROLLBACK,
+    async (
+      event: IpcMainInvokeEvent,
+      args: DeployRollbackRequest
+    ): Promise<IpcResponse<DeployRollbackResult>> =>
+      wrap(async () => {
+        const snapshot = deploySnapshotStore.get(args.id);
+        if (!snapshot) {
+          throw new Error(`Deploy snapshot not found: ${args.id}`);
+        }
+
+        const runId = randomUUID();
+        const runner = spawnCli(
+          snapshot.cliConfig,
+          (lineEvent) => {
+            if (!event.sender.isDestroyed()) {
+              event.sender.send(IPC_CHANNELS.CLI_OUTPUT, { runId, ...lineEvent });
+            }
+          },
+          (exitEvent) => {
+            _activeCliProcesses.delete(runId);
+            if (!event.sender.isDestroyed()) {
+              event.sender.send(IPC_CHANNELS.CLI_EXIT, { runId, ...exitEvent });
+            }
+          }
+        );
+
+        _activeCliProcesses.set(runId, runner);
+        log.info(`[DEPLOY] rollback run ${runId} from snapshot ${snapshot.id} — pid ${runner.pid}`);
+        return { runId };
       })
   );
 }

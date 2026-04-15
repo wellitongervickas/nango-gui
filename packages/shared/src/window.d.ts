@@ -29,6 +29,12 @@ import type {
   CliAbortRequest,
   CliOutputEvent,
   CliExitEvent,
+  DeploySnapshot,
+  DeploySaveSnapshotRequest,
+  DeployListSnapshotsResult,
+  DeployDeleteSnapshotRequest,
+  DeployRollbackRequest,
+  DeployRollbackResult,
 } from "./ipc-channels.js";
 
 declare global {
@@ -102,6 +108,12 @@ declare global {
       removeAllOutputListeners(): void;
       /** Remove all exit listeners (call on component unmount to prevent leaks). */
       removeAllExitListeners(): void;
+    };
+    deploy: {
+      saveSnapshot(args: DeploySaveSnapshotRequest): Promise<IpcResponse<DeploySnapshot>>;
+      listSnapshots(): Promise<IpcResponse<DeployListSnapshotsResult>>;
+      deleteSnapshot(args: DeployDeleteSnapshotRequest): Promise<IpcResponse<void>>;
+      rollback(args: DeployRollbackRequest): Promise<IpcResponse<DeployRollbackResult>>;
     };
   }
 }

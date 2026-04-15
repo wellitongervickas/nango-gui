@@ -23,6 +23,9 @@ import type {
   CliAbortRequest,
   CliOutputEvent,
   CliExitEvent,
+  DeploySaveSnapshotRequest,
+  DeployDeleteSnapshotRequest,
+  DeployRollbackRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -103,6 +106,18 @@ contextBridge.exposeInMainWorld("cli", {
   /** Remove all registered CLI_EXIT listeners (call on component unmount). */
   removeAllExitListeners: () =>
     ipcRenderer.removeAllListeners(IPC_CHANNELS.CLI_EXIT),
+});
+
+// Expose window.deploy — deploy snapshot storage and rollback
+contextBridge.exposeInMainWorld("deploy", {
+  saveSnapshot: (args: DeploySaveSnapshotRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_SAVE_SNAPSHOT, args),
+  listSnapshots: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_LIST_SNAPSHOTS),
+  deleteSnapshot: (args: DeployDeleteSnapshotRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_DELETE_SNAPSHOT, args),
+  rollback: (args: DeployRollbackRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DEPLOY_ROLLBACK, args),
 });
 
 export {};

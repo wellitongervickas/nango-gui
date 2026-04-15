@@ -53,6 +53,12 @@ export const IPC_CHANNELS = {
   CLI_OUTPUT: "cli:output",
   /** Main → renderer push event: the CLI process has exited. */
   CLI_EXIT: "cli:exit",
+
+  // Deploy snapshots & rollback
+  DEPLOY_SAVE_SNAPSHOT: "deploy:saveSnapshot",
+  DEPLOY_LIST_SNAPSHOTS: "deploy:listSnapshots",
+  DEPLOY_DELETE_SNAPSHOT: "deploy:deleteSnapshot",
+  DEPLOY_ROLLBACK: "deploy:rollback",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -367,4 +373,47 @@ export interface NangoDashboardData {
   errorSyncs: number;
   recentErrors: NangoDashboardRecentError[];
   topConnections: NangoDashboardTopConnection[];
+}
+
+// ── Deploy snapshots & rollback ────────────────────────────────────────────
+
+/** The CLI configuration captured at deploy time — enough to re-run exactly. */
+export interface DeployCliConfig {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+/** A point-in-time snapshot of a successful deploy. */
+export interface DeploySnapshot {
+  id: string;
+  timestamp: string;
+  environment: NangoEnvironment;
+  cliConfig: DeployCliConfig;
+  /** Optional human-readable label (e.g. branch name, version tag). */
+  label?: string;
+}
+
+export interface DeploySaveSnapshotRequest {
+  environment: NangoEnvironment;
+  cliConfig: DeployCliConfig;
+  label?: string;
+}
+
+export interface DeployListSnapshotsResult {
+  snapshots: DeploySnapshot[];
+}
+
+export interface DeployDeleteSnapshotRequest {
+  id: string;
+}
+
+export interface DeployRollbackRequest {
+  id: string;
+}
+
+export interface DeployRollbackResult {
+  /** runId to correlate CLI_OUTPUT / CLI_EXIT stream events. */
+  runId: string;
 }

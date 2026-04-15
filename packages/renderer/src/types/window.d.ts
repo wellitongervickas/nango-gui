@@ -31,6 +31,12 @@ import type {
   AppSetEnvironmentRequest,
   AppSettings,
   AppUpdateSettingsRequest,
+  DeploySnapshot,
+  DeploySaveSnapshotRequest,
+  DeployListSnapshotsResult,
+  DeployDeleteSnapshotRequest,
+  DeployRollbackRequest,
+  DeployRollbackResult,
 } from "@nango-gui/shared";
 
 declare global {
@@ -96,6 +102,12 @@ declare global {
       setEnvironment(args: AppSetEnvironmentRequest): Promise<IpcResponse<void>>;
       getSettings(): Promise<IpcResponse<AppSettings>>;
       updateSettings(args: AppUpdateSettingsRequest): Promise<IpcResponse<void>>;
+    };
+    deploy: {
+      saveSnapshot(args: DeploySaveSnapshotRequest): Promise<IpcResponse<DeploySnapshot>>;
+      listSnapshots(): Promise<IpcResponse<DeployListSnapshotsResult>>;
+      deleteSnapshot(args: DeployDeleteSnapshotRequest): Promise<IpcResponse<void>>;
+      rollback(args: DeployRollbackRequest): Promise<IpcResponse<DeployRollbackResult>>;
     };
   }
 }
