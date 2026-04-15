@@ -254,3 +254,135 @@ models:
     expect((modelNode!.data as { fields: unknown[] }).fields).toHaveLength(2);
   });
 });
+
+// ── Edge-based model resolution tests ───────────────────────────────────
+
+describe("graphToYaml edge resolution", () => {
+  it("resolves sync output model from edge when modelRef is empty", () => {
+    const nodes = [
+      makeNode("s1", "sync", {
+        label: "Users",
+        endpoint: "/users",
+        frequency: "every 1h",
+        modelRef: "",
+      }),
+      makeNode("m1", "model", {
+        label: "User",
+        fields: [{ name: "id", type: "string", optional: false }],
+      }),
+    ];
+    const edges = [makeEdge("s1", "m1")];
+    const result = graphToYaml(baseProject, nodes, edges);
+    expect(result).toContain("output: User");
+    expect(result).not.toContain("output: Unknown");
+  });
+
+  it("resolves action input model from edge when inputModelRef is empty", () => {
+    const nodes = [
+      makeNode("m-in", "model", {
+        label: "ReqBody",
+        fields: [{ name: "name", type: "string", optional: false }],
+      }),
+      makeNode("a1", "action", {
+        label: "Create",
+        endpoint: "/create",
+        inputModelRef: "",
+        outputModelRef: "Result",
+      }),
+    ];
+    const edges = [makeEdge("m-in", "a1")];
+    const result = graphToYaml(baseProject, nodes, edges);
+    expect(result).toContain("input: ReqBody");
+  });
+
+  it("prefers explicit modelRef over edge", () => {
+    const nodes = [
+      makeNode("s1", "sync", {
+        label: "Users",
+        endpoint: "/users",
+        frequency: "every 1h",
+        modelRef: "ExplicitModel",
+      }),
+      makeNode("m1", "model", {
+        label: "EdgeModel",
+        fields: [],
+      }),
+    ];
+    const edges = [makeEdge("s1", "m1")];
+    const result = graphToYaml(baseProject, nodes, edges);
+    expect(result).toContain("output: ExplicitModel");
+  });
+
+  it("resolves webhook output from edge", () => {
+    const nodes = [
+      makeNode("w1", "webhook", {
+        label: "OnEvent",
+        endpoint: "/hook",
+        modelRef: "",
+      }),
+      makeNode("m1", "model", { label: "Event", fields: [] }),
+    ];
+    const edges = [makeEdge("w1", "m1")];
+    const result = graphToYaml(baseProject, nodes, edges);
+    expect(result).toContain("output: Event");
+  });
+});
+
+// ── Trigger node tests ──────────────────────────────────────────────────
+
+describe("graphToYaml trigger handling", () => {
+  it("overrides sync frequency from connected trigger node", () => {
+    const nodes = [
+      makeNode("t1", "trigger", {
+        label: "Fast Trigger",
+        frequency: "every 5m",
+      }),
+      makeNode("s1", "sync", {
+        label: "Users",
+        endpoint: "/users",
+        frequency: "every 1h",
+        modelRef: "User",
+      }),
+    ];
+    const edges = [makeEdge("t1", "s1")];
+    const result = graphToYaml(baseProject, nodes, edges);
+    expect(result).toContain("frequency: every 5m");
+    expect(result).not.toContain("frequency: every 1h");
+  });
+});
+
+// ── Transform node tests ────────────────────────────────────────────────
+
+describe("graphToYaml transform handling", () => {
+  it("emits transform metadata as comments", () => {
+    const nodes = [
+      makeNode("tr1", "transform", {
+        label: "MapFields",
+        inputModelRef: "RawUser",
+        outputModelRef: "User",
+        mappings: [
+          { sourceField: "full_name", targetField: "name", transform: "rename" },
+          { sourceField: "age", targetField: "age", transform: "direct" },
+        ],
+      }),
+    ];
+    const result = graphToYaml(baseProject, nodes, []);
+    expect(result).toContain("# transform: MapFields");
+    expect(result).toContain("RawUser → User");
+    expect(result).toContain("full_name → name [rename]");
+    expect(result).toContain("age → age [direct]");
+  });
+
+  it("omits transform section when no transforms exist", () => {
+    const nodes = [
+      makeNode("s1", "sync", {
+        label: "Users",
+        endpoint: "/users",
+        frequency: "every 1h",
+        modelRef: "User",
+      }),
+    ];
+    const result = graphToYaml(baseProject, nodes, []);
+    expect(result).not.toContain("# transform:");
+  });
+});

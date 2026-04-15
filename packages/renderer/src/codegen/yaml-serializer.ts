@@ -4,7 +4,9 @@ import type {
   SyncNodeData,
   ActionNodeData,
   ModelNodeData,
+  TriggerNodeData,
   WebhookNodeData,
+  TransformNodeData,
   NangoProject,
   ModelField,
 } from "../types/flow";
@@ -17,15 +19,53 @@ import type {
   NangoYamlIntegration,
 } from "./yaml-schema";
 
+// ── Edge helpers ────────────────────────────────────────────────────────
+
+/** Find all nodes connected as targets from the given source. */
+function connectedTargets(nodeId: string, edges: Edge[], nodes: Node[]): Node[] {
+  const targetIds = edges.filter((e) => e.source === nodeId).map((e) => e.target);
+  return nodes.filter((n) => targetIds.includes(n.id));
+}
+
+/** Find all nodes connected as sources to the given target. */
+function connectedSources(nodeId: string, edges: Edge[], nodes: Node[]): Node[] {
+  const sourceIds = edges.filter((e) => e.target === nodeId).map((e) => e.source);
+  return nodes.filter((n) => sourceIds.includes(n.id));
+}
+
+/**
+ * Resolve the output model label for a node.
+ * Prefers the explicit modelRef from data, falls back to the first
+ * connected model node found via edges.
+ */
+function resolveModelRef(
+  nodeId: string,
+  explicitRef: string | undefined,
+  edges: Edge[],
+  nodes: Node[],
+): string {
+  if (explicitRef) return explicitRef;
+  const targets = connectedTargets(nodeId, edges, nodes);
+  const sources = connectedSources(nodeId, edges, nodes);
+  const connected = [...targets, ...sources];
+  const model = connected.find((n) => n.type === "model");
+  if (model) return (model.data as unknown as ModelNodeData).label || model.id;
+  return "Unknown";
+}
+
 // ── Graph → YAML ────────────────────────────────────────────────────────
 
 /**
  * Convert the visual graph + project config into a valid `nango.yaml` string.
+ *
+ * This transpiler walks the graph, resolves node connections via edges,
+ * and emits valid Nango YAML covering syncs, actions, webhooks, and models.
+ * Transform and trigger nodes contribute metadata annotations.
  */
 export function graphToYaml(
   project: NangoProject,
   nodes: Node[],
-  _edges: Edge[],
+  edges: Edge[],
 ): string {
   const provider = project.provider || "unknown";
   const integration: NangoYamlIntegration = {};
@@ -50,13 +90,23 @@ export function graphToYaml(
     for (const node of syncNodes) {
       const d = node.data as unknown as SyncNodeData;
       const name = d.label || node.id;
+      const output = resolveModelRef(node.id, d.modelRef, edges, nodes);
       const entry: NangoYamlSync = {
         endpoint: d.endpoint || "/",
         frequency: d.frequency || "every 1h",
-        output: d.modelRef || "Unknown",
+        output,
       };
       if (d.description) entry.description = d.description;
       if (d.method && d.method !== "GET") entry.method = d.method;
+
+      // Check for connected trigger node → override frequency/auto_start
+      const sources = connectedSources(node.id, edges, nodes);
+      const trigger = sources.find((n) => n.type === "trigger");
+      if (trigger) {
+        const td = trigger.data as unknown as TriggerNodeData;
+        if (td.frequency) entry.frequency = td.frequency;
+      }
+
       integration.syncs[name] = entry;
     }
   }
@@ -68,13 +118,25 @@ export function graphToYaml(
     for (const node of actionNodes) {
       const d = node.data as unknown as ActionNodeData;
       const name = d.label || node.id;
+
+      // Resolve output model: explicit ref → edge-connected model
+      const output = resolveModelRef(node.id, d.outputModelRef, edges, nodes);
+
+      // Resolve input model: explicit ref → edge-connected model from sources
+      let input = d.inputModelRef || "";
+      if (!input) {
+        const sources = connectedSources(node.id, edges, nodes);
+        const inputModel = sources.find((n) => n.type === "model");
+        if (inputModel) input = (inputModel.data as unknown as ModelNodeData).label || "";
+      }
+
       const entry: NangoYamlAction = {
         endpoint: d.endpoint || "/",
-        output: d.outputModelRef || "Unknown",
+        output,
       };
       if (d.description) entry.description = d.description;
       if (d.method && d.method !== "POST") entry.method = d.method;
-      if (d.inputModelRef) entry.input = d.inputModelRef;
+      if (input) entry.input = input;
       integration.actions[name] = entry;
     }
   }
@@ -86,9 +148,10 @@ export function graphToYaml(
     for (const node of webhookNodes) {
       const d = node.data as unknown as WebhookNodeData;
       const name = d.label || node.id;
+      const output = resolveModelRef(node.id, d.modelRef, edges, nodes);
       const entry: NangoYamlWebhook = {
         endpoint: d.endpoint || "/",
-        output: d.modelRef || "Unknown",
+        output,
       };
       if (d.description) entry.description = d.description;
       if (d.method) entry.method = d.method;
@@ -101,7 +164,7 @@ export function graphToYaml(
     models,
   };
 
-  return yaml.dump(doc, {
+  let output = yaml.dump(doc, {
     indent: 2,
     lineWidth: 120,
     noRefs: true,
@@ -109,6 +172,26 @@ export function graphToYaml(
     quotingType: "'",
     forceQuotes: false,
   });
+
+  // Append transform metadata as comments (not part of nango.yaml spec,
+  // but preserved for round-trip fidelity in the GUI).
+  const transforms = nodes.filter((n) => n.type === "transform");
+  if (transforms.length > 0) {
+    output += "\n# ── Transform mappings (GUI metadata) ──\n";
+    for (const node of transforms) {
+      const d = node.data as unknown as TransformNodeData;
+      const name = d.label || node.id;
+      output += `# transform: ${name}`;
+      if (d.inputModelRef || d.outputModelRef)
+        output += ` (${d.inputModelRef || "?"} → ${d.outputModelRef || "?"})`;
+      output += "\n";
+      for (const m of d.mappings ?? []) {
+        output += `#   ${m.sourceField} → ${m.targetField} [${m.transform}]\n`;
+      }
+    }
+  }
+
+  return output;
 }
 
 // ── YAML → Graph-compatible data ────────────────────────────────────────
