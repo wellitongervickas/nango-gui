@@ -47,9 +47,11 @@ useFlowStore.subscribe(
   },
 );
 
+const EMPTY: ValidationDiagnostic[] = [];
+
 /** Convenience selector: get diagnostics for a specific node. */
 export function useNodeDiagnostics(
   nodeId: string,
 ): ValidationDiagnostic[] {
-  return useValidationStore((s) => s.byNode.get(nodeId) ?? []);
+  return useValidationStore((s) => s.byNode.get(nodeId) ?? EMPTY);
 }
