@@ -1,4 +1,5 @@
 import type { SyncNodeData } from "../../types/flow";
+import { FunctionCodeViewer } from "./FunctionCodeViewer";
 
 interface Props {
   data: SyncNodeData;
@@ -102,6 +103,8 @@ export function SyncProperties({ data, onUpdate }: Props) {
           placeholder="Model name"
         />
       </Field>
+
+      <FunctionCodeViewer nodeType="sync" data={data} />
     </div>
   );
 }

@@ -294,6 +294,32 @@ export default async function runAction(nango: NangoAction${inputParam ? `, ${in
 `;
 }
 
+// ── Single-node code generation ─────────────────────────────────────
+
+/**
+ * Generate the TypeScript handler source for a single sync or action node.
+ * Returns `null` for unsupported node types.
+ */
+export function generateFunctionCode(
+  nodeType: string,
+  nodeData: SyncNodeData | ActionNodeData,
+  modelNodes: Node[],
+): string | null {
+  const modelMap = new Map<string, ModelField[]>();
+  for (const node of modelNodes) {
+    const d = node.data as unknown as ModelNodeData;
+    modelMap.set(d.label, d.fields ?? []);
+  }
+
+  if (nodeType === "sync") {
+    return emitSyncHandler(nodeData as SyncNodeData, modelMap);
+  }
+  if (nodeType === "action") {
+    return emitActionHandler(nodeData as ActionNodeData, modelMap);
+  }
+  return null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Convert a user-facing label to a valid TypeScript identifier (PascalCase). */
@@ -306,7 +332,7 @@ function toTypeName(label: string): string {
 }
 
 /** Convert a user-facing label to a kebab-case filename. */
-function toFileName(label: string): string {
+export function toFileName(label: string): string {
   return label
     .replace(/[^a-zA-Z0-9\s_-]/g, "")
     .trim()

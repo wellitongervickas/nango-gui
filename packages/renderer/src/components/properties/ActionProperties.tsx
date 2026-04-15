@@ -1,4 +1,5 @@
 import type { ActionNodeData } from "../../types/flow";
+import { FunctionCodeViewer } from "./FunctionCodeViewer";
 
 interface Props {
   data: ActionNodeData;
@@ -86,6 +87,8 @@ export function ActionProperties({ data, onUpdate }: Props) {
           placeholder="Output model name"
         />
       </Field>
+
+      <FunctionCodeViewer nodeType="action" data={data} />
     </div>
   );
 }
