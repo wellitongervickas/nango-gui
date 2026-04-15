@@ -1,4 +1,4 @@
-import { ipcMain, app } from "electron";
+import { ipcMain, app, type IpcMainInvokeEvent } from "electron";
 import log from "./logger.js";
 import {
   IPC_CHANNELS,
@@ -183,16 +183,16 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_LIST_CONNECTIONS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args?: NangoListConnectionsRequest
     ): Promise<IpcResponse<NangoConnectionSummary[]>> =>
       wrap(async () => {
         const client = getNangoClient();
-        const result = await client.listConnections(
-          args?.integrationId
+        const result = await client.listConnections({
+          ...(args?.integrationId
             ? { integrationId: args.integrationId }
-            : {}
-        );
+            : {}),
+        });
         return result.connections.map(toConnectionSummary);
       })
   );
@@ -200,7 +200,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_GET_CONNECTION,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoGetConnectionRequest
     ): Promise<IpcResponse<NangoConnectionDetail>> =>
       wrap(async () => {
@@ -216,7 +216,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_DELETE_CONNECTION,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoDeleteConnectionRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -228,7 +228,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_VALIDATE_KEY,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoValidateKeyRequest
     ): Promise<IpcResponse<NangoValidateKeyResult>> =>
       wrap(async () => {
@@ -240,7 +240,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_CREATE_CONNECT_SESSION,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoCreateConnectSessionRequest
     ): Promise<IpcResponse<NangoCreateConnectSessionResult>> =>
       wrap(async () => {
@@ -273,7 +273,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_LIST_PROVIDERS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args?: NangoListProvidersRequest
     ): Promise<IpcResponse<NangoProvider[]>> =>
       wrap(async () => {
@@ -307,7 +307,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_GET_PROVIDER,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoGetProviderRequest
     ): Promise<IpcResponse<NangoProvider>> =>
       wrap(async () => {
@@ -330,7 +330,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_LIST_SYNCS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoListSyncsRequest
     ): Promise<IpcResponse<NangoSyncRecord[]>> =>
       wrap(async () => {
@@ -351,7 +351,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_GET_SYNC_STATUS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoGetSyncStatusRequest
     ): Promise<IpcResponse<NangoSyncRecord[]>> =>
       wrap(async () => {
@@ -372,7 +372,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_TRIGGER_SYNC,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoTriggerSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -392,7 +392,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_PAUSE_SYNC,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoPauseSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -411,7 +411,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_START_SYNC,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoStartSyncRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -432,7 +432,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_LIST_RECORDS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoListRecordsRequest
     ): Promise<IpcResponse<NangoListRecordsResult>> =>
       wrap(async () => {
@@ -462,7 +462,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_TRIGGER_ACTION,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoTriggerActionRequest
     ): Promise<IpcResponse<NangoTriggerActionResult>> =>
       wrap(async () => {
@@ -482,7 +482,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.NANGO_PROXY_REQUEST,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoProxyRequest
     ): Promise<IpcResponse<NangoProxyResult>> =>
       wrap(async () => {
@@ -646,7 +646,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.CREDENTIALS_SAVE,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: CredentialsSaveRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -674,7 +674,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.CREDENTIALS_VALIDATE,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: NangoValidateKeyRequest
     ): Promise<IpcResponse<NangoValidateKeyResult>> =>
       wrap(async () => {
@@ -696,7 +696,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.APP_SET_ENVIRONMENT,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: AppSetEnvironmentRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
@@ -722,7 +722,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.APP_UPDATE_SETTINGS,
     async (
-      _event,
+      _event: IpcMainInvokeEvent,
       args: AppUpdateSettingsRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
