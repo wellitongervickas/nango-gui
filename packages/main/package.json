@@ -11,7 +11,8 @@
     "./nango-client.js": "./src/nango-client.ts",
     "./logger.js": "./src/logger.ts",
     "./auto-updater.js": "./src/auto-updater.ts",
-    "./cli-runner.js": "./src/cli-runner.ts"
+    "./cli-runner.js": "./src/cli-runner.ts",
+    "./webhook-server.js": "./src/webhook-server.ts"
   },
   "dependencies": {
     "@nango-gui/shared": "workspace:*",

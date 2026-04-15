@@ -46,6 +46,11 @@ import type {
   CliAbortRequest,
   CliOutputEvent,
   CliExitEvent,
+  WebhookStartServerRequest,
+  WebhookStartServerResult,
+  WebhookServerStatus,
+  WebhookGetEventsResult,
+  WebhookEvent,
 } from "@nango-gui/shared";
 
 declare global {
@@ -132,6 +137,15 @@ declare global {
       showDirectoryDialog(): Promise<IpcResponse<ProjectFileDialogResult>>;
       readFile(args: ProjectReadFileRequest): Promise<IpcResponse<ProjectReadFileResult>>;
       writeFile(args: ProjectWriteFileRequest): Promise<IpcResponse<void>>;
+    };
+    webhook: {
+      startServer(args?: WebhookStartServerRequest): Promise<IpcResponse<WebhookStartServerResult>>;
+      stopServer(): Promise<IpcResponse<void>>;
+      getStatus(): Promise<IpcResponse<WebhookServerStatus>>;
+      getEvents(): Promise<IpcResponse<WebhookGetEventsResult>>;
+      clearEvents(): Promise<IpcResponse<void>>;
+      onEvent(listener: (event: WebhookEvent) => void): void;
+      removeAllEventListeners(): void;
     };
   }
 }

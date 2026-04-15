@@ -66,6 +66,15 @@ export const IPC_CHANNELS = {
   PROJECT_SHOW_DIRECTORY_DIALOG: "project:showDirectoryDialog",
   PROJECT_READ_FILE: "project:readFile",
   PROJECT_WRITE_FILE: "project:writeFile",
+
+  // Webhook listener
+  WEBHOOK_START_SERVER: "webhook:startServer",
+  WEBHOOK_STOP_SERVER: "webhook:stopServer",
+  WEBHOOK_GET_STATUS: "webhook:getStatus",
+  WEBHOOK_GET_EVENTS: "webhook:getEvents",
+  WEBHOOK_CLEAR_EVENTS: "webhook:clearEvents",
+  /** Main → renderer push event: a new incoming webhook was received. */
+  WEBHOOK_EVENT: "webhook:event",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -443,4 +452,37 @@ export interface ProjectWriteFileRequest {
 
 export interface ProjectReadFileResult {
   data: string;
+}
+
+// ── Webhook listener ──────────────────────────────────────────────────────────
+
+export interface WebhookStartServerRequest {
+  /** Local port to listen on. Defaults to 3456 if omitted. */
+  port?: number;
+}
+
+export interface WebhookStartServerResult {
+  port: number;
+  url: string;
+}
+
+export interface WebhookServerStatus {
+  running: boolean;
+  port: number | null;
+  url: string | null;
+  eventCount: number;
+}
+
+export interface WebhookEvent {
+  id: string;
+  timestamp: string;
+  method: string;
+  path: string;
+  query: Record<string, string>;
+  headers: Record<string, string>;
+  body: unknown;
+}
+
+export interface WebhookGetEventsResult {
+  events: WebhookEvent[];
 }

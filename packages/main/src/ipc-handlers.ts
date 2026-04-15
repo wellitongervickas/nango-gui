@@ -51,7 +51,12 @@ import {
   type ProjectReadFileRequest,
   type ProjectReadFileResult,
   type ProjectWriteFileRequest,
+  type WebhookStartServerRequest,
+  type WebhookStartServerResult,
+  type WebhookServerStatus,
+  type WebhookGetEventsResult,
 } from "@nango-gui/shared";
+import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import {
   getNangoClient,
@@ -944,6 +949,56 @@ export function registerIpcHandlers(): void {
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
         await writeFile(args.filePath, args.data, "utf-8");
+      })
+  );
+
+  // ── Webhook listener handlers ───────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.WEBHOOK_START_SERVER,
+    async (
+      _event: IpcMainInvokeEvent,
+      args?: WebhookStartServerRequest
+    ): Promise<IpcResponse<WebhookStartServerResult>> =>
+      wrap(async () => {
+        const result = await webhookServer.start(args?.port);
+        log.info(`[IPC] Webhook server started on port ${result.port}`);
+        return result;
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WEBHOOK_STOP_SERVER,
+    async (): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        await webhookServer.stop();
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WEBHOOK_GET_STATUS,
+    async (): Promise<IpcResponse<WebhookServerStatus>> =>
+      wrap(async () => ({
+        running: webhookServer.isRunning,
+        port: webhookServer.currentPort,
+        url: webhookServer.currentPort
+          ? `http://127.0.0.1:${webhookServer.currentPort}`
+          : null,
+        eventCount: webhookServer.eventCount,
+      }))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WEBHOOK_GET_EVENTS,
+    async (): Promise<IpcResponse<WebhookGetEventsResult>> =>
+      wrap(async () => ({ events: webhookServer.getEvents() }))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.WEBHOOK_CLEAR_EVENTS,
+    async (): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        webhookServer.clearEvents();
       })
   );
 }

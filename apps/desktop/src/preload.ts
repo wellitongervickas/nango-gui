@@ -28,6 +28,8 @@ import type {
   DeployRollbackRequest,
   ProjectReadFileRequest,
   ProjectWriteFileRequest,
+  WebhookStartServerRequest,
+  WebhookEvent,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -134,6 +136,23 @@ contextBridge.exposeInMainWorld("project", {
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_READ_FILE, args),
   writeFile: (args: ProjectWriteFileRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.PROJECT_WRITE_FILE, args),
+});
+
+// Expose window.webhook — local HTTP webhook listener
+contextBridge.exposeInMainWorld("webhook", {
+  startServer: (args?: WebhookStartServerRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.WEBHOOK_START_SERVER, args),
+  stopServer: () => ipcRenderer.invoke(IPC_CHANNELS.WEBHOOK_STOP_SERVER),
+  getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.WEBHOOK_GET_STATUS),
+  getEvents: () => ipcRenderer.invoke(IPC_CHANNELS.WEBHOOK_GET_EVENTS),
+  clearEvents: () => ipcRenderer.invoke(IPC_CHANNELS.WEBHOOK_CLEAR_EVENTS),
+  onEvent: (listener: (event: WebhookEvent) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.WEBHOOK_EVENT, (_evt, data: WebhookEvent) =>
+      listener(data)
+    );
+  },
+  removeAllEventListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.WEBHOOK_EVENT),
 });
 
 export {};
