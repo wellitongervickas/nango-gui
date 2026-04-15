@@ -5,6 +5,7 @@ import { ModelProperties } from "./ModelProperties";
 import { TriggerProperties } from "./TriggerProperties";
 import { WebhookProperties } from "./WebhookProperties";
 import { TransformProperties } from "./TransformProperties";
+import { IntegrationProperties } from "./IntegrationProperties";
 import type {
   SyncNodeData,
   ActionNodeData,
@@ -21,13 +22,15 @@ export function PropertiesPanel() {
 
   if (!selectedNodeId) {
     return (
-      <aside className="w-[360px] shrink-0 bg-[var(--color-surface)] border-l border-[var(--color-border)] flex flex-col p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
-          Properties
-        </h2>
-        <p className="text-xs text-[var(--color-text-muted)] mt-3">
-          Select a node to view and edit its properties.
-        </p>
+      <aside className="w-[360px] shrink-0 bg-[var(--color-surface)] border-l border-[var(--color-border)] flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-[var(--color-border)] shrink-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
+            Integration Settings
+          </h2>
+        </div>
+        <div className="p-4 flex-1 overflow-y-auto">
+          <IntegrationProperties />
+        </div>
       </aside>
     );
   }

@@ -63,9 +63,20 @@ export interface FieldMappingEdgeData {
   expanded: boolean;
 }
 
+export type NangoAuthType = "oauth2" | "api_key" | "basic" | "none";
+export type NangoEnvironment = "development" | "production";
+
+export interface NangoErrorHandling {
+  retryOn: ("4xx" | "5xx" | "timeout" | "network")[];
+  maxRetries: number;
+}
+
 export interface NangoProject {
   name: string;
   provider: string;
+  authType: NangoAuthType;
+  environment: NangoEnvironment;
+  errorHandling: NangoErrorHandling;
   filePath: string | null;
   lastSaved: string | null;
 }
