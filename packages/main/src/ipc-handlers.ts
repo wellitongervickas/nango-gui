@@ -298,7 +298,8 @@ export function registerIpcHandlers(): void {
         // Refresh cache if stale or forced by a search term.
         if (!_providersCache || now - _providersCacheAt > PROVIDERS_TTL_MS) {
           const client = getNangoClient();
-          const result = await client.listProviders({ search: args?.search ?? "" });
+          const search = args?.search?.trim() || undefined;
+          const result = await client.listProviders(search ? { search } : {});
           _providersCache = (result.data as NangoProvider[]).map((p) => ({
             name: p.name,
             display_name: p.display_name,
