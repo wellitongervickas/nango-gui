@@ -25,8 +25,17 @@ interface ConnectModalProps {
 export function ConnectModal({ onConnected, onClose, children }: ConnectModalProps) {
   const [state, setState] = useState<ConnectState>({ kind: "idle" });
   const connectUIRef = useRef<ConnectUI | null>(null);
+  const closedRef = useRef(false);
   const fetchConnections = useConnectionsStore((s) => s.fetchConnections);
   const addConnection = useConnectionsStore((s) => s.addConnection);
+
+  const forceClose = useCallback(() => {
+    connectUIRef.current?.close();
+    connectUIRef.current = null;
+    closedRef.current = true;
+    setState({ kind: "idle" });
+    onClose?.();
+  }, [onClose]);
 
   // Clean up the Connect UI instance on unmount.
   useEffect(() => {
@@ -39,6 +48,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
     async (event: ConnectUIEvent) => {
       switch (event.type) {
         case "close":
+          closedRef.current = true;
           setState({ kind: "idle" });
           connectUIRef.current?.close();
           connectUIRef.current = null;
@@ -57,6 +67,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
             metadata: null,
           });
           await fetchConnections();
+          closedRef.current = true;
           setState({ kind: "idle" });
           connectUIRef.current?.close();
           connectUIRef.current = null;
@@ -65,6 +76,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
         }
 
         case "error":
+          closedRef.current = true;
           setState({ kind: "error", message: event.payload.errorMessage });
           connectUIRef.current?.close();
           connectUIRef.current = null;
@@ -78,6 +90,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
   );
 
   const open = useCallback(async () => {
+    closedRef.current = false;
     setState({ kind: "loading" });
 
     try {
@@ -91,11 +104,20 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
         return;
       }
 
+      // Guard: if the user cancelled while the session was being created,
+      // don't open the Connect UI.
+      if (closedRef.current) return;
+
       const nango = new Nango({ connectSessionToken: res.data.token });
       const connectUI = nango.openConnectUI({ onEvent: handleEvent });
       connectUIRef.current = connectUI;
       connectUI.open();
-      setState({ kind: "open" });
+
+      // Guard: if a close/error event already fired synchronously during
+      // open(), don't overwrite the resulting state.
+      if (!closedRef.current) {
+        setState({ kind: "open" });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to open Connect UI";
       setState({ kind: "error", message });
@@ -105,6 +127,18 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
   return (
     <>
       {children({ open, isLoading: state.kind === "loading" })}
+
+      {/* Cancel overlay — visible during loading & open states */}
+      {(state.kind === "loading" || state.kind === "open") && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-6 pointer-events-none">
+          <button
+            onClick={forceClose}
+            className="pointer-events-auto px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] text-[var(--color-text-primary)] shadow-lg hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+          >
+            Cancel connection
+          </button>
+        </div>
+      )}
 
       {state.kind === "error" && (
         <div
