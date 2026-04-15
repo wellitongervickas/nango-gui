@@ -4,12 +4,14 @@ import { ActionProperties } from "./ActionProperties";
 import { ModelProperties } from "./ModelProperties";
 import { TriggerProperties } from "./TriggerProperties";
 import { WebhookProperties } from "./WebhookProperties";
+import { TransformProperties } from "./TransformProperties";
 import type {
   SyncNodeData,
   ActionNodeData,
   ModelNodeData,
   TriggerNodeData,
   WebhookNodeData,
+  TransformNodeData,
 } from "../../types/flow";
 
 export function PropertiesPanel() {
@@ -75,6 +77,12 @@ export function PropertiesPanel() {
         {node.type === "webhook" && (
           <WebhookProperties
             data={node.data as unknown as WebhookNodeData}
+            onUpdate={handleUpdate}
+          />
+        )}
+        {node.type === "transform" && (
+          <TransformProperties
+            data={node.data as unknown as TransformNodeData}
             onUpdate={handleUpdate}
           />
         )}

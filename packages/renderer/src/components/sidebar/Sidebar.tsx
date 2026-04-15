@@ -37,6 +37,12 @@ const NODE_TEMPLATES: {
     color: "var(--color-webhook)",
     description: "HTTP-event entry point",
   },
+  {
+    type: "transform",
+    label: "Transform",
+    color: "var(--color-transform)",
+    description: "Map fields between models",
+  },
 ];
 
 export function Sidebar() {

@@ -17,6 +17,7 @@ import { ActionNode } from "./nodes/ActionNode";
 import { ModelNode } from "./nodes/ModelNode";
 import { TriggerNode } from "./nodes/TriggerNode";
 import { WebhookNode } from "./nodes/WebhookNode";
+import { TransformNode } from "./nodes/TransformNode";
 import type { NangoNodeType } from "../../types/flow";
 
 const nodeTypes: NodeTypes = {
@@ -25,6 +26,7 @@ const nodeTypes: NodeTypes = {
   model: ModelNode,
   trigger: TriggerNode,
   webhook: WebhookNode,
+  transform: TransformNode,
 };
 
 interface ContextMenu {
