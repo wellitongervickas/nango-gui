@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { useFlowStore } from "../../store/flowStore";
+import { useCodePanelStore } from "../../store/codePanelStore";
 import { cn } from "../../lib/utils";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 
@@ -111,6 +112,8 @@ export function Toolbar() {
   const setProject = useProjectStore((s) => s.setProject);
   const updateProject = useProjectStore((s) => s.updateProject);
   const markClean = useProjectStore((s) => s.markClean);
+  const codePanelOpen = useCodePanelStore((s) => s.isOpen);
+  const toggleCodePanel = useCodePanelStore((s) => s.toggle);
   const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
@@ -288,6 +291,17 @@ export function Toolbar() {
           </button>
           <button className="px-3 py-1.5 text-xs rounded-md bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer">
             Deploy
+          </button>
+          <button
+            onClick={toggleCodePanel}
+            className={cn(
+              "px-3 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
+              codePanelOpen
+                ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+                : "bg-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-text-muted)]/20"
+            )}
+          >
+            Code
           </button>
         </>
       )}
