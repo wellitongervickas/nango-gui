@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@nango-gui/main": "workspace:*",
-    "@nango-gui/shared": "workspace:*"
+    "@nango-gui/shared": "workspace:*",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

@@ -50,6 +50,9 @@ importers:
       '@nango-gui/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      electron-updater:
+        specifier: ^6.8.3
+        version: 6.8.3
     devDependencies:
       '@types/node':
         specifier: ^22.15.3
