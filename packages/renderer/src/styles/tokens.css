@@ -4,22 +4,22 @@
   --color-brand-400: #8B5CF6;
   --color-brand-600: #6D28D9;
 
-  /* Background */
-  --color-bg-base:    #0F0F11;
-  --color-bg-surface: #1A1A1F;
-  --color-bg-raised:  #242429;
-  --color-bg-overlay: #2E2E35;
+  /* Background — light mode */
+  --color-bg-base:    #FAFAFA;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-raised:  #F3F3F8;
+  --color-bg-overlay: #EBEBF5;
 
-  /* Border */
-  --color-border-subtle: #2E2E35;
-  --color-border-base:   #3A3A42;
+  /* Border — light mode */
+  --color-border-subtle: #E8E8EE;
+  --color-border-base:   #D0D0DA;
   --color-border-focus:  #7C3AED;
 
-  /* Text */
-  --color-text-primary:   #F5F5F7;
-  --color-text-secondary: #9999A8;
-  --color-text-disabled:  #555560;
-  --color-text-inverse:   #0F0F11;
+  /* Text — light mode */
+  --color-text-primary:   #0F0F11;
+  --color-text-secondary: #555566;
+  --color-text-disabled:  #AAAABC;
+  --color-text-inverse:   #F5F5F7;
 
   /* Semantic */
   --color-success: #22C55E;
@@ -49,4 +49,22 @@
   --color-trigger:    var(--color-node-trigger);
   --color-webhook:    var(--color-node-webhook);
   --color-transform:  var(--color-node-transform);
+}
+
+.dark {
+  /* Background — dark mode */
+  --color-bg-base:    #0F0F11;
+  --color-bg-surface: #1A1A1F;
+  --color-bg-raised:  #242429;
+  --color-bg-overlay: #2E2E35;
+
+  /* Border — dark mode */
+  --color-border-subtle: #2E2E35;
+  --color-border-base:   #3A3A42;
+
+  /* Text — dark mode */
+  --color-text-primary:   #F5F5F7;
+  --color-text-secondary: #9999A8;
+  --color-text-disabled:  #555560;
+  --color-text-inverse:   #0F0F11;
 }
