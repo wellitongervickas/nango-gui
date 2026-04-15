@@ -261,6 +261,11 @@ export function Toolbar() {
           onClick={() => navigate("webhooks")}
         />
         <NavButton
+          label="Deploys"
+          active={currentRoute === "deploys"}
+          onClick={() => navigate("deploys")}
+        />
+        <NavButton
           label="Settings"
           active={currentRoute === "settings"}
           onClick={() => navigate("settings")}

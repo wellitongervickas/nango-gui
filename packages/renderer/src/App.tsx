@@ -23,6 +23,7 @@ import { RecordsPage } from "./pages/RecordsPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
+import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { applyTheme } from "./store/settingsStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
@@ -185,6 +186,24 @@ function App() {
           <main className="flex-1 relative overflow-hidden">
             <PageErrorBoundary pageName="Webhooks">
               <WebhooksPage />
+            </PageErrorBoundary>
+          </main>
+        </div>
+        <StatusBar />
+        <ErrorToasts />
+      </div>
+    );
+  }
+
+  if (route === "deploys") {
+    return (
+      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+        <OfflineBanner />
+        <Toolbar />
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 relative overflow-hidden">
+            <PageErrorBoundary pageName="Deploy History">
+              <DeployHistoryPage />
             </PageErrorBoundary>
           </main>
         </div>
