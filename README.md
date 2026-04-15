@@ -90,6 +90,10 @@ pnpm test
 
 Pull requests to `main` trigger CI automatically (typecheck, lint, test with coverage).
 
+## Versioning and Releases
+
+See [VERSIONING.md](VERSIONING.md) for the full versioning policy, release types (patch / minor / major), and step-by-step release process.
+
 ## License
 
 MIT
