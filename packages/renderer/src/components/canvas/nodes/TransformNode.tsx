@@ -1,5 +1,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { TransformNodeData } from "../../../types/flow";
+import { NodeValidationIndicator } from "../NodeValidationIndicator";
 
 const TRANSFORM_LABELS: Record<string, string> = {
   direct: "=",
@@ -8,13 +9,14 @@ const TRANSFORM_LABELS: Record<string, string> = {
   template: "Tmpl",
 };
 
-export function TransformNode({ data, selected }: NodeProps) {
+export function TransformNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as TransformNodeData;
   const mappings = d.mappings ?? [];
 
   return (
     <div
       style={{
+        position: "relative",
         width: 260,
         background: "var(--color-bg-surface)",
         border: selected
@@ -25,6 +27,7 @@ export function TransformNode({ data, selected }: NodeProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
       }}
     >
+      <NodeValidationIndicator nodeId={id} />
       <div
         style={{
           backgroundColor: "var(--color-node-transform)",

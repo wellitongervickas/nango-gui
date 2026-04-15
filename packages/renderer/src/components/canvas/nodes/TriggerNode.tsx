@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { TriggerNodeData } from "../../../types/flow";
+import { NodeValidationIndicator } from "../NodeValidationIndicator";
 
-export function TriggerNode({ data, selected }: NodeProps) {
+export function TriggerNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as TriggerNodeData;
   return (
     <div
       style={{
+        position: "relative",
         width: 220,
         background: "var(--color-bg-surface)",
         border: selected
@@ -16,6 +18,7 @@ export function TriggerNode({ data, selected }: NodeProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
       }}
     >
+      <NodeValidationIndicator nodeId={id} />
       <div
         style={{
           backgroundColor: "var(--color-node-trigger)",

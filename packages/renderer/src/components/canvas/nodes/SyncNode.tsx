@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { SyncNodeData } from "../../../types/flow";
+import { NodeValidationIndicator } from "../NodeValidationIndicator";
 
-export function SyncNode({ data, selected }: NodeProps) {
+export function SyncNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as SyncNodeData;
   return (
     <div
       style={{
+        position: "relative",
         width: 220,
         background: "var(--color-bg-surface)",
         border: selected
@@ -16,6 +18,7 @@ export function SyncNode({ data, selected }: NodeProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
       }}
     >
+      <NodeValidationIndicator nodeId={id} />
       {/* Colored header band */}
       <div
         style={{

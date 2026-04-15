@@ -31,6 +31,7 @@ interface FlowState {
   removeNode: (id: string) => void;
   duplicateNode: (id: string) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
+  updateEdgeData: (id: string, data: Record<string, unknown>) => void;
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
@@ -93,6 +94,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       nodes: get().nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, ...data } } : n,
+      ),
+    });
+  },
+
+  updateEdgeData: (id, data) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === id ? { ...e, data: { ...e.data, ...data } } : e,
       ),
     });
   },

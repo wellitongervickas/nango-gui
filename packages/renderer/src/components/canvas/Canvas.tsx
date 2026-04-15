@@ -8,17 +8,20 @@ import {
   type Edge,
   type Connection,
   type NodeTypes,
+  type EdgeTypes,
   type Node,
 } from "@xyflow/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFlowStore } from "../../store/flowStore";
+import "../../store/validationStore"; // activate validation subscription
 import { SyncNode } from "./nodes/SyncNode";
 import { ActionNode } from "./nodes/ActionNode";
 import { ModelNode } from "./nodes/ModelNode";
 import { TriggerNode } from "./nodes/TriggerNode";
 import { WebhookNode } from "./nodes/WebhookNode";
 import { TransformNode } from "./nodes/TransformNode";
-import type { NangoNodeType } from "../../types/flow";
+import { FieldMappingEdge } from "./edges/FieldMappingEdge";
+import type { NangoNodeType, TransformNodeData } from "../../types/flow";
 
 const nodeTypes: NodeTypes = {
   sync: SyncNode,
@@ -27,6 +30,10 @@ const nodeTypes: NodeTypes = {
   trigger: TriggerNode,
   webhook: WebhookNode,
   transform: TransformNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  fieldMapping: FieldMappingEdge,
 };
 
 interface ContextMenu {
@@ -41,7 +48,7 @@ export function Canvas() {
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
+    onConnect: storeOnConnect,
     addNode,
     removeNode,
     duplicateNode,
@@ -51,6 +58,33 @@ export function Canvas() {
     redo,
     pushHistory,
   } = useFlowStore();
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      const src = nodes.find((n) => n.id === connection.source);
+      const tgt = nodes.find((n) => n.id === connection.target);
+      const involvesTransform = src?.type === "transform" || tgt?.type === "transform";
+
+      if (involvesTransform) {
+        const transformNode = src?.type === "transform" ? src : tgt;
+        const td = transformNode?.data as unknown as TransformNodeData | undefined;
+        pushHistory();
+        const edge: Edge = {
+          id: `e-${connection.source}-${connection.target}`,
+          source: connection.source!,
+          target: connection.target!,
+          sourceHandle: connection.sourceHandle,
+          targetHandle: connection.targetHandle,
+          type: "fieldMapping",
+          data: { mappings: td?.mappings ?? [], expanded: false },
+        };
+        useFlowStore.setState((s) => ({ edges: [...s.edges, edge] }));
+      } else {
+        storeOnConnect(connection);
+      }
+    },
+    [nodes, storeOnConnect, pushHistory],
+  );
 
   const { screenToFlowPosition } = useReactFlow();
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -159,6 +193,7 @@ export function Canvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         isValidConnection={isValidConnection}
         onDragOver={onDragOver}
         onDrop={onDrop}

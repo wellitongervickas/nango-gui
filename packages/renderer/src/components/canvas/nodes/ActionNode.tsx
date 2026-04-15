@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ActionNodeData } from "../../../types/flow";
+import { NodeValidationIndicator } from "../NodeValidationIndicator";
 
-export function ActionNode({ data, selected }: NodeProps) {
+export function ActionNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as ActionNodeData;
   return (
     <div
       style={{
+        position: "relative",
         width: 220,
         background: "var(--color-bg-surface)",
         border: selected
@@ -16,6 +18,7 @@ export function ActionNode({ data, selected }: NodeProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
       }}
     >
+      <NodeValidationIndicator nodeId={id} />
       {/* Colored header band */}
       <div
         style={{

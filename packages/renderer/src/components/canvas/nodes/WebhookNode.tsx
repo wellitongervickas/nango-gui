@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { WebhookNodeData } from "../../../types/flow";
+import { NodeValidationIndicator } from "../NodeValidationIndicator";
 
-export function WebhookNode({ data, selected }: NodeProps) {
+export function WebhookNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as WebhookNodeData;
   return (
     <div
       style={{
+        position: "relative",
         width: 220,
         background: "var(--color-bg-surface)",
         border: selected
@@ -16,6 +18,7 @@ export function WebhookNode({ data, selected }: NodeProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
       }}
     >
+      <NodeValidationIndicator nodeId={id} />
       <div
         style={{
           backgroundColor: "var(--color-node-webhook)",

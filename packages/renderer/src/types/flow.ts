@@ -58,6 +58,11 @@ export interface TransformNodeData {
   mappings: FieldMapping[];
 }
 
+export interface FieldMappingEdgeData {
+  mappings: FieldMapping[];
+  expanded: boolean;
+}
+
 export interface NangoProject {
   name: string;
   provider: string;

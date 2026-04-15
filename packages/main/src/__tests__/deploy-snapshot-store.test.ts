@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { fileSystem, mockRandomUUID } = vi.hoisted(() => ({
   fileSystem: {} as Record<string, string>,
-  mockRandomUUID: vi.fn<[], string>(),
+  mockRandomUUID: vi.fn<() => string>(),
 }));
 
 vi.mock("electron", () => ({
@@ -12,7 +12,7 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("fs", () => ({
-  readFileSync: vi.fn((path: string, _encoding: string) => {
+  readFileSync: vi.fn((path: string) => {
     const data = fileSystem[path];
     if (data === undefined)
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });

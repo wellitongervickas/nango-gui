@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useProjectStore } from "../../store/projectStore";
 import { cn } from "../../lib/utils";
+import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 
 function NavButton({
   label,
@@ -45,10 +47,32 @@ function GearIcon() {
   );
 }
 
+function HelpIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
 export function Toolbar() {
   const project = useProjectStore((s) => s.project);
   const isDirty = useProjectStore((s) => s.isDirty);
   const currentRoute = window.location.hash.replace(/^#\/?/, "") || "/";
+  const shouldAutoShow = useTourAutoShow();
+  const [tourOpen, setTourOpen] = useState(shouldAutoShow);
 
   const isDashboard = currentRoute === "/" || currentRoute === "dashboard";
   const isCanvas = currentRoute === "canvas";
@@ -127,12 +151,28 @@ export function Toolbar() {
       )}
 
       <button
+        onClick={() => setTourOpen((v) => !v)}
+        aria-label="Take a tour"
+        title="Take a tour"
+        className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-md transition-colors cursor-pointer",
+          tourOpen
+            ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10"
+            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]"
+        )}
+      >
+        <HelpIcon />
+      </button>
+
+      <button
         onClick={() => navigate("settings")}
         aria-label="Settings"
         className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
       >
         <GearIcon />
       </button>
+
+      {tourOpen && <WalkthroughTour onClose={() => setTourOpen(false)} />}
     </header>
   );
 }
