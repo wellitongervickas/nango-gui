@@ -18,8 +18,7 @@ export interface GeneratedFile {
  * Walk the visual graph and emit a set of TypeScript files that form a valid
  * Nango integration project.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function graphToTypeScript(project: NangoProject, nodes: Node[], edges: Edge[]): GeneratedFile[] {
+export function graphToTypeScript(_project: NangoProject, nodes: Node[], _edges: Edge[]): GeneratedFile[] {
   const files: GeneratedFile[] = [];
 
   const modelNodes = nodes.filter((n) => n.type === "model");

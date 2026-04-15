@@ -42,6 +42,8 @@ describe("parseHash", () => {
     expect(parseHash("#/dashboard")).toBe("dashboard");
     expect(parseHash("#/canvas")).toBe("canvas");
     expect(parseHash("#/setup")).toBe("setup");
+    expect(parseHash("#/webhooks")).toBe("webhooks");
+    expect(parseHash("#/deploys")).toBe("deploys");
   });
 
   it("strips '#' without slash prefix", () => {
@@ -83,6 +85,8 @@ describe("navigate hash contract", () => {
       "canvas",
       "setup",
       "dashboard",
+      "webhooks",
+      "deploys",
     ];
     for (const route of routes) {
       expect(navigate(route)).toBe(`/${route}`);
@@ -100,6 +104,8 @@ describe("navigate hash contract", () => {
       "settings",
       "canvas",
       "dashboard",
+      "webhooks",
+      "deploys",
     ];
     for (const route of routes) {
       const assigned = navigate(route);
