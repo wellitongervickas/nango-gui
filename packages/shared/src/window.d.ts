@@ -24,6 +24,11 @@ import type {
   AppSetEnvironmentRequest,
   AppSettings,
   AppUpdateSettingsRequest,
+  CliRunRequest,
+  CliRunResult,
+  CliAbortRequest,
+  CliOutputEvent,
+  CliExitEvent,
 } from "./ipc-channels.js";
 
 declare global {
@@ -83,6 +88,20 @@ declare global {
       ): Promise<IpcResponse<void>>;
       getSettings(): Promise<IpcResponse<AppSettings>>;
       updateSettings(args: AppUpdateSettingsRequest): Promise<IpcResponse<void>>;
+    };
+    cli: {
+      /** Spawn a CLI subprocess. Returns a runId to correlate streamed events. */
+      run(args: CliRunRequest): Promise<IpcResponse<CliRunResult>>;
+      /** Kill a running subprocess by runId. No-op if already exited. */
+      abort(args: CliAbortRequest): Promise<IpcResponse<void>>;
+      /** Register a listener for stdout/stderr lines from any active CLI run. */
+      onOutput(listener: (event: CliOutputEvent) => void): void;
+      /** Register a listener for process exit events. */
+      onExit(listener: (event: CliExitEvent) => void): void;
+      /** Remove all output listeners (call on component unmount to prevent leaks). */
+      removeAllOutputListeners(): void;
+      /** Remove all exit listeners (call on component unmount to prevent leaks). */
+      removeAllExitListeners(): void;
     };
   }
 }

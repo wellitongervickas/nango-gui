@@ -1,4 +1,6 @@
 import { ipcMain, app, type IpcMainInvokeEvent } from "electron";
+import { randomUUID } from "node:crypto";
+import { spawnCli, type CliRunner } from "./cli-runner.js";
 import log from "./logger.js";
 import {
   IPC_CHANNELS,
@@ -35,6 +37,9 @@ import {
   type AppSetEnvironmentRequest,
   type AppSettings,
   type AppUpdateSettingsRequest,
+  type CliRunRequest,
+  type CliRunResult,
+  type CliAbortRequest,
 } from "@nango-gui/shared";
 import {
   getNangoClient,
@@ -731,6 +736,61 @@ export function registerIpcHandlers(): void {
         }
         if (args.theme !== undefined) {
           credentialStore.saveTheme(args.theme);
+        }
+      })
+  );
+
+  // ── CLI subprocess handlers ─────────────────────────────────────────────
+  // Keyed by runId. Cleaned up on process exit or explicit CLI_ABORT.
+  const _activeCliProcesses = new Map<string, CliRunner>();
+
+  ipcMain.handle(
+    IPC_CHANNELS.CLI_RUN,
+    async (
+      event: IpcMainInvokeEvent,
+      args: CliRunRequest
+    ): Promise<IpcResponse<CliRunResult>> =>
+      wrap(async () => {
+        const runId = randomUUID();
+
+        const runner = spawnCli(
+          {
+            command: args.command,
+            args: args.args,
+            cwd: args.cwd,
+            env: args.env,
+          },
+          (lineEvent) => {
+            if (!event.sender.isDestroyed()) {
+              event.sender.send(IPC_CHANNELS.CLI_OUTPUT, { runId, ...lineEvent });
+            }
+          },
+          (exitEvent) => {
+            _activeCliProcesses.delete(runId);
+            if (!event.sender.isDestroyed()) {
+              event.sender.send(IPC_CHANNELS.CLI_EXIT, { runId, ...exitEvent });
+            }
+          }
+        );
+
+        _activeCliProcesses.set(runId, runner);
+        log.info(`[CLI] started run ${runId} — pid ${runner.pid} — ${args.command} ${args.args.join(" ")}`);
+        return { runId };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CLI_ABORT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: CliAbortRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const runner = _activeCliProcesses.get(args.runId);
+        if (runner) {
+          log.info(`[CLI] aborting run ${args.runId} — pid ${runner.pid}`);
+          runner.kill();
+          _activeCliProcesses.delete(args.runId);
         }
       })
   );

@@ -45,6 +45,14 @@ export const IPC_CHANNELS = {
   // Auto-updater
   APP_UPDATE_DOWNLOAD: "app:updateDownload",
   APP_UPDATE_INSTALL: "app:updateInstall",
+
+  // CLI subprocess
+  CLI_RUN: "cli:run",
+  CLI_ABORT: "cli:abort",
+  /** Main → renderer push event: a line of stdout/stderr from a running CLI process. */
+  CLI_OUTPUT: "cli:output",
+  /** Main → renderer push event: the CLI process has exited. */
+  CLI_EXIT: "cli:exit",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -297,6 +305,39 @@ export interface NangoProxyResult {
   status: number;
   headers: Record<string, string>;
   data: unknown;
+}
+
+// ── CLI subprocess ───────────────────────────────────────────────────────────
+
+export interface CliRunRequest {
+  /** Executable to invoke (e.g. "nango", "node"). */
+  command: string;
+  args: string[];
+  /** Working directory for the subprocess. */
+  cwd?: string;
+  /** Extra environment variables to inject on top of the main process env. */
+  env?: Record<string, string>;
+}
+
+export interface CliRunResult {
+  /** Unique ID for this run — correlates CLI_OUTPUT / CLI_EXIT events and CLI_ABORT. */
+  runId: string;
+}
+
+export interface CliAbortRequest {
+  runId: string;
+}
+
+export interface CliOutputEvent {
+  runId: string;
+  stream: "stdout" | "stderr";
+  line: string;
+}
+
+export interface CliExitEvent {
+  runId: string;
+  code: number | null;
+  signal: string | null;
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────

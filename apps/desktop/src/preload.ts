@@ -19,6 +19,10 @@ import type {
   CredentialsSaveRequest,
   AppSetEnvironmentRequest,
   AppUpdateSettingsRequest,
+  CliRunRequest,
+  CliAbortRequest,
+  CliOutputEvent,
+  CliExitEvent,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -75,6 +79,30 @@ contextBridge.exposeInMainWorld("electronApp", {
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_SETTINGS),
   updateSettings: (args: AppUpdateSettingsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.APP_UPDATE_SETTINGS, args),
+});
+
+// Expose window.cli — Nango CLI subprocess (dryrun / deploy streaming)
+contextBridge.exposeInMainWorld("cli", {
+  run: (args: CliRunRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CLI_RUN, args),
+  abort: (args: CliAbortRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CLI_ABORT, args),
+  onOutput: (listener: (event: CliOutputEvent) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.CLI_OUTPUT, (_evt, data: CliOutputEvent) =>
+      listener(data)
+    );
+  },
+  onExit: (listener: (event: CliExitEvent) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.CLI_EXIT, (_evt, data: CliExitEvent) =>
+      listener(data)
+    );
+  },
+  /** Remove all registered CLI_OUTPUT listeners (call on component unmount). */
+  removeAllOutputListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.CLI_OUTPUT),
+  /** Remove all registered CLI_EXIT listeners (call on component unmount). */
+  removeAllExitListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.CLI_EXIT),
 });
 
 export {};
