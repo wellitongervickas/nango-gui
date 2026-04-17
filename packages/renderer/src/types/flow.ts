@@ -64,7 +64,7 @@ export interface FieldMappingEdgeData {
 }
 
 export type NangoAuthType = "oauth2" | "api_key" | "basic" | "none";
-export type NangoEnvironment = "development" | "production";
+export type NangoEnvironment = "development" | "staging" | "production";
 
 export interface NangoErrorHandling {
   retryOn: ("4xx" | "5xx" | "timeout" | "network")[];

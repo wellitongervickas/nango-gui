@@ -211,22 +211,25 @@ function EnvironmentSection({
         Switch between Nango environments. Switching will affect all API calls.
       </p>
       <div className="flex gap-2">
-        {(["development", "production"] as NangoEnvironment[]).map((env) => (
-          <button
-            key={env}
-            onClick={() => handleSwitch(env)}
-            disabled={switching}
-            className={cn(
-              "rounded-md border px-4 py-2 text-sm font-medium capitalize transition-colors",
-              environment === env
-                ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10 text-[var(--color-brand-400)]"
-                : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-focus)] hover:text-[var(--color-text)]",
-              switching && "cursor-not-allowed opacity-50"
-            )}
-          >
-            {env === "development" ? "Dev" : "Prod"}
-          </button>
-        ))}
+        {(["development", "staging", "production"] as NangoEnvironment[]).map((env) => {
+          const label = env === "development" ? "Dev" : env === "staging" ? "Staging" : "Prod";
+          return (
+            <button
+              key={env}
+              onClick={() => handleSwitch(env)}
+              disabled={switching}
+              className={cn(
+                "rounded-md border px-4 py-2 text-sm font-medium capitalize transition-colors",
+                environment === env
+                  ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10 text-[var(--color-brand-400)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-focus)] hover:text-[var(--color-text)]",
+                switching && "cursor-not-allowed opacity-50"
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       {envError && (
         <p className="mt-2 text-xs text-[var(--color-error)]">{envError}</p>

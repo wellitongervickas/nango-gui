@@ -76,6 +76,11 @@ export const IPC_CHANNELS = {
   WEBHOOK_CLEAR_EVENTS: "webhook:clearEvents",
   /** Main → renderer push event: a new incoming webhook was received. */
   WEBHOOK_EVENT: "webhook:event",
+
+  // Rate limit monitor
+  RATE_LIMIT_GET_STATE: "rateLimit:getState",
+  /** Main → renderer push event: a rate-limit threshold was crossed. */
+  RATE_LIMIT_ALERT: "rateLimit:alert",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -499,4 +504,36 @@ export interface WebhookEvent {
 
 export interface WebhookGetEventsResult {
   events: WebhookEvent[];
+}
+
+// ── Rate limit monitor ────────────────────────────────────────────────────────
+
+/** Per-provider rate-limit state extracted from X-RateLimit-* response headers. */
+export interface RateLimitProviderState {
+  /** Provider key (e.g. "github", "slack"). */
+  provider: string;
+  /** Remaining requests in the current window. */
+  remaining: number;
+  /** Total requests allowed in the window. */
+  limit: number;
+  /** Unix timestamp (seconds) when the window resets. */
+  reset: number;
+  /** ISO timestamp of the last header observation. */
+  updatedAt: string;
+}
+
+export type RateLimitAlertLevel = "warning" | "critical";
+
+/** Emitted when a provider crosses the 75% (warning) or 90% (critical) threshold. */
+export interface RateLimitAlert {
+  provider: string;
+  level: RateLimitAlertLevel;
+  remaining: number;
+  limit: number;
+  reset: number;
+  timestamp: string;
+}
+
+export interface RateLimitGetStateResult {
+  providers: RateLimitProviderState[];
 }

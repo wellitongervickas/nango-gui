@@ -157,11 +157,12 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
           </span>
           <select
             value={environment}
-            onChange={(e) => updateEnvironment(e.target.value as "development" | "production")}
+            onChange={(e) => updateEnvironment(e.target.value as "development" | "staging" | "production")}
             disabled={status === "running"}
             className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] cursor-pointer disabled:opacity-50"
           >
             <option value="development">Development</option>
+            <option value="staging">Staging</option>
             <option value="production">Production</option>
           </select>
           <StatusBadge status={status} />

@@ -25,6 +25,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { applyTheme } from "./store/settingsStore";
+import { useEnvironmentStore } from "./store/environmentStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
 
@@ -37,7 +38,7 @@ function App() {
   const deployPanelOpen = useDeployPanelStore((s) => s.isOpen);
   const closeDeployPanel = useDeployPanelStore((s) => s.close);
 
-  // Apply persisted theme preference as early as possible.
+  // Apply persisted theme preference and initialize environment as early as possible.
   useEffect(() => {
     window.electronApp
       ?.getSettings()
@@ -45,6 +46,7 @@ function App() {
         if (res.status === "ok") applyTheme(res.data.theme);
       })
       .catch(() => {/* ignore — falls back to system */});
+    useEnvironmentStore.getState().initialize();
   }, []);
 
   if (route === "setup") {

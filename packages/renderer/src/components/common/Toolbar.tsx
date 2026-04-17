@@ -7,6 +7,8 @@ import { useDeployPanelStore } from "../../store/deployPanelStore";
 import { cn } from "../../lib/utils";
 import { useHashRoute, navigate } from "../../lib/router";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
+import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
+import { RateLimitBadge } from "../rate-limit/RateLimitBadge";
 
 function NavButton({
   label,
@@ -178,7 +180,7 @@ export function Toolbar() {
       name: fileData.project.name,
       provider: fileData.project.provider,
       authType: fileData.project.authType as "oauth2" | "api_key" | "basic" | "none",
-      environment: fileData.project.environment as "development" | "production",
+      environment: fileData.project.environment as "development" | "staging" | "production",
       errorHandling: fileData.project.errorHandling as {
         retryOn: ("4xx" | "5xx" | "timeout" | "network")[];
         maxRetries: number;
@@ -337,6 +339,10 @@ export function Toolbar() {
           </button>
         </>
       )}
+
+      <EnvironmentSwitcher />
+
+      <RateLimitBadge />
 
       <button
         onClick={() => setTourOpen((v) => !v)}
