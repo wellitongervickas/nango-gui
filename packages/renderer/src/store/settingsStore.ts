@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
+import { syncEnvironmentUrlParam } from "./environmentStore";
 
 interface SettingsState {
   theme: AppTheme;
@@ -64,14 +65,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   updateEnvironment: async (environment) => {
     const prev = get().environment;
     set({ environment });
+    syncEnvironmentUrlParam(environment);
     try {
       const res = await window.electronApp.updateSettings({ environment });
       if (res.status === "error") {
         set({ environment: prev });
+        syncEnvironmentUrlParam(prev);
         throw new Error(res.error);
       }
     } catch (err) {
       set({ environment: prev });
+      syncEnvironmentUrlParam(prev);
       throw err;
     }
   },

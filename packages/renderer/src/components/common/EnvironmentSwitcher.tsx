@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useEnvironmentStore, type EnvironmentEntry } from "../../store/environmentStore";
+import { useSettingsStore } from "../../store/settingsStore";
+import {
+  ENVIRONMENTS,
+  getEnvironmentEntry,
+  syncEnvironmentUrlParam,
+  type EnvironmentEntry,
+} from "../../store/environmentStore";
 import { cn } from "../../lib/utils";
 import { navigate } from "../../lib/router";
 import type { NangoEnvironment } from "@nango-gui/shared";
@@ -121,21 +127,24 @@ function ProdConfirmation({
 }
 
 export function EnvironmentSwitcher() {
-  const current = useEnvironmentStore((s) => s.current);
-  const environments = useEnvironmentStore((s) => s.environments);
-  const isSwitching = useEnvironmentStore((s) => s.isSwitching);
-  const switchEnvironment = useEnvironmentStore((s) => s.switchEnvironment);
-  const getCurrentEntry = useEnvironmentStore((s) => s.getCurrentEntry);
+  const environment = useSettingsStore((s) => s.environment);
+  const updateEnvironment = useSettingsStore((s) => s.updateEnvironment);
 
   const [open, setOpen] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
   const [confirmingProd, setConfirmingProd] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const currentEntry = getCurrentEntry();
-  const isSingleEnv = environments.length <= 1;
+  const currentEntry = getEnvironmentEntry(environment);
+  const isSingleEnv = ENVIRONMENTS.length <= 1;
+
+  // Keep URL param in sync with current environment
+  useEffect(() => {
+    syncEnvironmentUrlParam(environment);
+  }, [environment]);
 
   // Close on click outside
   useEffect(() => {
@@ -151,9 +160,23 @@ export function EnvironmentSwitcher() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const doSwitch = useCallback(
+    async (env: NangoEnvironment) => {
+      setIsSwitching(true);
+      try {
+        await updateEnvironment(env);
+      } catch {
+        // settingsStore handles rollback internally
+      } finally {
+        setIsSwitching(false);
+      }
+    },
+    [updateEnvironment]
+  );
+
   const handleSelect = useCallback(
     (env: NangoEnvironment) => {
-      if (env === current) {
+      if (env === environment) {
         setOpen(false);
         setFocusedIndex(-1);
         return;
@@ -162,19 +185,19 @@ export function EnvironmentSwitcher() {
         setConfirmingProd(true);
         return;
       }
-      switchEnvironment(env);
+      doSwitch(env);
       setOpen(false);
       setFocusedIndex(-1);
     },
-    [current, switchEnvironment]
+    [environment, doSwitch]
   );
 
   const handleConfirmProd = useCallback(() => {
     setConfirmingProd(false);
-    switchEnvironment("production");
+    doSwitch("production");
     setOpen(false);
     setFocusedIndex(-1);
-  }, [switchEnvironment]);
+  }, [doSwitch]);
 
   const handleCancelProd = useCallback(() => {
     setConfirmingProd(false);
@@ -202,7 +225,7 @@ export function EnvironmentSwitcher() {
           break;
         case "ArrowDown":
           e.preventDefault();
-          setFocusedIndex((prev) => Math.min(prev + 1, environments.length - 1));
+          setFocusedIndex((prev) => Math.min(prev + 1, ENVIRONMENTS.length - 1));
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -211,8 +234,8 @@ export function EnvironmentSwitcher() {
         case "Enter":
         case " ":
           e.preventDefault();
-          if (focusedIndex >= 0 && focusedIndex < environments.length) {
-            handleSelect(environments[focusedIndex].name);
+          if (focusedIndex >= 0 && focusedIndex < ENVIRONMENTS.length) {
+            handleSelect(ENVIRONMENTS[focusedIndex].name);
           }
           break;
         case "Home":
@@ -221,11 +244,11 @@ export function EnvironmentSwitcher() {
           break;
         case "End":
           e.preventDefault();
-          setFocusedIndex(environments.length - 1);
+          setFocusedIndex(ENVIRONMENTS.length - 1);
           break;
       }
     },
-    [open, focusedIndex, environments, handleSelect]
+    [open, focusedIndex, handleSelect]
   );
 
   // Scroll focused item into view
@@ -290,14 +313,14 @@ export function EnvironmentSwitcher() {
             ref={listRef}
             role="listbox"
             aria-label="Environments"
-            aria-activedescendant={focusedIndex >= 0 ? `env-option-${environments[focusedIndex].name}` : undefined}
+            aria-activedescendant={focusedIndex >= 0 ? `env-option-${ENVIRONMENTS[focusedIndex].name}` : undefined}
             className="py-1"
           >
-            {environments.map((env, idx) => (
+            {ENVIRONMENTS.map((env, idx) => (
               <EnvironmentOption
                 key={env.name}
                 entry={env}
-                isActive={env.name === current}
+                isActive={env.name === environment}
                 isFocused={idx === focusedIndex}
                 onSelect={() => handleSelect(env.name)}
                 onHover={() => setFocusedIndex(idx)}
@@ -313,7 +336,7 @@ export function EnvironmentSwitcher() {
             />
           )}
 
-          {/* Create environment link */}
+          {/* Manage environments link */}
           <div className="border-t border-[var(--color-border)]">
             <button
               onClick={() => {
@@ -323,13 +346,32 @@ export function EnvironmentSwitcher() {
               }}
               className="w-full px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-raised)] transition-colors cursor-pointer text-left flex items-center gap-1.5"
             >
-              <span aria-hidden="true">+</span>
-              Create environment
+              <GearSmallIcon />
+              Manage environments
             </button>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function GearSmallIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   );
 }
 

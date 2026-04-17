@@ -28,8 +28,8 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
-import { applyTheme } from "./store/settingsStore";
-import { useEnvironmentStore } from "./store/environmentStore";
+import { applyTheme, useSettingsStore } from "./store/settingsStore";
+import { readEnvironmentFromUrl, syncEnvironmentUrlParam } from "./store/environmentStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
 
@@ -64,15 +64,25 @@ function App() {
   const aiBuilderOpen = useAiBuilderPanelStore((s) => s.isOpen);
   const closeAiBuilder = useAiBuilderPanelStore((s) => s.close);
 
-  // Apply persisted theme preference and initialize environment as early as possible.
+  // Apply persisted theme/environment and sync URL param on startup.
   useEffect(() => {
     window.electronApp
       ?.getSettings()
       .then((res) => {
-        if (res.status === "ok") applyTheme(res.data.theme);
+        if (res.status === "ok") {
+          applyTheme(res.data.theme);
+          // URL param overrides stored env; otherwise use stored value.
+          const urlEnv = readEnvironmentFromUrl();
+          const env = urlEnv ?? res.data.environment;
+          if (env !== res.data.environment) {
+            useSettingsStore.getState().updateEnvironment(env);
+          } else {
+            useSettingsStore.setState({ environment: env });
+          }
+          syncEnvironmentUrlParam(env);
+        }
       })
       .catch(() => {/* ignore — falls back to system */});
-    useEnvironmentStore.getState().initialize();
   }, []);
 
   if (route === "setup") {
