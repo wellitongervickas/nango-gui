@@ -215,6 +215,11 @@ export function Toolbar() {
           onClick={() => navigate("deploys")}
         />
         <NavButton
+          label="MCP"
+          active={currentRoute === "mcp"}
+          onClick={() => navigate("mcp")}
+        />
+        <NavButton
           label="Settings"
           active={currentRoute === "settings"}
           onClick={() => navigate("settings")}
