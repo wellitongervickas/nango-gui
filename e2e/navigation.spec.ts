@@ -23,27 +23,17 @@ let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
+  // NANGO_E2E=true tells the main process to skip the credential gate and
+  // start directly on the main route, so we never land on the setup wizard.
   app = await electron.launch({
     args: [MAIN_JS],
-    env: { ...process.env, NODE_ENV: "production" },
+    env: { ...process.env, NODE_ENV: "production", NANGO_E2E: "true" },
   });
   page = await app.firstWindow();
-  // Give the renderer time to fully paint
-  await page.waitForTimeout(3000);
 
-  // Navigate past the setup wizard by forcing the hash to dashboard.
-  // App.tsx routes purely on window.location.hash, so this bypasses the
-  // credential check that only runs in the main process at startup.
-  await page.evaluate(() => {
-    window.location.hash = "/dashboard";
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-  });
-
-  // Wait for React to process the hashchange and re-render
-  await page.waitForTimeout(1000);
-
-  // The Toolbar is present on every non-setup page — confirm we are past setup.
-  await expect(page.locator('header').first()).toBeVisible({ timeout: 5000 });
+  // Wait for React to mount and the Toolbar (<header>) to appear.
+  // 10 s is generous; in practice the renderer is ready in well under 5 s.
+  await expect(page.locator('header').first()).toBeVisible({ timeout: 10000 });
 });
 
 test.afterAll(async () => {

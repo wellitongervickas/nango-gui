@@ -53,10 +53,18 @@ function createWindow(startRoute: "/" | "/setup" = "/"): void {
 async function bootstrap(): Promise<void> {
   registerIpcHandlers();
 
+  // In E2E test mode (NANGO_E2E=true) skip the credential gate entirely so
+  // the app starts directly on the main route without the setup wizard.
+  // This avoids the unreliable hash-manipulation bypass that was needed when
+  // the app started at #/setup in a headless CI environment.
+  const isE2E = process.env.NANGO_E2E === "true";
+
   // Determine startup route based on stored credentials
   let startRoute: "/" | "/setup" = "/setup";
 
-  if (credentialStore.isAvailable()) {
+  if (isE2E) {
+    startRoute = "/";
+  } else if (credentialStore.isAvailable()) {
     const storedKey = credentialStore.load();
     if (storedKey) {
       try {

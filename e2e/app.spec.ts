@@ -10,13 +10,15 @@ let app: ElectronApplication;
 let page: Page;
 
 test.beforeAll(async () => {
+  // NANGO_E2E=true skips the credential gate so the app starts on the main
+  // route rather than the setup wizard.
   app = await electron.launch({
     args: [MAIN_JS],
-    env: { ...process.env, NODE_ENV: "production" },
+    env: { ...process.env, NODE_ENV: "production", NANGO_E2E: "true" },
   });
   page = await app.firstWindow();
-  // Give the renderer time to fully paint
-  await page.waitForTimeout(3000);
+  // Give the renderer time to fully mount before running assertions.
+  await page.waitForTimeout(2000);
 });
 
 test.afterAll(async () => {
