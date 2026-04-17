@@ -35,6 +35,11 @@ import type {
   AiGenerateRequest,
   AiRefineRequest,
   AiStreamTokenEvent,
+  McpAddConfigRequest,
+  McpRemoveConfigRequest,
+  McpStartRequest,
+  McpStopRequest,
+  McpStatusChangedEvent,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -185,6 +190,28 @@ contextBridge.exposeInMainWorld("rateLimit", {
   },
   removeAllAlertListeners: () =>
     ipcRenderer.removeAllListeners(IPC_CHANNELS.RATE_LIMIT_ALERT),
+});
+
+// Expose window.mcp — MCP server lifecycle management
+contextBridge.exposeInMainWorld("mcp", {
+  listConfigs: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.MCP_LIST_CONFIGS),
+  addConfig: (args: McpAddConfigRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MCP_ADD_CONFIG, args),
+  removeConfig: (args: McpRemoveConfigRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MCP_REMOVE_CONFIG, args),
+  start: (args: McpStartRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MCP_START, args),
+  stop: (args: McpStopRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.MCP_STOP, args),
+  onStatusChange: (listener: (event: McpStatusChangedEvent) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.MCP_STATUS_CHANGED,
+      (_evt, data: McpStatusChangedEvent) => listener(data)
+    );
+  },
+  removeAllStatusChangeListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.MCP_STATUS_CHANGED),
 });
 
 export {};

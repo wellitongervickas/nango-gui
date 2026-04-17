@@ -61,11 +61,17 @@ import {
   type AiGenerateRequest,
   type AiRefineRequest,
   type AiGenerationResult,
+  type McpListConfigsResult,
+  type McpAddConfigRequest,
+  type McpRemoveConfigRequest,
+  type McpStartRequest,
+  type McpStopRequest,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import { rateLimitTracker } from "./rate-limit-tracker.js";
 import { aiService } from "./ai-service.js";
+import { mcpManager } from "./mcp-manager.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -1084,4 +1090,80 @@ export function registerIpcHandlers(): void {
         return aiService.refine(args);
       })
   );
+
+  // ── MCP server management handlers ──────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.MCP_LIST_CONFIGS,
+    async (): Promise<IpcResponse<McpListConfigsResult>> =>
+      wrap(async () => {
+        await mcpManager.loadConfigs();
+        return {
+          servers: mcpManager.getState(),
+          configFiles: mcpManager.getConfigPaths(),
+        };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MCP_ADD_CONFIG,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: McpAddConfigRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.name || !args?.command) {
+          throw new Error("name and command are required");
+        }
+        await mcpManager.addConfig(
+          { name: args.name, command: args.command, args: args.args ?? [], env: args.env },
+          args.targetFile
+        );
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MCP_REMOVE_CONFIG,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: McpRemoveConfigRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.name) throw new Error("name is required");
+        await mcpManager.removeConfig(args.name);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MCP_START,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: McpStartRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.name) throw new Error("name is required");
+        await mcpManager.start(args.name);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MCP_STOP,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: McpStopRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.name) throw new Error("name is required");
+        mcpManager.stop(args.name);
+      })
+  );
+
+  // Broadcast MCP status changes to all renderer windows.
+  mcpManager.onStatusChange((event) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.MCP_STATUS_CHANGED, event);
+      }
+    }
+  });
 }
