@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WebhookEvent } from "@nango-gui/shared";
 import { useWebhookStore, selectFilteredEvents } from "../store/webhookStore";
 import { cn } from "../lib/utils";
@@ -335,6 +335,48 @@ export function WebhooksPage() {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [allEvents.length, autoScroll]);
+
+  // Keyboard shortcuts: J/K navigate, C copy body, Esc close detail
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Ignore when typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "Escape") {
+        setSelectedEventId(null);
+        return;
+      }
+
+      if (e.key === "j" || e.key === "k") {
+        if (events.length === 0) return;
+        const currentIdx = selectedEventId
+          ? events.findIndex((ev) => ev.id === selectedEventId)
+          : -1;
+        const nextIdx = e.key === "j"
+          ? Math.min(currentIdx + 1, events.length - 1)
+          : Math.max(currentIdx - 1, 0);
+        setSelectedEventId(events[nextIdx].id);
+        return;
+      }
+
+      if (e.key === "c" && !e.ctrlKey && !e.metaKey) {
+        const sel = allEvents.find((ev) => ev.id === selectedEventId);
+        if (!sel) return;
+        const bodyText = sel.body == null
+          ? ""
+          : typeof sel.body === "string"
+            ? sel.body
+            : JSON.stringify(sel.body, null, 2);
+        void navigator.clipboard.writeText(bodyText);
+      }
+    },
+    [events, allEvents, selectedEventId, setSelectedEventId]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   function handleScroll() {
     const el = listRef.current;
