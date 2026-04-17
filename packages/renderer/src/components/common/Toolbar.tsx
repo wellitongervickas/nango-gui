@@ -7,10 +7,11 @@ import { useDeployPanelStore } from "../../store/deployPanelStore";
 import { useAiBuilderPanelStore } from "../../store/aiBuilderPanelStore";
 import { cn } from "../../lib/utils";
 import { useHashRoute, navigate } from "../../lib/router";
+import { useNavigationStore } from "../../store/navigationStore";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { RateLimitBadge } from "../rate-limit/RateLimitBadge";
-import { FolderOpenIcon, HelpIcon } from "@/components/icons";
+import { FolderOpenIcon, HelpIcon, ChevronIcon } from "@/components/icons";
 
 
 // ── Project file format ──────────────────────────────────────────────────
@@ -47,6 +48,10 @@ export function Toolbar() {
   const aiBuilderOpen = useAiBuilderPanelStore((s) => s.isOpen);
   const toggleAiBuilder = useAiBuilderPanelStore((s) => s.toggle);
   const currentRoute = useHashRoute();
+  const canGoBack = useNavigationStore((s) => s.canGoBack);
+  const canGoForward = useNavigationStore((s) => s.canGoForward);
+  const goBack = useNavigationStore((s) => s.goBack);
+  const goForward = useNavigationStore((s) => s.goForward);
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
 
@@ -120,7 +125,7 @@ export function Toolbar() {
     navigate("canvas");
   }, [setProject]);
 
-  // Ctrl+S / Cmd+S keyboard shortcut
+  // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -131,10 +136,19 @@ export function Toolbar() {
         e.preventDefault();
         openProject();
       }
+      // Alt+Left / Alt+Right for back/forward navigation
+      if (e.altKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        goBack();
+      }
+      if (e.altKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        goForward();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [saveProject, openProject]);
+  }, [saveProject, openProject, goBack, goForward]);
 
   return (
     <header className="h-12 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center px-4 gap-1 shrink-0">
@@ -148,6 +162,29 @@ export function Toolbar() {
           {isDirty && " *"}
         </span>
       )}
+
+      {/* Back / Forward navigation */}
+      <div className="flex items-center gap-0.5 ml-2">
+        <button
+          onClick={goBack}
+          disabled={!canGoBack}
+          aria-label="Go back"
+          title="Go back (Alt+Left)"
+          className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+        >
+          <ChevronIcon direction="left" />
+        </button>
+        <button
+          onClick={goForward}
+          disabled={!canGoForward}
+          aria-label="Go forward"
+          title="Go forward (Alt+Right)"
+          className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-[var(--color-text-muted)]"
+        >
+          <ChevronIcon direction="right" />
+        </button>
+      </div>
+
       <div className="flex-1" />
 
       <button
