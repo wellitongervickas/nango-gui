@@ -9,6 +9,8 @@ import {
   applyEdgeChanges,
   addEdge,
 } from "@xyflow/react";
+import type { AiGenerationResult } from "@nango-gui/shared";
+import { definitionToFlow } from "../lib/graph-converter";
 
 const MAX_HISTORY = 50;
 
@@ -36,6 +38,12 @@ interface FlowState {
   undo: () => void;
   redo: () => void;
   reset: () => void;
+  /**
+   * Merge an AI-generated definition into the current graph.
+   * Takes an undo snapshot first so the merge can be reverted.
+   * Preserves existing nodes — only adds new syncs/actions/models.
+   */
+  mergeAiDefinition: (definition: AiGenerationResult) => void;
 }
 
 export const useFlowStore = create<FlowState>((set, get) => ({
@@ -158,4 +166,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   reset: () =>
     set({ nodes: [], edges: [], past: [], future: [], selectedNodeId: null }),
+
+  mergeAiDefinition: (definition) => {
+    const { nodes, edges } = definitionToFlow(definition);
+    if (nodes.length === 0) return;
+
+    // Snapshot for undo before merging
+    get().pushHistory();
+
+    const existingNodes = get().nodes;
+    const existingEdges = get().edges;
+
+    // Offset new nodes so they don't overlap existing ones
+    const maxY = existingNodes.reduce(
+      (max, n) => Math.max(max, n.position.y + 200),
+      0
+    );
+    const offsetNodes = nodes.map((n) => ({
+      ...n,
+      position: { x: n.position.x, y: n.position.y + maxY },
+    }));
+
+    set({
+      nodes: [...existingNodes, ...offsetNodes],
+      edges: [...existingEdges, ...edges],
+    });
+  },
 }));
