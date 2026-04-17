@@ -97,7 +97,7 @@ export type IpcResponse<T> =
   | { status: "ok"; data: T; error: null }
   | { status: "error"; data: null; error: string; errorCode: IpcErrorCode };
 
-export type NangoEnvironment = "development" | "production";
+export type NangoEnvironment = "development" | "staging" | "production";
 
 // Per-channel request/response types
 

@@ -36,6 +36,11 @@
   --color-node-webhook:  #DC2626;
   --color-node-transform:#8B5CF6;
 
+  /* Environment indicators */
+  --color-env-production:  #22C55E;
+  --color-env-staging:     #F59E0B;
+  --color-env-development: #3B82F6;
+
   /* Legacy aliases — keep existing component references working */
   --color-bg:         var(--color-bg-base);
   --color-surface:    var(--color-bg-surface);
