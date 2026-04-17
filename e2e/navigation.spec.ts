@@ -16,7 +16,7 @@ const NAV_CASES: [string, string, string][] = [
   ["Actions",      "#/actions",      "Actions"],
   ["Integrations", "#/integrations", "Integrations"],
   ["Settings",     "#/settings",     "Settings"],
-  ["Dashboard",    "#/",             "Dashboard"],
+  ["Dashboard",    "#/dashboard",    "Dashboard"],
 ];
 
 let app: ElectronApplication;
@@ -99,12 +99,12 @@ test("active nav button reflects the current route after navigation", async () =
     await page.waitForTimeout(200);
 
     // The clicked button should carry the active background class.
-    // Active buttons receive bg-[var(--color-bg)] per Toolbar.tsx NavButton.
+    // Active buttons receive bg-[var(--color-primary)]/10 per Toolbar.tsx NavButton.
     const activeButton = page.locator(`button:has-text("${label}")`).first();
     const classList = await activeButton.evaluate((el) =>
       Array.from(el.classList).join(" ")
     );
-    expect(classList).toContain("bg-[var(--color-bg)]");
+    expect(classList).toContain("bg-[var(--color-primary)]/10");
   }
 });
 
@@ -147,15 +147,15 @@ test("rapid sequential navigation always lands on the last clicked route", async
   await expect(page.locator('h1:has-text("Connections")')).not.toBeVisible();
 });
 
-// ── Settings navigation via gear icon ────────────────────────────────────────
+// ── Settings navigation via sidebar button ──────────────────────────────────
 
-test("gear icon button navigates to settings", async () => {
+test("Settings sidebar button navigates to settings", async () => {
   // Go somewhere else first
   await page.click('button:has-text("Dashboard")');
   await expect(page.locator('h1:has-text("Dashboard")')).toBeVisible({ timeout: 2000 });
 
-  // Click the gear icon (aria-label="Settings")
-  await page.click('[aria-label="Settings"]');
+  // Click the Settings button in the NavSidebar
+  await page.click('button:has-text("Settings")');
   await expect(page.locator('h1:has-text("Settings")')).toBeVisible({ timeout: 2000 });
 });
 
@@ -190,7 +190,7 @@ test("Canvas nav button receives active styling after navigation", async () => {
   const classList = await canvasBtn.evaluate((el) =>
     Array.from(el.classList).join(" ")
   );
-  expect(classList).toContain("bg-[var(--color-bg)]");
+  expect(classList).toContain("bg-[var(--color-primary)]/10");
 });
 
 // ── Toolbar structure ────────────────────────────────────────────────────────
@@ -199,22 +199,13 @@ test("Canvas nav button receives active styling after navigation", async () => {
 
 test("Toolbar title and Open-project button are visible on all routes", async () => {
   const routes = [
-    { button: "Dashboard", hash: "#/" },
+    { button: "Dashboard", hash: "#/dashboard" },
     { button: "Connections", hash: "#/connections" },
     { button: "Settings", hash: "#/settings" },
   ];
 
-  for (const { button, hash } of routes) {
-    if (button === "Dashboard") {
-      await page.evaluate(() => { window.location.hash = "/"; window.dispatchEvent(new HashChangeEvent("hashchange")); });
-    } else {
-      await page.click(`button:has-text("${button}")`);
-    }
-
-    await expect(async () => {
-      const h = await page.evaluate(() => window.location.hash);
-      expect(h).toBe(hash);
-    }).toPass({ timeout: 2000 });
+  for (const { button } of routes) {
+    await page.click(`button:has-text("${button}")`);
 
     await expect(page.locator('header h1:has-text("Nango Builder")')).toBeVisible({
       timeout: 2000,

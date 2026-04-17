@@ -65,7 +65,7 @@ test.afterAll(async () => {
 
 /** Navigate to the Webhooks page via the toolbar. */
 async function goToWebhooks() {
-  await page.click('button:has-text("Webhooks")');
+  await page.click('button:has-text("Webhook Inspector")');
   await expect(async () => {
     const hash = await page.evaluate(() => window.location.hash);
     expect(hash).toBe("#/webhooks");
@@ -139,9 +139,9 @@ test("Webhooks nav button updates hash to #/webhooks", async () => {
 test("Webhooks nav button receives active styling", async () => {
   await goToWebhooks();
   await page.waitForTimeout(200);
-  const btn = page.locator('button:has-text("Webhooks")').first();
+  const btn = page.locator('button:has-text("Webhook Inspector")').first();
   const cls = await btn.evaluate((el) => Array.from(el.classList).join(" "));
-  expect(cls).toContain("bg-[var(--color-bg)]");
+  expect(cls).toContain("bg-[var(--color-primary)]/10");
 });
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -463,7 +463,7 @@ test("Toolbar title and nav are visible on the Webhooks route", async () => {
   await expect(page.locator('[aria-label="Open project"]')).toBeVisible({
     timeout: 2000,
   });
-  await expect(page.locator('[aria-label="Settings"]')).toBeVisible({
+  await expect(page.locator('button:has-text("Settings")')).toBeVisible({
     timeout: 2000,
   });
 });
