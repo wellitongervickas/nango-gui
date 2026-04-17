@@ -34,9 +34,9 @@ const NAV_GROUPS: NavGroup[] = [
     title: "MONITOR",
     items: [
       { label: "Dashboard", route: "dashboard" },
-      { label: "Webhook Inspector", route: "webhooks", disabled: true },
-      { label: "Rate Limit Dashboard", route: "rate-limits", disabled: true },
-      { label: "MCP Servers", route: "mcp", disabled: true },
+      { label: "Webhook Inspector", route: "webhooks" },
+      { label: "MCP Servers", route: "mcp" },
+      { label: "Rate Limits", route: "rate-limits", disabled: true },
     ],
   },
 ];
