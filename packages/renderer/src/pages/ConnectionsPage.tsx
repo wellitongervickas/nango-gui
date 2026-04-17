@@ -3,67 +3,8 @@ import type { NangoConnectionDetail, NangoConnectionSummary } from "@nango-gui/s
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn } from "@/lib/utils";
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ direction }: { direction: "up" | "down" | "right" | "left" }) {
-  const deg = { up: 0, right: 90, down: 180, left: 270 }[direction];
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: `rotate(${deg}deg)` }}>
-      <path d="m18 15-6-6-6 6" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
-  );
-}
-
-function PlugIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 22v-5" />
-      <path d="M9 8V2" />
-      <path d="M15 8V2" />
-      <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
-    </svg>
-  );
-}
+import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
+import { ErrorBanner } from "@/components/common/ErrorBanner";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -123,11 +64,7 @@ function DeleteDialog({ connection, onConfirm, onCancel, isDeleting }: DeleteDia
             disabled={isDeleting}
             className="px-4 py-2 text-sm rounded-lg bg-[var(--color-error)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-2"
           >
-            {isDeleting && (
-              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-            )}
+            {isDeleting && <SpinnerIcon />}
             Delete
           </button>
         </div>
@@ -220,9 +157,7 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
               <div className="h-32 rounded-lg bg-[var(--color-bg-overlay)]" />
             </div>
           ) : error ? (
-            <div className="rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
-              {error}
-            </div>
+            <ErrorBanner message={error} />
           ) : detail ? (
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
@@ -244,11 +179,7 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
                 disabled={connectLoading}
                 className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {connectLoading && (
-                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                )}
+                {connectLoading && <SpinnerIcon />}
                 Re-authorize
               </button>
             )}
@@ -394,9 +325,7 @@ export function ConnectionsPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
             >
               {connectLoading ? (
-                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
+                <SpinnerIcon />
               ) : (
                 <span className="text-base leading-none">+</span>
               )}
@@ -407,17 +336,8 @@ export function ConnectionsPage() {
       </div>
 
       {/* Error banner */}
-      {error && (
-        <div className="mx-6 mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shrink-0">
-          {error}
-        </div>
-      )}
-
-      {deleteError && (
-        <div className="mx-6 mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shrink-0">
-          {deleteError}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
+      {deleteError && <ErrorBanner message={deleteError} className="mx-6 mt-4 shrink-0" />}
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto">

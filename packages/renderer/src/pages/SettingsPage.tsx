@@ -3,6 +3,7 @@ import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
 import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
 import { navigate } from "@/lib/router";
+import { ErrorBanner } from "../components/common/ErrorBanner";
 
 export function SettingsPage() {
   const {
@@ -36,11 +37,7 @@ export function SettingsPage() {
       <div className="mx-auto max-w-2xl px-6 py-8 space-y-8">
         <h1 className="text-xl font-semibold text-[var(--color-text)]">Settings</h1>
 
-        {error && (
-          <div className="rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
-            {error}
-          </div>
-        )}
+        {error && <ErrorBanner message={error} />}
 
         <ApiKeySection maskedKey={maskedKey} />
         <EnvironmentSection environment={environment} onUpdate={updateEnvironment} />

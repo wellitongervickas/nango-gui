@@ -3,64 +3,8 @@ import type { NangoRecord, NangoRecordFilterAction } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { useRecordsStore } from "@/store/recordsStore";
 import { cn } from "@/lib/utils";
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ direction }: { direction: "up" | "down" }) {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: direction === "down" ? "rotate(180deg)" : undefined }}>
-      <path d="m18 15-6-6-6 6" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
-  );
-}
-
-function DatabaseIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <ellipse cx="12" cy="5" rx="9" ry="3" />
-      <path d="M3 5v14a9 3 0 0 0 18 0V5" />
-      <path d="M3 12a9 3 0 0 0 18 0" />
-    </svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
+import { SearchIcon, ChevronIcon, XIcon, RefreshIcon, DatabaseIcon, DownloadIcon, SpinnerIcon } from "@/components/icons";
+import { ErrorBanner } from "@/components/common/ErrorBanner";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -472,11 +416,7 @@ export function RecordsPage() {
       </div>
 
       {/* Error banner */}
-      {error && (
-        <div className="mx-6 mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shrink-0">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
@@ -561,11 +501,7 @@ export function RecordsPage() {
                   disabled={isLoadingMore}
                   className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {isLoadingMore ? (
-                    <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                    </svg>
-                  ) : null}
+                  {isLoadingMore ? <SpinnerIcon /> : null}
                   Load more
                 </button>
               </div>

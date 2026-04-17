@@ -3,47 +3,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { NangoProvider } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
+import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon } from "@/components/icons";
+import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn } from "@/lib/utils";
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-  );
-}
-
-function GridIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}
 
 // ── Provider logo ──────────────────────────────────────────────────────────
 
@@ -279,11 +241,7 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
                 disabled={isLoading}
                 className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isLoading && (
-                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                )}
+                {isLoading && <SpinnerIcon />}
                 Connect {provider.display_name}
               </button>
             )}
@@ -435,11 +393,7 @@ export function IntegrationsPage() {
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="mx-6 mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shrink-0">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Category sidebar */}

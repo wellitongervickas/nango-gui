@@ -3,6 +3,7 @@ import type { NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { useSyncsStore } from "@/store/syncsStore";
 import { SearchIcon, RefreshIcon, SyncIcon } from "@/components/icons";
+import { ErrorBanner } from "../components/common/ErrorBanner";
 import { ConnectionSelector } from "@/components/syncs/ConnectionSelector";
 import { SortHeader, type SyncSortKey, type SortDir } from "@/components/syncs/SortHeader";
 import { SyncRow } from "@/components/syncs/SyncRow";
@@ -133,11 +134,7 @@ export function SyncsPage() {
       </div>
 
       {/* Error banner */}
-      {error && (
-        <div className="mx-6 mt-4 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shrink-0">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
