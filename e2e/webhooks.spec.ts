@@ -25,6 +25,7 @@ import { _electron as electron } from "playwright";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import * as http from "node:http";
+import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAIN_JS = resolve(__dirname, "../apps/desktop/dist/main.js");
@@ -38,13 +39,17 @@ test.beforeAll(async () => {
   // NANGO_E2E=true tells the main process to skip the credential gate and
   // start directly on the main route, so we never land on the setup wizard.
   app = await electron.launch({
-    args: [MAIN_JS],
+    args: [MAIN_JS, `--user-data-dir=${tmpdir()}/nango-e2e-${Date.now()}`],
     env: { ...process.env, NODE_ENV: "production", NANGO_E2E: "true" },
   });
   page = await app.firstWindow();
 
   // Wait for React to mount and the Toolbar (<header>) to appear.
   await expect(page.locator("header").first()).toBeVisible({ timeout: 10000 });
+
+  // Dismiss the walkthrough tour that auto-shows on first launch (fresh
+  // user-data-dir means localStorage is empty, so the tour always opens).
+  await page.getByRole("button", { name: "Close tour" }).click().catch(() => {});
 });
 
 test.afterAll(async () => {
@@ -184,7 +189,7 @@ test("Start listener button starts the server and shows URL", async () => {
 
   await page.click('button:has-text("Start listener")');
   // URL display must appear
-  await expect(page.locator("text=http://127.0.0.1:")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=http://127.0.0.1:").first()).toBeVisible({ timeout: 5000 });
   // Port input becomes disabled
   const portInput = page.locator('input[type="number"]');
   await expect(portInput).toBeDisabled({ timeout: 3000 });
@@ -233,7 +238,7 @@ test("incoming POST request appears in the event log", async () => {
 
   await postToListener(listenerPort, { path: "/my/hook", body: { source: "nango" } });
   // The push event should cause the row to appear without reload
-  await expect(page.locator("text=/my/hook")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("/my/hook")).toBeVisible({ timeout: 5000 });
   await expect(page.locator("text=POST").first()).toBeVisible({ timeout: 3000 });
 
   await stopListener();
@@ -285,7 +290,7 @@ test("clicking an event opens the detail panel with body content", async () => {
   await page.locator("text=/detail-test").first().click();
 
   // Detail panel should show the body
-  await expect(page.locator("text=value123")).toBeVisible({ timeout: 3000 });
+  await expect(page.locator("text=value123").first()).toBeVisible({ timeout: 3000 });
 
   await stopListener();
 });
@@ -308,7 +313,7 @@ test("clicking the close button in the detail panel collapses it", async () => {
   await expect(page.locator("text=/close-panel-test")).toBeVisible({ timeout: 5000 });
   await page.locator("text=/close-panel-test").first().click();
   // Panel is open — close button is visible
-  await expect(page.locator("[title='Close'], button svg path[d='M18 6 6 18']").first()).toBeVisible({ timeout: 3000 });
+  await expect(page.locator("[aria-label='Close']").first()).toBeVisible({ timeout: 3000 });
 
   // Click the row again to deselect (toggle behaviour)
   await page.locator("text=/close-panel-test").first().click();
@@ -368,17 +373,17 @@ test("path text filter narrows event list", async () => {
   await postToListener(listenerPort, { path: "/alpha/event" });
   await postToListener(listenerPort, { path: "/beta/event" });
 
-  await expect(page.locator("text=/alpha/event")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("text=/beta/event")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("/alpha/event")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("/beta/event")).toBeVisible({ timeout: 5000 });
 
   // Filter by "alpha"
   await page.fill('input[placeholder="Filter by path…"]', "alpha");
-  await expect(page.locator("text=/alpha/event")).toBeVisible({ timeout: 2000 });
-  await expect(page.locator("text=/beta/event")).not.toBeVisible({ timeout: 2000 });
+  await expect(page.getByText("/alpha/event")).toBeVisible({ timeout: 2000 });
+  await expect(page.getByText("/beta/event")).not.toBeVisible({ timeout: 2000 });
 
   // Clear filter
   await page.fill('input[placeholder="Filter by path…"]', "");
-  await expect(page.locator("text=/beta/event")).toBeVisible({ timeout: 2000 });
+  await expect(page.getByText("/beta/event")).toBeVisible({ timeout: 2000 });
 
   await stopListener();
 });

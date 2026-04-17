@@ -33,8 +33,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "MONITOR",
     items: [
-      { label: "Dashboard", route: "dashboard" },
-      { label: "Webhook Inspector", route: "webhooks" },
+      { label: "Dashboard", route: "/" },
+      { label: "Webhooks", route: "webhooks" },
       { label: "MCP Servers", route: "mcp" },
       { label: "Rate Limits", route: "rate-limits", disabled: true },
     ],
@@ -42,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 function isRouteActive(route: string, currentRoute: string): boolean {
-  if (route === "dashboard") {
+  if (route === "/" || route === "dashboard") {
     return currentRoute === "/" || currentRoute === "dashboard";
   }
   return currentRoute === route;
@@ -74,7 +74,7 @@ export function NavSidebar() {
                         item.disabled
                           ? "text-[var(--color-text-muted)]/50 cursor-default"
                           : active
-                            ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+                            ? "bg-[var(--color-bg)] text-[var(--color-primary)] font-medium"
                             : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50 cursor-pointer"
                       )}
                     >
@@ -97,10 +97,11 @@ export function NavSidebar() {
       <div className="px-2 pb-3 border-t border-[var(--color-border)] pt-2">
         <button
           onClick={() => navigate("settings")}
+          aria-label="Settings"
           className={cn(
             "w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
             currentRoute === "settings"
-              ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+              ? "bg-[var(--color-bg)] text-[var(--color-primary)] font-medium"
               : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
           )}
         >
@@ -111,7 +112,7 @@ export function NavSidebar() {
           className={cn(
             "w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
             currentRoute === "deploys"
-              ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+              ? "bg-[var(--color-bg)] text-[var(--color-primary)] font-medium"
               : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
           )}
         >

@@ -57,9 +57,11 @@ class WebhookServer {
 
       server.listen(port, "127.0.0.1", () => {
         this.server = server;
-        this.port = port;
-        log.info(`[Webhook] Listening on http://127.0.0.1:${port}`);
-        resolve({ port, url: `http://127.0.0.1:${port}` });
+        const addr = server.address() as { port: number };
+        const actualPort = addr.port;
+        this.port = actualPort;
+        log.info(`[Webhook] Listening on http://127.0.0.1:${actualPort}`);
+        resolve({ port: actualPort, url: `http://127.0.0.1:${actualPort}` });
       });
     });
   }

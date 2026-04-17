@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { WebhookEvent } from "@nango-gui/shared";
 import { useWebhookStore, selectFilteredEvents } from "../store/webhookStore";
 import { cn } from "../lib/utils";
@@ -126,6 +127,7 @@ function EventDetail({ event, onClose }: { event: WebhookEvent; onClose: () => v
         <span className="flex-1 text-sm font-mono text-[var(--color-text)] truncate">{event.path}</span>
         <button
           onClick={onClose}
+          aria-label="Close"
           className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
         >
           <XIcon />
@@ -300,7 +302,7 @@ function FilterBar() {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function WebhooksPage() {
-  const events = useWebhookStore(selectFilteredEvents);
+  const events = useWebhookStore(useShallow(selectFilteredEvents));
   const allEvents = useWebhookStore((s) => s.events);
   const selectedEventId = useWebhookStore((s) => s.selectedEventId);
   const setSelectedEventId = useWebhookStore((s) => s.setSelectedEventId);

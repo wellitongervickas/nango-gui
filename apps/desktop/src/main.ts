@@ -40,7 +40,7 @@ function createWindow(startRoute: "/" | "/setup" = "/"): void {
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(
-      join(__dirname, "../../packages/renderer/dist/index.html"),
+      join(__dirname, "../../../packages/renderer/dist/index.html"),
       startRoute === "/setup" ? { hash: "/setup" } : undefined
     );
   }

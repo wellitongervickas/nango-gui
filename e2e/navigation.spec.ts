@@ -2,6 +2,7 @@ import { test, expect, type ElectronApplication, type Page } from "@playwright/t
 import { _electron as electron } from "playwright";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MAIN_JS = resolve(__dirname, "../apps/desktop/dist/main.js");
@@ -26,7 +27,7 @@ test.beforeAll(async () => {
   // NANGO_E2E=true tells the main process to skip the credential gate and
   // start directly on the main route, so we never land on the setup wizard.
   app = await electron.launch({
-    args: [MAIN_JS],
+    args: [MAIN_JS, `--user-data-dir=${tmpdir()}/nango-e2e-${Date.now()}`],
     env: { ...process.env, NODE_ENV: "production", NANGO_E2E: "true" },
   });
   page = await app.firstWindow();
@@ -47,13 +48,17 @@ test.beforeAll(async () => {
     await expect(page.locator('header').first()).toBeVisible({ timeout: 10000 });
   } catch (e) {
     // Dump debug info so the CI log shows exactly what the renderer contains.
-    const url = await page.url().catch(() => "<unavailable>");
+    const url = page.url();
     const dom = await page.content().catch(() => "<unavailable>");
     console.error("[E2E] Renderer URL:", url);
     console.error("[E2E] Renderer errors:", rendererErrors.join(" | ") || "none");
     console.error("[E2E] DOM excerpt:", dom.slice(0, 800));
     throw e;
   }
+
+  // Dismiss the walkthrough tour that auto-shows on first launch (fresh
+  // user-data-dir means localStorage is empty, so the tour always opens).
+  await page.getByRole("button", { name: "Close tour" }).click().catch(() => {});
 });
 
 test.afterAll(async () => {
