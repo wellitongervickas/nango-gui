@@ -31,6 +31,7 @@ import type {
   ProjectWriteFileRequest,
   WebhookStartServerRequest,
   WebhookEvent,
+  RateLimitAlert,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -156,6 +157,19 @@ contextBridge.exposeInMainWorld("webhook", {
   },
   removeAllEventListeners: () =>
     ipcRenderer.removeAllListeners(IPC_CHANNELS.WEBHOOK_EVENT),
+});
+
+// Expose window.rateLimit — rate-limit monitoring for API providers
+contextBridge.exposeInMainWorld("rateLimit", {
+  getState: () => ipcRenderer.invoke(IPC_CHANNELS.RATE_LIMIT_GET_STATE),
+  onAlert: (listener: (alert: RateLimitAlert) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.RATE_LIMIT_ALERT,
+      (_evt, data: RateLimitAlert) => listener(data)
+    );
+  },
+  removeAllAlertListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.RATE_LIMIT_ALERT),
 });
 
 export {};

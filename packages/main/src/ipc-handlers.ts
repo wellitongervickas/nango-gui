@@ -57,9 +57,11 @@ import {
   type WebhookStartServerResult,
   type WebhookServerStatus,
   type WebhookGetEventsResult,
+  type RateLimitGetStateResult,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
+import { rateLimitTracker } from "./rate-limit-tracker.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -548,6 +550,11 @@ export function registerIpcHandlers(): void {
             if (typeof value === "string") headers[key] = value;
           }
         }
+        // Feed rate-limit headers to the tracker
+        if (args.integrationId) {
+          rateLimitTracker.observe(args.integrationId, headers);
+        }
+
         return {
           status: response.status,
           headers,
@@ -1024,4 +1031,23 @@ export function registerIpcHandlers(): void {
         webhookServer.clearEvents();
       })
   );
+
+  // ── Rate limit monitor handlers ─────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.RATE_LIMIT_GET_STATE,
+    async (): Promise<IpcResponse<RateLimitGetStateResult>> =>
+      wrap(async () => ({
+        providers: rateLimitTracker.getState(),
+      }))
+  );
+
+  // Broadcast rate-limit alerts to all renderer windows.
+  rateLimitTracker.onAlert((alert) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.RATE_LIMIT_ALERT, alert);
+      }
+    }
+  });
 }
