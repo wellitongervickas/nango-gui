@@ -31,9 +31,29 @@ test.beforeAll(async () => {
   });
   page = await app.firstWindow();
 
+  // Capture renderer console errors and uncaught exceptions so CI logs show
+  // the root cause when the page fails to hydrate.
+  const rendererErrors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") rendererErrors.push(`console.error: ${msg.text()}`);
+  });
+  page.on("pageerror", (err) => {
+    rendererErrors.push(`pageerror: ${err.message}`);
+  });
+
   // Wait for React to mount and the Toolbar (<header>) to appear.
   // 10 s is generous; in practice the renderer is ready in well under 5 s.
-  await expect(page.locator('header').first()).toBeVisible({ timeout: 10000 });
+  try {
+    await expect(page.locator('header').first()).toBeVisible({ timeout: 10000 });
+  } catch (e) {
+    // Dump debug info so the CI log shows exactly what the renderer contains.
+    const url = await page.url().catch(() => "<unavailable>");
+    const dom = await page.content().catch(() => "<unavailable>");
+    console.error("[E2E] Renderer URL:", url);
+    console.error("[E2E] Renderer errors:", rendererErrors.join(" | ") || "none");
+    console.error("[E2E] DOM excerpt:", dom.slice(0, 800));
+    throw e;
+  }
 });
 
 test.afterAll(async () => {
