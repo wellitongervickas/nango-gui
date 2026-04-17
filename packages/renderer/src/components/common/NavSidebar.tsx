@@ -17,7 +17,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "BUILD",
     items: [
       { label: "Canvas", route: "canvas" },
-      { label: "AI Integration Builder", route: "ai-builder", disabled: true },
+      { label: "AI Builder", route: "ai-builder" },
     ],
   },
   {
@@ -36,7 +36,6 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", route: "dashboard" },
       { label: "Webhook Inspector", route: "webhooks" },
       { label: "MCP Servers", route: "mcp" },
-      { label: "Rate Limits", route: "rate-limits", disabled: true },
     ],
   },
 ];

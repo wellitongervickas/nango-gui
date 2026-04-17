@@ -75,6 +75,13 @@ function App() {
     useEnvironmentStore.getState().initialize();
   }, []);
 
+  // Auto-open AI Builder panel when navigating via ai-builder route
+  useEffect(() => {
+    if (route === "ai-builder") {
+      useAiBuilderPanelStore.getState().open();
+    }
+  }, [route]);
+
   if (route === "setup") {
     return <SetupWizard />;
   }
