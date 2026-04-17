@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { NangoDashboardData } from "@nango-gui/shared";
 import { useDashboardStore } from "@/store/dashboardStore";
+import { useRateLimitStore, selectOverallStatus } from "@/store/rateLimitStore";
 import { cn } from "@/lib/utils";
 import { navigate } from "@/lib/router";
 
@@ -394,6 +395,72 @@ function EmptyState() {
   );
 }
 
+// ── Rate limit summary widget ─────────────────────────────────────────────
+
+const RATE_LIMIT_STATUS_STYLES = {
+  empty:    null,
+  ok:       { bg: "bg-[var(--color-success)]/10",  bar: "bg-[var(--color-success)]",  text: "text-[var(--color-success)]",  label: "All clear" },
+  warning:  { bg: "bg-[var(--color-warning)]/10",  bar: "bg-[var(--color-warning)]",  text: "text-[var(--color-warning)]",  label: "Approaching limit" },
+  critical: { bg: "bg-[var(--color-error)]/10",    bar: "bg-[var(--color-error)]",    text: "text-[var(--color-error)]",    label: "Near limit" },
+} as const;
+
+function RateLimitSummaryWidget() {
+  const providers = useRateLimitStore((s) => s.providers);
+  const fetchState = useRateLimitStore((s) => s.fetchState);
+
+  useEffect(() => {
+    fetchState();
+  }, [fetchState]);
+
+  const status = selectOverallStatus(providers);
+  const styles = RATE_LIMIT_STATUS_STYLES[status];
+
+  if (!styles) return null;
+
+  const providerList = [...providers.values()];
+
+  return (
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider">
+          API Rate Limits
+        </h2>
+        <span className={cn("text-xs font-medium", styles.text)}>
+          {styles.label}
+        </span>
+      </div>
+      <div className="space-y-2.5">
+        {providerList.map((p) => {
+          const pct = p.limit > 0 ? Math.min(100, ((p.limit - p.remaining) / p.limit) * 100) : 0;
+          const diffSec = Math.max(0, Math.floor(p.reset - Date.now() / 1000));
+          const m = Math.floor(diffSec / 60);
+          const s = diffSec % 60;
+          const resetIn = diffSec === 0 ? "now" : m === 0 ? `${s}s` : `${m}m ${s}s`;
+          const rowLevel = pct >= 90 ? "critical" : pct >= 75 ? "warning" : "ok";
+          const rowBarColor = rowLevel === "critical" ? "bg-[var(--color-error)]" : rowLevel === "warning" ? "bg-[var(--color-warning)]" : "bg-[var(--color-success)]";
+          const rowTextColor = rowLevel === "critical" ? "text-[var(--color-error)]" : rowLevel === "warning" ? "text-[var(--color-warning)]" : "text-[var(--color-success)]";
+          return (
+            <div key={p.provider} className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="capitalize font-medium text-[var(--color-text-primary)]">{p.provider}</span>
+                <span className={cn("tabular-nums", rowTextColor)}>
+                  {p.remaining}/{p.limit} · resets in {resetIn}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[var(--color-bg-overlay)] overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full transition-all duration-500", rowBarColor)}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────
 
 const AUTO_REFRESH_INTERVAL_MS = 60_000;
@@ -519,6 +586,9 @@ export function DashboardPage() {
                 }
               />
             </div>
+
+            {/* Rate limit summary */}
+            <RateLimitSummaryWidget />
 
             {/* Sync status bar */}
             <SyncStatusBar dashboard={dashboard} />

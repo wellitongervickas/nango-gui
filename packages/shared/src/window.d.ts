@@ -46,6 +46,8 @@ import type {
   WebhookServerStatus,
   WebhookGetEventsResult,
   WebhookEvent,
+  RateLimitGetStateResult,
+  RateLimitAlert,
 } from "./ipc-channels.js";
 
 declare global {
@@ -144,6 +146,14 @@ declare global {
       clearEvents(): Promise<IpcResponse<void>>;
       onEvent(listener: (event: WebhookEvent) => void): void;
       removeAllEventListeners(): void;
+    };
+    rateLimit: {
+      /** Fetch the current per-provider rate-limit state from the main process. */
+      getState(): Promise<IpcResponse<RateLimitGetStateResult>>;
+      /** Register a listener for threshold-crossing alert events. */
+      onAlert(listener: (alert: RateLimitAlert) => void): void;
+      /** Remove all alert listeners (call on component unmount to prevent leaks). */
+      removeAllAlertListeners(): void;
     };
   }
 }

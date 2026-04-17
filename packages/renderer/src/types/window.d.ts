@@ -53,6 +53,8 @@ import type {
   WebhookServerStatus,
   WebhookGetEventsResult,
   WebhookEvent,
+  RateLimitGetStateResult,
+  RateLimitAlert,
 } from "@nango-gui/shared";
 
 declare global {
@@ -151,6 +153,11 @@ declare global {
       clearEvents(): Promise<IpcResponse<void>>;
       onEvent(listener: (event: WebhookEvent) => void): void;
       removeAllEventListeners(): void;
+    };
+    rateLimit: {
+      getState(): Promise<IpcResponse<RateLimitGetStateResult>>;
+      onAlert(listener: (alert: RateLimitAlert) => void): void;
+      removeAllAlertListeners(): void;
     };
   }
 }
