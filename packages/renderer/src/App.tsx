@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { Canvas } from "./components/canvas/Canvas";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { Toolbar } from "./components/common/Toolbar";
+import { NavSidebar } from "./components/common/NavSidebar";
 import { StatusBar } from "./components/common/StatusBar";
 import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { CodePreviewPanel } from "./components/canvas/CodePreviewPanel";
@@ -32,6 +33,26 @@ import { useEnvironmentStore } from "./store/environmentStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
 
+/** Shared shell layout with toolbar, sidebar nav, and status bar. */
+function AppShell({ children, pageName }: { children: React.ReactNode; pageName: string }) {
+  return (
+    <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
+      <OfflineBanner />
+      <Toolbar />
+      <div className="flex flex-1 overflow-hidden">
+        <NavSidebar />
+        <main className="flex-1 relative overflow-hidden">
+          <PageErrorBoundary pageName={pageName}>
+            {children}
+          </PageErrorBoundary>
+        </main>
+      </div>
+      <StatusBar />
+      <ErrorToasts />
+    </div>
+  );
+}
+
 function App() {
   const route = useHashRoute();
   const codePanelOpen = useCodePanelStore((s) => s.isOpen);
@@ -59,191 +80,53 @@ function App() {
   }
 
   if (route === "/" || route === "dashboard") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Dashboard">
-              <DashboardPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Dashboard"><DashboardPage /></AppShell>;
   }
 
   if (route === "settings") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Settings">
-              <SettingsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Settings"><SettingsPage /></AppShell>;
   }
 
   if (route === "connections") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Connections">
-              <ConnectionsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Connections"><ConnectionsPage /></AppShell>;
   }
 
   if (route === "integrations") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Integrations">
-              <IntegrationsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Integrations"><IntegrationsPage /></AppShell>;
   }
 
   if (route === "syncs") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Syncs">
-              <SyncsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Syncs"><SyncsPage /></AppShell>;
   }
 
   if (route === "records") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Records">
-              <RecordsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Records"><RecordsPage /></AppShell>;
   }
 
   if (route === "actions") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Actions">
-              <ActionsPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Actions"><ActionsPage /></AppShell>;
   }
 
   if (route === "webhooks") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Webhooks">
-              <WebhooksPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Webhooks"><WebhooksPage /></AppShell>;
   }
 
   if (route === "deploys") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="Deploy History">
-              <DeployHistoryPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="Deploy History"><DeployHistoryPage /></AppShell>;
   }
 
   if (route === "mcp") {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
-        <OfflineBanner />
-        <Toolbar />
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 relative overflow-hidden">
-            <PageErrorBoundary pageName="MCP Servers">
-              <McpPage />
-            </PageErrorBoundary>
-          </main>
-        </div>
-        <StatusBar />
-        <ErrorToasts />
-      </div>
-    );
+    return <AppShell pageName="MCP Servers"><McpPage /></AppShell>;
   }
 
+  // Canvas (default route) — uses ReactFlowProvider + extra panels
   return (
     <ReactFlowProvider>
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
         <OfflineBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
+          <NavSidebar />
           <Sidebar />
           <main className="flex-1 relative overflow-hidden">
             <PageErrorBoundary pageName="Canvas">

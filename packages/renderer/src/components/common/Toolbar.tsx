@@ -10,31 +10,7 @@ import { useHashRoute, navigate } from "../../lib/router";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { RateLimitBadge } from "../rate-limit/RateLimitBadge";
-import { GearIcon, FolderOpenIcon, HelpIcon } from "@/components/icons";
-
-function NavButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-3 py-1 text-xs rounded-md transition-colors cursor-pointer",
-        active
-          ? "bg-[var(--color-bg)] text-[var(--color-text)]"
-          : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
-      )}
-    >
-      {label}
-    </button>
-  );
-}
+import { FolderOpenIcon, HelpIcon } from "@/components/icons";
 
 
 // ── Project file format ──────────────────────────────────────────────────
@@ -74,7 +50,6 @@ export function Toolbar() {
   const shouldAutoShow = useTourAutoShow();
   const [tourOpen, setTourOpen] = useState(shouldAutoShow);
 
-  const isDashboard = currentRoute === "/" || currentRoute === "dashboard";
   const isCanvas = currentRoute === "canvas";
 
   const saveProject = useCallback(
@@ -167,67 +142,8 @@ export function Toolbar() {
         Nango Builder
       </h1>
 
-      {/* Nav */}
-      <nav className="flex items-center gap-0.5">
-        <NavButton
-          label="Dashboard"
-          active={isDashboard}
-          onClick={() => navigate("/")}
-        />
-        <NavButton
-          label="Canvas"
-          active={isCanvas}
-          onClick={() => navigate("canvas")}
-        />
-        <NavButton
-          label="Connections"
-          active={currentRoute === "connections"}
-          onClick={() => navigate("connections")}
-        />
-        <NavButton
-          label="Syncs"
-          active={currentRoute === "syncs"}
-          onClick={() => navigate("syncs")}
-        />
-        <NavButton
-          label="Records"
-          active={currentRoute === "records"}
-          onClick={() => navigate("records")}
-        />
-        <NavButton
-          label="Actions"
-          active={currentRoute === "actions"}
-          onClick={() => navigate("actions")}
-        />
-        <NavButton
-          label="Integrations"
-          active={currentRoute === "integrations"}
-          onClick={() => navigate("integrations")}
-        />
-        <NavButton
-          label="Webhooks"
-          active={currentRoute === "webhooks"}
-          onClick={() => navigate("webhooks")}
-        />
-        <NavButton
-          label="Deploys"
-          active={currentRoute === "deploys"}
-          onClick={() => navigate("deploys")}
-        />
-        <NavButton
-          label="MCP"
-          active={currentRoute === "mcp"}
-          onClick={() => navigate("mcp")}
-        />
-        <NavButton
-          label="Settings"
-          active={currentRoute === "settings"}
-          onClick={() => navigate("settings")}
-        />
-      </nav>
-
       {project && (
-        <span className="ml-3 text-xs text-[var(--color-text-muted)]">
+        <span className="text-xs text-[var(--color-text-muted)]">
           {project.name}
           {isDirty && " *"}
         </span>
@@ -320,14 +236,6 @@ export function Toolbar() {
         )}
       >
         <HelpIcon />
-      </button>
-
-      <button
-        onClick={() => navigate("settings")}
-        aria-label="Settings"
-        className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
-      >
-        <GearIcon />
       </button>
 
       {tourOpen && <WalkthroughTour onClose={() => setTourOpen(false)} />}
