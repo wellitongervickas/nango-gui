@@ -32,6 +32,9 @@ import type {
   WebhookStartServerRequest,
   WebhookEvent,
   RateLimitAlert,
+  AiGenerateRequest,
+  AiRefineRequest,
+  AiStreamTokenEvent,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -70,6 +73,18 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_PROXY_REQUEST, args),
   getDashboard: () =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_DASHBOARD),
+  aiGenerateIntegration: (args: AiGenerateRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_AI_GENERATE, args),
+  aiRefineIntegration: (args: AiRefineRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_AI_REFINE, args),
+  onAiStreamToken: (listener: (event: AiStreamTokenEvent) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.NANGO_AI_STREAM_TOKEN,
+      (_evt, data: AiStreamTokenEvent) => listener(data)
+    );
+  },
+  removeAllAiStreamListeners: () =>
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.NANGO_AI_STREAM_TOKEN),
 });
 
 // Expose window.credentials — secure credential storage

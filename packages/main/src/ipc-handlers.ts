@@ -58,10 +58,14 @@ import {
   type WebhookServerStatus,
   type WebhookGetEventsResult,
   type RateLimitGetStateResult,
+  type AiGenerateRequest,
+  type AiRefineRequest,
+  type AiGenerationResult,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import { rateLimitTracker } from "./rate-limit-tracker.js";
+import { aiService } from "./ai-service.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -1050,4 +1054,34 @@ export function registerIpcHandlers(): void {
       }
     }
   });
+
+  // ── AI Integration Builder handlers ─────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_AI_GENERATE,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: AiGenerateRequest
+    ): Promise<IpcResponse<AiGenerationResult>> =>
+      wrap(async () => {
+        if (!args?.provider || !args?.prompt) {
+          throw new Error("provider and prompt are required");
+        }
+        return aiService.generate(args);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_AI_REFINE,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: AiRefineRequest
+    ): Promise<IpcResponse<AiGenerationResult>> =>
+      wrap(async () => {
+        if (!args?.provider || !args?.prompt || !args?.currentDefinition) {
+          throw new Error("provider, prompt, and currentDefinition are required");
+        }
+        return aiService.refine(args);
+      })
+  );
 }

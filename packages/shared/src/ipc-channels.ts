@@ -81,6 +81,12 @@ export const IPC_CHANNELS = {
   RATE_LIMIT_GET_STATE: "rateLimit:getState",
   /** Main → renderer push event: a rate-limit threshold was crossed. */
   RATE_LIMIT_ALERT: "rateLimit:alert",
+
+  // AI Integration Builder
+  NANGO_AI_GENERATE: "nango:aiGenerate",
+  NANGO_AI_REFINE: "nango:aiRefine",
+  /** Main → renderer push event: a partial token streamed from the AI endpoint. */
+  NANGO_AI_STREAM_TOKEN: "nango:aiStreamToken",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -536,4 +542,52 @@ export interface RateLimitAlert {
 
 export interface RateLimitGetStateResult {
   providers: RateLimitProviderState[];
+}
+
+// ── AI Integration Builder ────────────────────────────────────────────────────
+
+/** A single turn in the AI conversation history. */
+export interface AiConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** The structured output produced by the Nango AI generate/refine endpoint. */
+export interface AiGenerationResult {
+  /** Provider key the integration was generated for (e.g. "github"). */
+  provider: string;
+  /** Human-readable summary of what was generated. */
+  description: string;
+  /** Generated nango.yaml content. */
+  yaml: string;
+  /** Generated TypeScript sync/action code. */
+  typescript: string;
+}
+
+export interface AiGenerateRequest {
+  /** Provider key to generate an integration for (e.g. "github", "slack"). */
+  provider: string;
+  /** Free-form user prompt describing the desired integration. */
+  prompt: string;
+  /** Conversation history for multi-turn context. Omit for the first turn. */
+  conversationHistory?: AiConversationTurn[];
+}
+
+export interface AiRefineRequest {
+  /** Provider key of the integration being refined. */
+  provider: string;
+  /** User's follow-up instruction for the refinement. */
+  prompt: string;
+  /** Full conversation history up to this point (at least one prior turn). */
+  conversationHistory: AiConversationTurn[];
+  /** The definition produced by the previous generate/refine call. */
+  currentDefinition: AiGenerationResult;
+}
+
+/** Emitted on the NANGO_AI_STREAM_TOKEN channel during streaming generation. */
+export interface AiStreamTokenEvent {
+  token: string;
+  /** True when this is the final token and the full result follows. */
+  done: boolean;
+  result?: AiGenerationResult;
 }

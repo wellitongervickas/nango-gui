@@ -55,6 +55,10 @@ import type {
   WebhookEvent,
   RateLimitGetStateResult,
   RateLimitAlert,
+  AiGenerateRequest,
+  AiRefineRequest,
+  AiGenerationResult,
+  AiStreamTokenEvent,
 } from "@nango-gui/shared";
 
 declare global {
@@ -99,6 +103,18 @@ declare global {
       updateSyncFrequency(
         args: NangoUpdateSyncFrequencyRequest
       ): Promise<IpcResponse<NangoUpdateSyncFrequencyResult>>;
+      /** Generate a new integration from a plain-English prompt. */
+      aiGenerateIntegration(
+        args: AiGenerateRequest
+      ): Promise<IpcResponse<AiGenerationResult>>;
+      /** Refine an existing generated integration with a follow-up prompt. */
+      aiRefineIntegration(
+        args: AiRefineRequest
+      ): Promise<IpcResponse<AiGenerationResult>>;
+      /** Register a listener for streaming AI token events. */
+      onAiStreamToken(listener: (event: AiStreamTokenEvent) => void): void;
+      /** Remove all AI stream token listeners. */
+      removeAllAiStreamListeners(): void;
       listRecords(
         args: NangoListRecordsRequest
       ): Promise<IpcResponse<NangoListRecordsResult>>;
