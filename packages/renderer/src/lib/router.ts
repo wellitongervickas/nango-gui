@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { useNavigationStore } from "../store/navigationStore";
 
 // ── Hash parsing ────────────────────────────────────────────────────────────
 
@@ -30,8 +31,14 @@ export function useHashRoute(): string {
  * dispatches a `HashChangeEvent` so listeners fire reliably even in
  * Electron's `file://` origin (where the browser-native event can be
  * swallowed).
+ *
+ * Also pushes the route onto the navigation history stack so the
+ * back/forward buttons work.
  */
 export function navigate(route: string): void {
+  const normalized = route === "/" ? "/" : route.replace(/^\//, "");
+  useNavigationStore.getState().push(normalized);
+
   window.location.hash = route === "/" ? "/" : `/${route}`;
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
