@@ -96,6 +96,10 @@ export const IPC_CHANNELS = {
   MCP_STOP: "mcp:stop",
   /** Main → renderer push event: an MCP server status changed. */
   MCP_STATUS_CHANGED: "mcp:statusChanged",
+
+  // Nango webhook settings (outgoing webhook URL configuration)
+  NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
+  NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -665,4 +669,28 @@ export interface McpStatusChangedEvent {
   status: McpServerStatus;
   pid: number | null;
   error: string | null;
+}
+
+// ── Nango webhook settings ────────────────────────────────────────────────────
+
+/** Nango outgoing webhook URL configuration and event filter settings. */
+export interface NangoWebhookSettings {
+  primaryUrl: string;
+  secondaryUrl: string;
+  onSyncCompletionAlways: boolean;
+  onAuthCreation: boolean;
+  onAuthRefreshError: boolean;
+  onSyncError: boolean;
+  onAsyncActionCompletion: boolean;
+}
+
+/** Partial update payload for webhook settings. */
+export interface NangoUpdateWebhookSettingsRequest {
+  primaryUrl?: string;
+  secondaryUrl?: string;
+  onSyncCompletionAlways?: boolean;
+  onAuthCreation?: boolean;
+  onAuthRefreshError?: boolean;
+  onSyncError?: boolean;
+  onAsyncActionCompletion?: boolean;
 }

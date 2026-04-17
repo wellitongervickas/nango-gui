@@ -47,8 +47,10 @@ test.beforeAll(async () => {
     await expect(page.locator('header').first()).toBeVisible({ timeout: 10000 });
   } catch (e) {
     // Dump debug info so the CI log shows exactly what the renderer contains.
-    const url = await page.url().catch(() => "<unavailable>");
-    const dom = await page.content().catch(() => "<unavailable>");
+    let url = "<unavailable>";
+    let dom = "<unavailable>";
+    try { url = page.url(); } catch { /* noop */ }
+    try { dom = await page.content(); } catch { /* noop */ }
     console.error("[E2E] Renderer URL:", url);
     console.error("[E2E] Renderer errors:", rendererErrors.join(" | ") || "none");
     console.error("[E2E] DOM excerpt:", dom.slice(0, 800));

@@ -326,7 +326,6 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
         handleSubmit();
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [isRefinement, isGenerating, provider, prompt]
   );
 

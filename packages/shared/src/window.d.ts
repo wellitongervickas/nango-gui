@@ -58,6 +58,8 @@ import type {
   McpStartRequest,
   McpStopRequest,
   McpStatusChangedEvent,
+  NangoWebhookSettings,
+  NangoUpdateWebhookSettingsRequest,
 } from "./ipc-channels.js";
 
 declare global {
@@ -114,6 +116,10 @@ declare global {
       onAiStreamToken(listener: (event: AiStreamTokenEvent) => void): void;
       /** Remove all AI stream token listeners. */
       removeAllAiStreamListeners(): void;
+      /** Fetch current Nango outgoing webhook settings. */
+      getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
+      /** Update Nango outgoing webhook settings (partial patch). */
+      updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
     };
     credentials: {
       save(
