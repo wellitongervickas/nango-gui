@@ -59,6 +59,12 @@ import type {
   AiRefineRequest,
   AiGenerationResult,
   AiStreamTokenEvent,
+  McpListConfigsResult,
+  McpAddConfigRequest,
+  McpRemoveConfigRequest,
+  McpStartRequest,
+  McpStopRequest,
+  McpStatusChangedEvent,
 } from "@nango-gui/shared";
 
 declare global {
@@ -174,6 +180,15 @@ declare global {
       getState(): Promise<IpcResponse<RateLimitGetStateResult>>;
       onAlert(listener: (alert: RateLimitAlert) => void): void;
       removeAllAlertListeners(): void;
+    };
+    mcp: {
+      listConfigs(): Promise<IpcResponse<McpListConfigsResult>>;
+      addConfig(args: McpAddConfigRequest): Promise<IpcResponse<void>>;
+      removeConfig(args: McpRemoveConfigRequest): Promise<IpcResponse<void>>;
+      start(args: McpStartRequest): Promise<IpcResponse<void>>;
+      stop(args: McpStopRequest): Promise<IpcResponse<void>>;
+      onStatusChange(listener: (event: McpStatusChangedEvent) => void): void;
+      removeAllStatusChangeListeners(): void;
     };
   }
 }

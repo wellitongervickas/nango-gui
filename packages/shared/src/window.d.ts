@@ -52,6 +52,12 @@ import type {
   AiRefineRequest,
   AiGenerationResult,
   AiStreamTokenEvent,
+  McpListConfigsResult,
+  McpAddConfigRequest,
+  McpRemoveConfigRequest,
+  McpStartRequest,
+  McpStopRequest,
+  McpStatusChangedEvent,
 } from "./ipc-channels.js";
 
 declare global {
@@ -170,6 +176,22 @@ declare global {
       onAlert(listener: (alert: RateLimitAlert) => void): void;
       /** Remove all alert listeners (call on component unmount to prevent leaks). */
       removeAllAlertListeners(): void;
+    };
+    mcp: {
+      /** Discover and list all MCP server configs and their runtime state. */
+      listConfigs(): Promise<IpcResponse<McpListConfigsResult>>;
+      /** Add a new MCP server config entry. */
+      addConfig(args: McpAddConfigRequest): Promise<IpcResponse<void>>;
+      /** Remove an MCP server config entry. */
+      removeConfig(args: McpRemoveConfigRequest): Promise<IpcResponse<void>>;
+      /** Start an MCP server by name. */
+      start(args: McpStartRequest): Promise<IpcResponse<void>>;
+      /** Stop an MCP server by name. */
+      stop(args: McpStopRequest): Promise<IpcResponse<void>>;
+      /** Register a listener for MCP server status change events. */
+      onStatusChange(listener: (event: McpStatusChangedEvent) => void): void;
+      /** Remove all status change listeners (call on component unmount). */
+      removeAllStatusChangeListeners(): void;
     };
   }
 }

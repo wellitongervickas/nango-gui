@@ -87,6 +87,15 @@ export const IPC_CHANNELS = {
   NANGO_AI_REFINE: "nango:aiRefine",
   /** Main → renderer push event: a partial token streamed from the AI endpoint. */
   NANGO_AI_STREAM_TOKEN: "nango:aiStreamToken",
+
+  // MCP server management
+  MCP_LIST_CONFIGS: "mcp:listConfigs",
+  MCP_ADD_CONFIG: "mcp:addConfig",
+  MCP_REMOVE_CONFIG: "mcp:removeConfig",
+  MCP_START: "mcp:start",
+  MCP_STOP: "mcp:stop",
+  /** Main → renderer push event: an MCP server status changed. */
+  MCP_STATUS_CHANGED: "mcp:statusChanged",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -590,4 +599,70 @@ export interface AiStreamTokenEvent {
   /** True when this is the final token and the full result follows. */
   done: boolean;
   result?: AiGenerationResult;
+}
+
+// ── MCP server management ─────────────────────────────────────────────────────
+
+export type McpServerStatus = "stopped" | "starting" | "running" | "error";
+
+/** A single MCP server entry from the config file. */
+export interface McpServerConfig {
+  /** Unique name for this server (the key in the config object). */
+  name: string;
+  /** Shell command to start the server (e.g. "npx", "node"). */
+  command: string;
+  /** Command arguments. */
+  args: string[];
+  /** Optional environment variables for the subprocess. */
+  env?: Record<string, string>;
+  /** Source config file path this entry was read from. */
+  sourceFile: string;
+}
+
+/** Runtime state for a managed MCP server. */
+export interface McpServerState {
+  config: McpServerConfig;
+  status: McpServerStatus;
+  /** Process ID when running/starting, null otherwise. */
+  pid: number | null;
+  /** Tool names discovered from tools/list on startup. */
+  tools: string[];
+  /** Error message if status is "error". */
+  error: string | null;
+  /** ISO timestamp of the last status change. */
+  updatedAt: string;
+}
+
+export interface McpListConfigsResult {
+  servers: McpServerState[];
+  /** Config file paths that were scanned. */
+  configFiles: string[];
+}
+
+export interface McpAddConfigRequest {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  /** Which config file to write to. If omitted, uses the first discovered path. */
+  targetFile?: string;
+}
+
+export interface McpRemoveConfigRequest {
+  name: string;
+}
+
+export interface McpStartRequest {
+  name: string;
+}
+
+export interface McpStopRequest {
+  name: string;
+}
+
+export interface McpStatusChangedEvent {
+  name: string;
+  status: McpServerStatus;
+  pid: number | null;
+  error: string | null;
 }

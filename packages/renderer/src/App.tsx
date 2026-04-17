@@ -8,9 +8,11 @@ import { PropertiesPanel } from "./components/properties/PropertiesPanel";
 import { CodePreviewPanel } from "./components/canvas/CodePreviewPanel";
 import { DryrunPanel } from "./components/canvas/DryrunPanel";
 import { DeployPanel } from "./components/deploy/DeployPanel";
+import { AiBuilderPanel } from "./components/ai/AiBuilderPanel";
 import { useCodePanelStore } from "./store/codePanelStore";
 import { useDryrunPanelStore } from "./store/dryrunPanelStore";
 import { useDeployPanelStore } from "./store/deployPanelStore";
+import { useAiBuilderPanelStore } from "./store/aiBuilderPanelStore";
 import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
@@ -37,6 +39,8 @@ function App() {
   const closeDryrunPanel = useDryrunPanelStore((s) => s.close);
   const deployPanelOpen = useDeployPanelStore((s) => s.isOpen);
   const closeDeployPanel = useDeployPanelStore((s) => s.close);
+  const aiBuilderOpen = useAiBuilderPanelStore((s) => s.isOpen);
+  const closeAiBuilder = useAiBuilderPanelStore((s) => s.close);
 
   // Apply persisted theme preference and initialize environment as early as possible.
   useEffect(() => {
@@ -226,12 +230,17 @@ function App() {
             <PageErrorBoundary pageName="Canvas">
               <div className="flex flex-col h-full">
                 <div className="flex flex-1 min-h-0">
-                  <div className={codePanelOpen ? "flex-1 min-w-0" : "w-full"}>
+                  <div className={codePanelOpen || aiBuilderOpen ? "flex-1 min-w-0" : "w-full"}>
                     <Canvas />
                   </div>
                   {codePanelOpen && (
                     <div className="w-[420px] shrink-0">
                       <CodePreviewPanel onClose={closeCodePanel} />
+                    </div>
+                  )}
+                  {aiBuilderOpen && (
+                    <div className="w-[400px] shrink-0">
+                      <AiBuilderPanel onClose={closeAiBuilder} />
                     </div>
                   )}
                 </div>
