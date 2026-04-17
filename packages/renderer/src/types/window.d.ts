@@ -65,6 +65,8 @@ import type {
   McpStartRequest,
   McpStopRequest,
   McpStatusChangedEvent,
+  NangoWebhookSettings,
+  NangoUpdateWebhookSettingsRequest,
 } from "@nango-gui/shared";
 
 declare global {
@@ -131,6 +133,8 @@ declare global {
         args: NangoProxyRequest
       ): Promise<IpcResponse<NangoProxyResult>>;
       getDashboard(): Promise<IpcResponse<NangoDashboardData>>;
+      getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
+      updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

@@ -23,7 +23,7 @@ vi.mock("../logger.js", () => ({
 const mockLoad = vi.fn<() => string | null>().mockReturnValue("test-secret-key");
 
 vi.mock("../credential-store.js", () => ({
-  credentialStore: { load: (...args: unknown[]) => mockLoad() },
+  credentialStore: { load: (..._args: unknown[]) => mockLoad() },
 }));
 
 // ── rateLimitTracker mock ─────────────────────────────────────────────────────
