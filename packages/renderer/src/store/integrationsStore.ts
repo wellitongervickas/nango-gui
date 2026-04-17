@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { NangoProvider } from "@nango-gui/shared";
-import { notifyIpcError } from "./notifyError";
+import { asyncFetch } from "./asyncFetch";
 
 interface IntegrationsState {
   providers: NangoProvider[];
@@ -22,19 +22,12 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   activeCategory: null,
 
   fetchProviders: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await window.nango.listProviders();
-      if (res.status === "error") {
-        notifyIpcError(res);
-        set({ error: res.error, isLoading: false });
-        return;
-      }
-      set({ providers: res.data, isLoading: false });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load providers";
-      set({ error: message, isLoading: false });
-    }
+    await asyncFetch(
+      set,
+      () => window.nango.listProviders(),
+      (data) => ({ providers: data }),
+      "Failed to load providers",
+    );
   },
 
   setSearch: (search) => set({ search }),

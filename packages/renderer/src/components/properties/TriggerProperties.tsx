@@ -1,4 +1,5 @@
 import type { TriggerNodeData } from "../../types/flow";
+import { inputBaseClass } from "../../lib/utils";
 
 interface Props {
   data: TriggerNodeData;
@@ -24,8 +25,6 @@ function Field({
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function TriggerProperties({ data, onUpdate }: Props) {
   return (
@@ -39,7 +38,7 @@ export function TriggerProperties({ data, onUpdate }: Props) {
 
       <Field label="Name">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.label || ""}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="Trigger name"
@@ -48,7 +47,7 @@ export function TriggerProperties({ data, onUpdate }: Props) {
 
       <Field label="Description">
         <textarea
-          className={`${inputCls} resize-none`}
+          className={`${inputBaseClass} resize-none`}
           rows={2}
           value={data.description || ""}
           onChange={(e) => onUpdate({ description: e.target.value })}
@@ -58,7 +57,7 @@ export function TriggerProperties({ data, onUpdate }: Props) {
 
       <Field label="Frequency">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={data.frequency || "1h"}
           onChange={(e) => onUpdate({ frequency: e.target.value })}
         >
@@ -72,7 +71,7 @@ export function TriggerProperties({ data, onUpdate }: Props) {
 
       <Field label="Output Model">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.modelRef || ""}
           onChange={(e) => onUpdate({ modelRef: e.target.value })}
           placeholder="Model name"

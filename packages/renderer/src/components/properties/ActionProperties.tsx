@@ -1,4 +1,5 @@
 import type { ActionNodeData } from "../../types/flow";
+import { inputBaseClass } from "../../lib/utils";
 import { FunctionCodeViewer } from "./FunctionCodeViewer";
 
 interface Props {
@@ -25,8 +26,6 @@ function Field({
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function ActionProperties({ data, onUpdate }: Props) {
   return (
@@ -40,7 +39,7 @@ export function ActionProperties({ data, onUpdate }: Props) {
 
       <Field label="Name">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.label || ""}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="Action name"
@@ -49,7 +48,7 @@ export function ActionProperties({ data, onUpdate }: Props) {
 
       <Field label="Endpoint">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.endpoint || ""}
           onChange={(e) => onUpdate({ endpoint: e.target.value })}
           placeholder="/api/resource"
@@ -58,7 +57,7 @@ export function ActionProperties({ data, onUpdate }: Props) {
 
       <Field label="Method">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={data.method || "POST"}
           onChange={(e) => onUpdate({ method: e.target.value })}
         >
@@ -72,7 +71,7 @@ export function ActionProperties({ data, onUpdate }: Props) {
 
       <Field label="Input Model">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.inputModelRef || ""}
           onChange={(e) => onUpdate({ inputModelRef: e.target.value })}
           placeholder="Input model name"
@@ -81,7 +80,7 @@ export function ActionProperties({ data, onUpdate }: Props) {
 
       <Field label="Output Model">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.outputModelRef || ""}
           onChange={(e) => onUpdate({ outputModelRef: e.target.value })}
           placeholder="Output model name"

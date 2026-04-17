@@ -1,4 +1,5 @@
 import { useProjectStore } from "../../store/projectStore";
+import { inputBaseClass } from "../../lib/utils";
 import type {
   NangoAuthType,
   NangoEnvironment,
@@ -41,8 +42,6 @@ function Field({
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function IntegrationProperties() {
   const project = useProjectStore((s) => s.project);
@@ -67,7 +66,7 @@ export function IntegrationProperties() {
 
       <Field label="Name">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={project.name}
           onChange={(e) => updateProject({ name: e.target.value })}
           placeholder="My Integration"
@@ -76,7 +75,7 @@ export function IntegrationProperties() {
 
       <Field label="Provider">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={project.provider}
           onChange={(e) => updateProject({ provider: e.target.value })}
           placeholder="e.g. github, slack, salesforce"
@@ -85,7 +84,7 @@ export function IntegrationProperties() {
 
       <Field label="Auth Type">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={project.authType}
           onChange={(e) =>
             updateProject({ authType: e.target.value as NangoAuthType })
@@ -101,7 +100,7 @@ export function IntegrationProperties() {
 
       <Field label="Environment">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={project.environment}
           onChange={(e) =>
             updateProject({
@@ -143,7 +142,7 @@ export function IntegrationProperties() {
             <Field label="Max Retries">
               <input
                 type="number"
-                className={inputCls}
+                className={inputBaseClass}
                 min={0}
                 max={10}
                 value={project.errorHandling.maxRetries}

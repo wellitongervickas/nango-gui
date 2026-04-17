@@ -4,6 +4,7 @@ import type {
   DeploySaveSnapshotRequest,
   DeployRollbackResult,
 } from "@nango-gui/shared";
+import { asyncFetch } from "./asyncFetch";
 
 interface DeploySnapshotState {
   snapshots: DeploySnapshot[];
@@ -23,20 +24,12 @@ export const useDeploySnapshotStore = create<DeploySnapshotState>((set) => ({
 
   fetchSnapshots: async () => {
     if (!window.deploy) return;
-    set({ isLoading: true, error: null });
-    try {
-      const res = await window.deploy.listSnapshots();
-      if (res.status === "ok") {
-        set({ snapshots: res.data.snapshots, isLoading: false });
-      } else {
-        set({ error: res.error, isLoading: false });
-      }
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : "Failed to fetch snapshots",
-        isLoading: false,
-      });
-    }
+    await asyncFetch(
+      set,
+      () => window.deploy.listSnapshots(),
+      (data) => ({ snapshots: data.snapshots }),
+      "Failed to fetch snapshots",
+    );
   },
 
   saveSnapshot: async (request) => {

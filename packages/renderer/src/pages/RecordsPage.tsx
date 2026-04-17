@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NangoRecord, NangoRecordFilterAction } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { useRecordsStore } from "@/store/recordsStore";
-import { cn } from "@/lib/utils";
+import { cn, searchInputClass } from "@/lib/utils";
 import { SearchIcon, ChevronIcon, XIcon, RefreshIcon, DatabaseIcon, DownloadIcon, SpinnerIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 
@@ -409,7 +409,7 @@ export function RecordsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search loaded records…"
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors"
+              className={searchInputClass}
             />
           </div>
         )}

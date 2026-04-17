@@ -4,6 +4,7 @@ import { useConnectionsStore } from "@/store/connectionsStore";
 import { useSyncsStore } from "@/store/syncsStore";
 import { SearchIcon, RefreshIcon, SyncIcon } from "@/components/icons";
 import { ErrorBanner } from "../components/common/ErrorBanner";
+import { searchInputClass } from "@/lib/utils";
 import { ConnectionSelector } from "@/components/syncs/ConnectionSelector";
 import { SortHeader, type SyncSortKey, type SortDir } from "@/components/syncs/SortHeader";
 import { SyncRow } from "@/components/syncs/SyncRow";
@@ -116,7 +117,7 @@ export function SyncsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search syncs\u2026"
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors"
+              className={searchInputClass}
             />
           </div>
         )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ModelNodeData, ModelField } from "../../types/flow";
+import { inputBaseClass } from "../../lib/utils";
 
 interface Props {
   data: ModelNodeData;
@@ -24,8 +25,6 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function ModelProperties({ data, onUpdate }: Props) {
   const [newName, setNewName] = useState("");
@@ -76,7 +75,7 @@ export function ModelProperties({ data, onUpdate }: Props) {
       <div className="flex flex-col gap-1">
         <Label>Name</Label>
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.label || ""}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="Model name"
@@ -149,7 +148,7 @@ export function ModelProperties({ data, onUpdate }: Props) {
 
         <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--color-border)]">
           <input
-            className={`${inputCls} text-xs`}
+            className={`${inputBaseClass} text-xs`}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addField()}

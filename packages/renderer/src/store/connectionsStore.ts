@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { NangoConnectionSummary } from "@nango-gui/shared";
-import { notifyIpcError } from "./notifyError";
+import { asyncFetch } from "./asyncFetch";
 
 interface ConnectionsState {
   connections: NangoConnectionSummary[];
@@ -18,21 +18,12 @@ export const useConnectionsStore = create<ConnectionsState>((set) => ({
   error: null,
 
   fetchConnections: async (integrationId?: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await window.nango.listConnections(
-        integrationId ? { integrationId } : undefined
-      );
-      if (res.status === "error") {
-        notifyIpcError(res);
-        set({ error: res.error, isLoading: false });
-        return;
-      }
-      set({ connections: res.data, isLoading: false });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load connections";
-      set({ error: message, isLoading: false });
-    }
+    await asyncFetch(
+      set,
+      () => window.nango.listConnections(integrationId ? { integrationId } : undefined),
+      (data) => ({ connections: data }),
+      "Failed to load connections",
+    );
   },
 
   addConnection: (connection) =>

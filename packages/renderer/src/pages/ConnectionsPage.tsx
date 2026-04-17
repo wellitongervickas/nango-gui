@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { NangoConnectionDetail, NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
-import { cn } from "@/lib/utils";
+import { cn, searchInputClass } from "@/lib/utils";
 import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 
@@ -304,7 +304,7 @@ export function ConnectionsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search connections…"
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors"
+            className={searchInputClass}
           />
         </div>
         {/* Refresh */}

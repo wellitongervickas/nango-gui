@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TransformNodeData, FieldMapping } from "../../types/flow";
+import { inputBaseClass } from "../../lib/utils";
 
 interface Props {
   data: TransformNodeData;
@@ -21,8 +22,6 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function TransformProperties({ data, onUpdate }: Props) {
   const [newSource, setNewSource] = useState("");
@@ -73,7 +72,7 @@ export function TransformProperties({ data, onUpdate }: Props) {
       <div className="flex flex-col gap-1">
         <Label>Name</Label>
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.label || ""}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="Transform name"
@@ -83,7 +82,7 @@ export function TransformProperties({ data, onUpdate }: Props) {
       <div className="flex flex-col gap-1">
         <Label>Description</Label>
         <textarea
-          className={`${inputCls} resize-none`}
+          className={`${inputBaseClass} resize-none`}
           rows={2}
           value={data.description || ""}
           onChange={(e) => onUpdate({ description: e.target.value })}
@@ -95,7 +94,7 @@ export function TransformProperties({ data, onUpdate }: Props) {
         <div className="flex flex-col gap-1 flex-1">
           <Label>Input Model</Label>
           <input
-            className={inputCls}
+            className={inputBaseClass}
             value={data.inputModelRef || ""}
             onChange={(e) => onUpdate({ inputModelRef: e.target.value })}
             placeholder="Source model"
@@ -104,7 +103,7 @@ export function TransformProperties({ data, onUpdate }: Props) {
         <div className="flex flex-col gap-1 flex-1">
           <Label>Output Model</Label>
           <input
-            className={inputCls}
+            className={inputBaseClass}
             value={data.outputModelRef || ""}
             onChange={(e) => onUpdate({ outputModelRef: e.target.value })}
             placeholder="Target model"
@@ -167,14 +166,14 @@ export function TransformProperties({ data, onUpdate }: Props) {
         <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--color-border)]">
           <div className="flex gap-1.5">
             <input
-              className={`${inputCls} text-xs flex-1`}
+              className={`${inputBaseClass} text-xs flex-1`}
               value={newSource}
               onChange={(e) => setNewSource(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMapping()}
               placeholder="Source field"
             />
             <input
-              className={`${inputCls} text-xs flex-1`}
+              className={`${inputBaseClass} text-xs flex-1`}
               value={newTarget}
               onChange={(e) => setNewTarget(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addMapping()}

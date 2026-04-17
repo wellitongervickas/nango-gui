@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { NangoDashboardData } from "@nango-gui/shared";
-import { notifyIpcError } from "./notifyError";
+import { asyncFetch } from "./asyncFetch";
 
 interface DashboardState {
   dashboard: NangoDashboardData | null;
@@ -18,24 +18,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   lastRefreshedAt: null,
 
   fetchDashboard: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await window.nango.getDashboard();
-      if (res.status === "error") {
-        notifyIpcError(res);
-        set({ error: res.error, isLoading: false });
-        return;
-      }
-      set({
-        dashboard: res.data,
-        isLoading: false,
-        lastRefreshedAt: new Date(),
-      });
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load dashboard";
-      set({ error: message, isLoading: false });
-    }
+    await asyncFetch(
+      set,
+      () => window.nango.getDashboard(),
+      (data) => ({ dashboard: data, lastRefreshedAt: new Date() }),
+      "Failed to load dashboard",
+    );
   },
 
   refresh: async () => {

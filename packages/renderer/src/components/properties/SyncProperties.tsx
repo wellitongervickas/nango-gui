@@ -1,4 +1,5 @@
 import type { SyncNodeData } from "../../types/flow";
+import { inputBaseClass } from "../../lib/utils";
 import { FunctionCodeViewer } from "./FunctionCodeViewer";
 
 interface Props {
@@ -26,8 +27,6 @@ function Field({
   );
 }
 
-const inputCls =
-  "w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors";
 
 export function SyncProperties({ data, onUpdate }: Props) {
   return (
@@ -41,7 +40,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Name">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.label || ""}
           onChange={(e) => onUpdate({ label: e.target.value })}
           placeholder="Sync name"
@@ -50,7 +49,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Description">
         <textarea
-          className={`${inputCls} resize-none`}
+          className={`${inputBaseClass} resize-none`}
           rows={2}
           value={data.description || ""}
           onChange={(e) => onUpdate({ description: e.target.value })}
@@ -60,7 +59,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Endpoint">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.endpoint || ""}
           onChange={(e) => onUpdate({ endpoint: e.target.value })}
           placeholder="/api/resource"
@@ -69,7 +68,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Method">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={data.method || "GET"}
           onChange={(e) => onUpdate({ method: e.target.value })}
         >
@@ -83,7 +82,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Frequency">
         <select
-          className={inputCls}
+          className={inputBaseClass}
           value={data.frequency || "1d"}
           onChange={(e) => onUpdate({ frequency: e.target.value })}
         >
@@ -97,7 +96,7 @@ export function SyncProperties({ data, onUpdate }: Props) {
 
       <Field label="Output Model">
         <input
-          className={inputCls}
+          className={inputBaseClass}
           value={data.modelRef || ""}
           onChange={(e) => onUpdate({ modelRef: e.target.value })}
           placeholder="Model name"
