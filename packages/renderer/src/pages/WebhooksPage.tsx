@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WebhookEvent } from "@nango-gui/shared";
-import { useWebhookStore, selectFilteredEvents } from "../store/webhookStore";
+import { useWebhookStore } from "../store/webhookStore";
 import { cn } from "../lib/utils";
 import { WebhookIcon, CopyIcon, XIcon, TrashIcon } from "@/components/icons";
 
@@ -300,14 +300,30 @@ function FilterBar() {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function WebhooksPage() {
-  const events = useWebhookStore(selectFilteredEvents);
   const allEvents = useWebhookStore((s) => s.events);
+  const filterText = useWebhookStore((s) => s.filterText);
+  const filterMethod = useWebhookStore((s) => s.filterMethod);
   const selectedEventId = useWebhookStore((s) => s.selectedEventId);
   const setSelectedEventId = useWebhookStore((s) => s.setSelectedEventId);
   const appendEvent = useWebhookStore((s) => s.appendEvent);
   const fetchStatus = useWebhookStore((s) => s.fetchStatus);
   const fetchEvents = useWebhookStore((s) => s.fetchEvents);
   const status = useWebhookStore((s) => s.status);
+
+  // Derive filtered events via useMemo so the reference is stable across
+  // renders.  The old `selectFilteredEvents` Zustand selector returned a new
+  // array on every snapshot call (.filter always allocates), which made
+  // useSyncExternalStore (Zustand v5 + React 19) re-render infinitely.
+  const events = useMemo(() => {
+    return allEvents.filter((e) => {
+      if (filterMethod && e.method !== filterMethod) return false;
+      if (filterText) {
+        const q = filterText.toLowerCase();
+        if (!e.path.toLowerCase().includes(q) && !e.method.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allEvents, filterText, filterMethod]);
 
   const listRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -325,7 +341,7 @@ export function WebhooksPage() {
       appendEvent(event);
     });
     return () => {
-      window.webhook.removeAllEventListeners();
+      if (window.webhook) window.webhook.removeAllEventListeners();
     };
   }, [appendEvent]);
 

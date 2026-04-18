@@ -471,7 +471,7 @@ test("Toolbar title and nav are visible on the Webhooks route", async () => {
   });
 });
 
-test.fixme("page heading reads Webhook Listener", async () => {
+test("page heading reads Webhook Listener", async () => {
   await goToWebhooks();
   await expect(page.getByText("Webhook Listener")).toBeVisible({ timeout: 3000 });
 });
