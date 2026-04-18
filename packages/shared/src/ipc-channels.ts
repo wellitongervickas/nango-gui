@@ -96,6 +96,22 @@ export const IPC_CHANNELS = {
   MCP_STOP: "mcp:stop",
   /** Main → renderer push event: an MCP server status changed. */
   MCP_STATUS_CHANGED: "mcp:statusChanged",
+
+  // Nango webhook settings (outgoing webhook URL configuration)
+  NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
+  NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
+
+  // AI Builder v2 — direct OpenAI/Anthropic tool-calling
+  AI_BUILDER_RUN: "ai:builderRun",
+  /** Main → renderer push event: a tool call was executed during the builder run. */
+  AI_BUILDER_TOOL_CALL: "ai:builderToolCall",
+  /** Main → renderer push event: a text message chunk from the AI. */
+  AI_BUILDER_MESSAGE: "ai:builderMessage",
+
+  // AI Provider key management (OpenAI / Anthropic API keys)
+  AI_PROVIDER_SAVE_KEY: "ai:providerSaveKey",
+  AI_PROVIDER_LOAD_KEY: "ai:providerLoadKey",
+  AI_PROVIDER_CLEAR_KEY: "ai:providerClearKey",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -665,4 +681,81 @@ export interface McpStatusChangedEvent {
   status: McpServerStatus;
   pid: number | null;
   error: string | null;
+}
+
+// ── Nango webhook settings ────────────────────────────────────────────────────
+
+/** Nango outgoing webhook URL configuration and event filter settings. */
+export interface NangoWebhookSettings {
+  primaryUrl: string;
+  secondaryUrl: string;
+  onSyncCompletionAlways: boolean;
+  onAuthCreation: boolean;
+  onAuthRefreshError: boolean;
+  onSyncError: boolean;
+  onAsyncActionCompletion: boolean;
+}
+
+/** Partial update payload for webhook settings. */
+export interface NangoUpdateWebhookSettingsRequest {
+  primaryUrl?: string;
+  secondaryUrl?: string;
+  onSyncCompletionAlways?: boolean;
+  onAuthCreation?: boolean;
+  onAuthRefreshError?: boolean;
+  onSyncError?: boolean;
+  onAsyncActionCompletion?: boolean;
+}
+
+// ── AI Builder v2 ────────────────────────────────────────────────────────────
+
+export type AiProviderType = "openai" | "anthropic";
+
+/** A snapshot of the current canvas state sent to the AI for context. */
+export interface AiCanvasSnapshot {
+  nodes: { id: string; type: string; data: Record<string, unknown> }[];
+  edges: { id: string; source: string; target: string; data?: Record<string, unknown> }[];
+  integrationMeta?: { name?: string; provider?: string; description?: string };
+}
+
+export interface AiBuilderRunRequest {
+  aiProvider: AiProviderType;
+  prompt: string;
+  conversationHistory?: AiConversationTurn[];
+  canvasSnapshot?: AiCanvasSnapshot;
+}
+
+export interface AiBuilderRunResult {
+  toolCalls: AiBuilderToolCallEvent[];
+  summary: string;
+  turnsUsed: number;
+}
+
+export interface AiBuilderToolCallEvent {
+  tool: string;
+  args: Record<string, unknown>;
+  result: unknown;
+}
+
+export interface AiBuilderMessageEvent {
+  text: string;
+  done: boolean;
+}
+
+export interface AiProviderSaveKeyRequest {
+  provider: AiProviderType;
+  apiKey: string;
+}
+
+export interface AiProviderLoadKeyRequest {
+  provider: AiProviderType;
+}
+
+export interface AiProviderLoadKeyResult {
+  exists: boolean;
+  maskedKey: string | null;
+}
+
+export interface AiProviderClearKeyRequest {
+  provider: AiProviderType;
 }

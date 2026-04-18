@@ -58,6 +58,16 @@ import type {
   McpStartRequest,
   McpStopRequest,
   McpStatusChangedEvent,
+  NangoWebhookSettings,
+  NangoUpdateWebhookSettingsRequest,
+  AiBuilderRunRequest,
+  AiBuilderRunResult,
+  AiBuilderToolCallEvent,
+  AiBuilderMessageEvent,
+  AiProviderSaveKeyRequest,
+  AiProviderLoadKeyRequest,
+  AiProviderLoadKeyResult,
+  AiProviderClearKeyRequest,
 } from "./ipc-channels.js";
 
 declare global {
@@ -192,6 +202,22 @@ declare global {
       onStatusChange(listener: (event: McpStatusChangedEvent) => void): void;
       /** Remove all status change listeners (call on component unmount). */
       removeAllStatusChangeListeners(): void;
+    };
+    aiBuilder: {
+      /** Run the AI builder v2 tool-calling loop. */
+      run(args: AiBuilderRunRequest): Promise<IpcResponse<AiBuilderRunResult>>;
+      /** Register a listener for streamed tool call events during a builder run. */
+      onToolCall(listener: (event: AiBuilderToolCallEvent) => void): void;
+      /** Register a listener for streamed AI text messages during a builder run. */
+      onMessage(listener: (event: AiBuilderMessageEvent) => void): void;
+      /** Remove all tool call and message listeners. */
+      removeAllListeners(): void;
+      /** Save an AI provider API key (encrypted). */
+      saveProviderKey(args: AiProviderSaveKeyRequest): Promise<IpcResponse<void>>;
+      /** Load an AI provider API key status (exists + masked). */
+      loadProviderKey(args: AiProviderLoadKeyRequest): Promise<IpcResponse<AiProviderLoadKeyResult>>;
+      /** Clear an AI provider API key. */
+      clearProviderKey(args: AiProviderClearKeyRequest): Promise<IpcResponse<void>>;
     };
   }
 }

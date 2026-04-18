@@ -63,6 +63,12 @@ import {
   type AiGenerateRequest,
   type AiRefineRequest,
   type AiGenerationResult,
+  type AiBuilderRunRequest,
+  type AiBuilderRunResult,
+  type AiProviderSaveKeyRequest,
+  type AiProviderLoadKeyRequest,
+  type AiProviderLoadKeyResult,
+  type AiProviderClearKeyRequest,
   type McpListConfigsResult,
   type McpAddConfigRequest,
   type McpRemoveConfigRequest,
@@ -73,6 +79,7 @@ import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
 import { rateLimitTracker } from "./rate-limit-tracker.js";
 import { aiService } from "./ai-service.js";
+import { runAiBuilder } from "./ai-builder-service.js";
 import { mcpManager } from "./mcp-manager.js";
 import {
   getNangoClient,
@@ -1111,6 +1118,76 @@ export function registerIpcHandlers(): void {
           throw new Error("provider, prompt, and currentDefinition are required");
         }
         return aiService.refine(args);
+      })
+  );
+
+  // ── AI Builder v2 handlers ───────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_BUILDER_RUN,
+    async (
+      event: IpcMainInvokeEvent,
+      args: AiBuilderRunRequest
+    ): Promise<IpcResponse<AiBuilderRunResult>> =>
+      wrap(async () => {
+        if (!args?.aiProvider || !args?.prompt) {
+          throw new Error("aiProvider and prompt are required");
+        }
+        const sender = event.sender;
+        return runAiBuilder(
+          args,
+          (toolCallEvent) => {
+            if (!sender.isDestroyed()) {
+              sender.send(IPC_CHANNELS.AI_BUILDER_TOOL_CALL, toolCallEvent);
+            }
+          },
+          (messageEvent) => {
+            if (!sender.isDestroyed()) {
+              sender.send(IPC_CHANNELS.AI_BUILDER_MESSAGE, messageEvent);
+            }
+          }
+        );
+      })
+  );
+
+  // ── AI Provider key management handlers ─────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROVIDER_SAVE_KEY,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: AiProviderSaveKeyRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.provider || !args?.apiKey) {
+          throw new Error("provider and apiKey are required");
+        }
+        credentialStore.saveAiProviderKey(args.provider, args.apiKey);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROVIDER_LOAD_KEY,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: AiProviderLoadKeyRequest
+    ): Promise<IpcResponse<AiProviderLoadKeyResult>> =>
+      wrap(async () => {
+        if (!args?.provider) throw new Error("provider is required");
+        const maskedKey = credentialStore.loadMaskedAiProviderKey(args.provider);
+        return { exists: maskedKey !== null, maskedKey };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_PROVIDER_CLEAR_KEY,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: AiProviderClearKeyRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.provider) throw new Error("provider is required");
+        credentialStore.clearAiProviderKey(args.provider);
       })
   );
 

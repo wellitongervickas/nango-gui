@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { NangoProvider } from "@nango-gui/shared";
+import type { NangoProvider, AiProviderType, AiBuilderToolCallEvent } from "@nango-gui/shared";
 import { useAiStore } from "@/store/aiStore";
 import { useFlowStore } from "@/store/flowStore";
 import { definitionToFlow } from "@/lib/graph-converter";
@@ -182,6 +182,109 @@ function ProviderSelector({ value, onChange, disabled }: ProviderSelectorProps) 
   );
 }
 
+// ── AI Provider selector (v2) ────────────────────────────────────────────
+
+const AI_PROVIDER_OPTIONS: { value: AiProviderType; label: string; model: string }[] = [
+  { value: "openai", label: "OpenAI", model: "GPT-4o" },
+  { value: "anthropic", label: "Anthropic", model: "Claude Sonnet" },
+];
+
+interface AiProviderSelectorProps {
+  value: AiProviderType;
+  onChange: (v: AiProviderType) => void;
+  disabled: boolean;
+}
+
+function AiProviderSelector({ value, onChange, disabled }: AiProviderSelectorProps) {
+  return (
+    <div className="flex gap-2">
+      {AI_PROVIDER_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          disabled={disabled}
+          className={cn(
+            "flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
+            value === opt.value
+              ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+              : "border-[var(--color-border)] bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/50 hover:text-[var(--color-text-primary)]",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          <span className="block">{opt.label}</span>
+          <span className="block text-[9px] opacity-60 mt-0.5">{opt.model}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Tool call activity feed (v2) ─────────────────────────────────────────
+
+function ToolCallActivity({ toolCalls }: { toolCalls: AiBuilderToolCallEvent[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [toolCalls]);
+
+  if (toolCalls.length === 0) return null;
+
+  return (
+    <div className="px-3 py-2 border-t border-[var(--color-border)]">
+      <p className="text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+        Tool Calls ({toolCalls.length})
+      </p>
+      <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+        {toolCalls.map((tc, i) => {
+          const resultObj = tc.result as Record<string, unknown> | null;
+          const nodeName = tc.args.config
+            ? ((tc.args.config as Record<string, unknown>).name as string)
+            : (tc.args.name as string | undefined);
+          return (
+            <div
+              key={i}
+              className="flex items-center gap-2 text-[10px] rounded px-2 py-1 bg-[var(--color-bg-overlay)]"
+            >
+              <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--color-primary)]" />
+              <span className="font-medium text-[var(--color-text-primary)]">{tc.tool}</span>
+              {nodeName && (
+                <span className="text-[var(--color-text-secondary)] truncate">
+                  {nodeName}
+                </span>
+              )}
+              {resultObj?.error != null && (
+                <span className="text-[var(--color-error)] ml-auto shrink-0">failed</span>
+              )}
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+    </div>
+  );
+}
+
+// ── Builder message output (v2) ──────────────────────────────────────────
+
+function BuilderMessageOutput() {
+  const builderMessage = useAiStore((s) => s.builderMessage);
+  const isGenerating = useAiStore((s) => s.isGenerating);
+
+  if (!builderMessage && !isGenerating) return null;
+
+  return (
+    <div className="px-3 py-2 border-t border-[var(--color-border)]">
+      <div className="rounded-md bg-[var(--color-bg-overlay)] p-2.5 max-h-32 overflow-y-auto">
+        <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed whitespace-pre-wrap">
+          {builderMessage || "Building integration…"}
+          {isGenerating && !builderMessage && <span className="animate-pulse">▋</span>}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Conversation history ─────────────────────────────────────────────────────
 
 function ConversationHistory() {
@@ -295,15 +398,25 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
   const resetConversation = useAiStore((s) => s.resetConversation);
   const applyStreamToken = useAiStore((s) => s.applyStreamToken);
 
+  // v2 state
+  const aiProvider = useAiStore((s) => s.aiProvider);
+  const setAiProvider = useAiStore((s) => s.setAiProvider);
+  const runBuilder = useAiStore((s) => s.runBuilder);
+  const builderToolCalls = useAiStore((s) => s.builderToolCalls);
+  const builderResult = useAiStore((s) => s.builderResult);
+  const applyBuilderToolCall = useAiStore((s) => s.applyBuilderToolCall);
+  const applyBuilderMessage = useAiStore((s) => s.applyBuilderMessage);
+
   const pushHistory = useFlowStore((s) => s.pushHistory);
   const existingNodes = useFlowStore((s) => s.nodes);
   const addNode = useFlowStore((s) => s.addNode);
 
   const [showDiff, setShowDiff] = useState(false);
+  const [useV2, setUseV2] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isRefinement = generatedDefinition !== null;
 
-  // Register AI stream token listener
+  // Register AI stream token listener (v1)
   useEffect(() => {
     if (!window.nango?.onAiStreamToken) return;
     window.nango.onAiStreamToken(applyStreamToken);
@@ -311,6 +424,16 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
       window.nango?.removeAllAiStreamListeners?.();
     };
   }, [applyStreamToken]);
+
+  // Register AI builder v2 event listeners
+  useEffect(() => {
+    if (!window.aiBuilder?.onToolCall) return;
+    window.aiBuilder.onToolCall(applyBuilderToolCall);
+    window.aiBuilder.onMessage((event) => applyBuilderMessage(event.text, event.done));
+    return () => {
+      window.aiBuilder?.removeAllListeners?.();
+    };
+  }, [applyBuilderToolCall, applyBuilderMessage]);
 
   // Auto-focus textarea when panel opens
   useEffect(() => {
@@ -327,25 +450,72 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isRefinement, isGenerating, provider, prompt]
+    [useV2, isRefinement, isGenerating, provider, prompt]
   );
 
   function handleSubmit() {
-    if (!provider.trim() || !prompt.trim() || isGenerating) return;
+    if (!prompt.trim() || isGenerating) return;
     clearPanelError();
-    if (isRefinement) {
-      refine();
+
+    if (useV2) {
+      runBuilder();
     } else {
-      generate();
+      if (!provider.trim()) return;
+      if (isRefinement) {
+        refine();
+      } else {
+        generate();
+      }
     }
   }
 
-  /** Merge generated definition into the flow canvas, preserving existing nodes. */
-  function handleAccept() {
+  /** v2: Apply builder tool call results to the canvas. */
+  function handleAcceptV2() {
+    if (!builderResult || builderResult.toolCalls.length === 0) return;
+
+    pushHistory();
+    const nodeIdMap = new Map<string, string>();
+
+    for (const tc of builderResult.toolCalls) {
+      if (tc.tool === "addNode") {
+        const result = tc.result as Record<string, unknown>;
+        if (result.error) continue;
+        const nodeId = String(result.nodeId);
+        const nodeType = String(tc.args.type ?? "action");
+        const config = (tc.args.config ?? {}) as Record<string, unknown>;
+        const nodeName = String(config.name ?? nodeId);
+
+        nodeIdMap.set(nodeId, nodeId);
+        addNode({
+          id: nodeId,
+          type: nodeType,
+          position: { x: 100 + Math.random() * 200, y: 100 + nodeIdMap.size * 150 },
+          data: { label: nodeName, ...config },
+        });
+      }
+    }
+
+    for (const tc of builderResult.toolCalls) {
+      if (tc.tool === "addEdge") {
+        const from = String(tc.args.from ?? "");
+        const to = String(tc.args.to ?? "");
+        if (nodeIdMap.has(from) && nodeIdMap.has(to)) {
+          useFlowStore.getState().onConnect({
+            source: from,
+            target: to,
+            sourceHandle: null,
+            targetHandle: null,
+          });
+        }
+      }
+    }
+  }
+
+  /** v1: Merge generated definition into the flow canvas, preserving existing nodes. */
+  function handleAcceptV1() {
     if (!generatedDefinition) return;
     const { nodes: newNodes, edges: newEdges } = definitionToFlow(generatedDefinition);
 
-    // Deduplicate: skip nodes whose label already exists in the canvas
     const existingLabels = new Set(
       existingNodes.map((n) => (n.data as Record<string, unknown>).label as string).filter(Boolean)
     );
@@ -357,8 +527,6 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
         addNode(node);
       }
     }
-    // Edges are added implicitly through the flow store's connect mechanism;
-    // add only edges whose source/target already landed
     const allNodeIds = new Set([...existingNodes.map((n) => n.id), ...newNodes.map((n) => n.id)]);
     for (const edge of newEdges) {
       if (allNodeIds.has(edge.source) && allNodeIds.has(edge.target)) {
@@ -372,7 +540,10 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
     }
   }
 
-  const canSubmit = provider.trim().length > 0 && prompt.trim().length > 0 && !isGenerating;
+  const canSubmitV2 = prompt.trim().length > 0 && !isGenerating;
+  const canSubmitV1 = provider.trim().length > 0 && prompt.trim().length > 0 && !isGenerating;
+  const canSubmit = useV2 ? canSubmitV2 : canSubmitV1;
+  const hasV2Result = builderResult !== null && builderResult.toolCalls.length > 0;
 
   return (
     <div className="flex flex-col h-full border-l border-[var(--color-border)] bg-[var(--color-bg-surface)]">
@@ -390,6 +561,18 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
           )}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setUseV2((v) => !v); resetConversation(); }}
+            title={useV2 ? "Switch to v1 (Nango AI)" : "Switch to v2 (Direct AI)"}
+            className={cn(
+              "flex items-center justify-center h-6 px-1.5 rounded text-[9px] font-medium transition-colors cursor-pointer",
+              useV2
+                ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+            )}
+          >
+            {useV2 ? "v2" : "v1"}
+          </button>
           {previousDefinition && (
             <button
               onClick={() => setShowDiff((v) => !v)}
@@ -425,26 +608,48 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
-        {/* Provider selector */}
-        <div className="px-3 py-3 border-b border-[var(--color-border)]">
-          <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
-            Provider
-          </label>
-          <ProviderSelector
-            value={provider}
-            onChange={setProvider}
-            disabled={isGenerating || (isRefinement && !isHistoryFull)}
-          />
-        </div>
+        {/* v2 AI Provider selector */}
+        {useV2 && (
+          <div className="px-3 py-3 border-b border-[var(--color-border)]">
+            <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+              AI Provider
+            </label>
+            <AiProviderSelector
+              value={aiProvider}
+              onChange={setAiProvider}
+              disabled={isGenerating}
+            />
+          </div>
+        )}
+
+        {/* v1 Nango Provider selector (only in v1 mode) */}
+        {!useV2 && (
+          <div className="px-3 py-3 border-b border-[var(--color-border)]">
+            <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+              Provider
+            </label>
+            <ProviderSelector
+              value={provider}
+              onChange={setProvider}
+              disabled={isGenerating || (isRefinement && !isHistoryFull)}
+            />
+          </div>
+        )}
 
         {/* Conversation history */}
         <ConversationHistory />
 
-        {/* Generated summary */}
-        <GeneratedSummary />
+        {/* v2 tool call activity */}
+        {useV2 && <ToolCallActivity toolCalls={builderToolCalls} />}
 
-        {/* Streaming output */}
-        <StreamingOutput />
+        {/* v2 builder message output */}
+        {useV2 && <BuilderMessageOutput />}
+
+        {/* v1 Generated summary */}
+        {!useV2 && <GeneratedSummary />}
+
+        {/* v1 Streaming output */}
+        {!useV2 && <StreamingOutput />}
 
         {/* Diff view (inline, appears below the summary when toggled) */}
         {showDiff && previousDefinition && generatedDefinition && (
@@ -494,7 +699,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
         {/* Prompt area */}
         <div className="px-3 py-3 border-t border-[var(--color-border)]">
           <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
-            {isRefinement ? "Refine prompt" : "Describe integration"}
+            {useV2 ? "Describe integration" : (isRefinement ? "Refine prompt" : "Describe integration")}
           </label>
           <textarea
             ref={textareaRef}
@@ -504,9 +709,11 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
             disabled={isGenerating || isHistoryFull}
             rows={4}
             placeholder={
-              isRefinement
-                ? "Describe what to change… (⌘Enter to send)"
-                : "e.g. Sync all GitHub issues to a model with id, title, state, and labels. (⌘Enter to generate)"
+              useV2
+                ? "e.g. Sync all GitHub issues with id, title, state, labels (⌘Enter to build)"
+                : isRefinement
+                  ? "Describe what to change… (⌘Enter to send)"
+                  : "e.g. Sync all GitHub issues to a model with id, title, state, and labels. (⌘Enter to generate)"
             }
             className={cn(
               "w-full px-3 py-2 text-sm rounded-md resize-none",
@@ -521,52 +728,87 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
 
       {/* Footer actions */}
       <div className="shrink-0 px-3 py-3 border-t border-[var(--color-border)] flex items-center gap-2">
-        {generatedDefinition && !isHistoryFull && (
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
-              canSubmit
-                ? "bg-[var(--color-bg-overlay)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] border border-[var(--color-border)]"
-                : "opacity-40 cursor-not-allowed bg-[var(--color-bg-overlay)] border border-[var(--color-border)]"
+        {useV2 ? (
+          <>
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                canSubmit
+                  ? "bg-[var(--color-primary)] text-white hover:opacity-90"
+                  : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+              )}
+            >
+              <SparklesIcon />
+              {isGenerating ? "Building…" : (hasV2Result ? "Rebuild" : "Build")}
+            </button>
+            {hasV2Result && (
+              <button
+                onClick={handleAcceptV2}
+                disabled={isGenerating}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                  !isGenerating
+                    ? "bg-[var(--color-primary)] text-white hover:opacity-90"
+                    : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+                )}
+              >
+                <CheckIcon />
+                Apply to Canvas
+              </button>
             )}
-          >
-            <RefreshIcon />
-            Refine
-          </button>
-        )}
+          </>
+        ) : (
+          <>
+            {generatedDefinition && !isHistoryFull && (
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                  canSubmit
+                    ? "bg-[var(--color-bg-overlay)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] border border-[var(--color-border)]"
+                    : "opacity-40 cursor-not-allowed bg-[var(--color-bg-overlay)] border border-[var(--color-border)]"
+                )}
+              >
+                <RefreshIcon />
+                Refine
+              </button>
+            )}
 
-        {!generatedDefinition && (
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
-              canSubmit
-                ? "bg-[var(--color-primary)] text-white hover:opacity-90"
-                : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+            {!generatedDefinition && (
+              <button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                  canSubmit
+                    ? "bg-[var(--color-primary)] text-white hover:opacity-90"
+                    : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+                )}
+              >
+                <SparklesIcon />
+                {isGenerating ? "Generating…" : "Generate"}
+              </button>
             )}
-          >
-            <SparklesIcon />
-            {isGenerating ? "Generating…" : "Generate"}
-          </button>
-        )}
 
-        {generatedDefinition && (
-          <button
-            onClick={handleAccept}
-            disabled={isGenerating}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
-              !isGenerating
-                ? "bg-[var(--color-primary)] text-white hover:opacity-90"
-                : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+            {generatedDefinition && (
+              <button
+                onClick={handleAcceptV1}
+                disabled={isGenerating}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                  !isGenerating
+                    ? "bg-[var(--color-primary)] text-white hover:opacity-90"
+                    : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+                )}
+              >
+                <CheckIcon />
+                Accept
+              </button>
             )}
-          >
-            <CheckIcon />
-            Accept
-          </button>
+          </>
         )}
       </div>
     </div>

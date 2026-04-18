@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
+import type { AppTheme, NangoEnvironment, AiProviderType } from "@nango-gui/shared";
 import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
 import { navigate } from "@/lib/router";
@@ -40,6 +40,7 @@ export function SettingsPage() {
         {error && <ErrorBanner message={error} />}
 
         <ApiKeySection maskedKey={maskedKey} />
+        <AiProviderKeysSection />
         <EnvironmentSection environment={environment} onUpdate={updateEnvironment} />
         <AppearanceSection theme={theme} onUpdate={updateTheme} />
         <AboutSection
@@ -170,6 +171,150 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
         </p>
       )}
     </Section>
+  );
+}
+
+// ── AI Provider Keys ──────────────────────────────────────────────────────
+
+const AI_PROVIDERS: { key: AiProviderType; label: string; placeholder: string }[] = [
+  { key: "openai", label: "OpenAI", placeholder: "sk-..." },
+  { key: "anthropic", label: "Anthropic", placeholder: "sk-ant-..." },
+];
+
+function AiProviderKeysSection() {
+  return (
+    <Section title="AI Providers">
+      <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+        Configure API keys for AI-powered integration building. Keys are encrypted and stored locally.
+      </p>
+      <div className="space-y-4">
+        {AI_PROVIDERS.map((p) => (
+          <AiProviderKeyRow key={p.key} provider={p.key} label={p.label} placeholder={p.placeholder} />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function AiProviderKeyRow({
+  provider,
+  label,
+  placeholder,
+}: {
+  provider: AiProviderType;
+  label: string;
+  placeholder: string;
+}) {
+  const [maskedKey, setMaskedKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [newKey, setNewKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+
+  async function loadKey() {
+    setLoading(true);
+    try {
+      const res = await window.aiBuilder.loadProviderKey({ provider });
+      if (res.status === "ok") {
+        setMaskedKey(res.data.maskedKey);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadKey();
+  }, [provider]);
+
+  async function handleSave() {
+    if (!newKey.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await window.aiBuilder.saveProviderKey({ provider, apiKey: newKey.trim() });
+      if (res.status === "error") {
+        setError(res.error);
+        setSaving(false);
+        return;
+      }
+      setNewKey("");
+      setEditing(false);
+      await loadKey();
+    } catch {
+      setError("Failed to save key.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove() {
+    try {
+      await window.aiBuilder.clearProviderKey({ provider });
+      setMaskedKey(null);
+      setRemoveConfirm(false);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-medium text-[var(--color-text)]">{label}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">Loading…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-medium text-[var(--color-text)]">{label}</span>
+        {maskedKey && !editing ? (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm text-[var(--color-text)]">{maskedKey}</span>
+            <ActionButton onClick={() => setEditing(true)}>Change</ActionButton>
+            {removeConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--color-text-muted)]">Remove?</span>
+                <ActionButton variant="destructive" onClick={handleRemove}>Yes</ActionButton>
+                <ActionButton onClick={() => setRemoveConfirm(false)}>No</ActionButton>
+              </div>
+            ) : (
+              <ActionButton variant="destructive" onClick={() => setRemoveConfirm(true)}>Remove</ActionButton>
+            )}
+          </div>
+        ) : !editing ? (
+          <ActionButton onClick={() => setEditing(true)}>Add Key</ActionButton>
+        ) : null}
+      </div>
+      {editing && (
+        <div className="space-y-2">
+          <input
+            type="password"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            placeholder={placeholder}
+            className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-500)]"
+            autoFocus
+          />
+          {error && <p className="text-xs text-[var(--color-error)]">{error}</p>}
+          <div className="flex gap-2">
+            <ActionButton onClick={handleSave} disabled={!newKey.trim() || saving}>
+              {saving ? "Saving…" : "Save Key"}
+            </ActionButton>
+            <ActionButton onClick={() => { setEditing(false); setNewKey(""); setError(null); }}>
+              Cancel
+            </ActionButton>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

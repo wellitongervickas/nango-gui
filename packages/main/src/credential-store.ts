@@ -1,11 +1,16 @@
 import { safeStorage, app } from "electron";
 import { join } from "path";
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
-import type { NangoEnvironment, AppTheme } from "@nango-gui/shared";
+import type { NangoEnvironment, AppTheme, AiProviderType } from "@nango-gui/shared";
 
 const CREDENTIALS_FILE = "credentials.enc";
 const ENVIRONMENT_FILE = "environment.json";
 const SETTINGS_FILE = "settings.json";
+
+const AI_PROVIDER_FILES: Record<AiProviderType, string> = {
+  openai: "ai-key-openai.enc",
+  anthropic: "ai-key-anthropic.enc",
+};
 
 function credentialsPath(): string {
   return join(app.getPath("userData"), CREDENTIALS_FILE);
@@ -132,5 +137,37 @@ export const credentialStore = {
     if (!key) return null;
     const suffix = key.slice(-4);
     return `••••••••${suffix}`;
+  },
+
+  // ── AI provider key management ─────────────────────────────────────────
+
+  saveAiProviderKey(provider: AiProviderType, apiKey: string): void {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error("Secure storage is not available on this system.");
+    }
+    const encrypted = safeStorage.encryptString(apiKey);
+    writeFileSync(join(app.getPath("userData"), AI_PROVIDER_FILES[provider]), encrypted);
+  },
+
+  loadAiProviderKey(provider: AiProviderType): string | null {
+    const path = join(app.getPath("userData"), AI_PROVIDER_FILES[provider]);
+    if (!existsSync(path)) return null;
+    try {
+      const encrypted = readFileSync(path);
+      return safeStorage.decryptString(encrypted);
+    } catch {
+      return null;
+    }
+  },
+
+  clearAiProviderKey(provider: AiProviderType): void {
+    const path = join(app.getPath("userData"), AI_PROVIDER_FILES[provider]);
+    if (existsSync(path)) unlinkSync(path);
+  },
+
+  loadMaskedAiProviderKey(provider: AiProviderType): string | null {
+    const key = this.loadAiProviderKey(provider);
+    if (!key) return null;
+    return `••••••••${key.slice(-4)}`;
   },
 };
