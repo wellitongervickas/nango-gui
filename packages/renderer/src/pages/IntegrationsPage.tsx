@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import Markdown from "react-markdown";
 import type { NangoProvider } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
+import { useIntegrationReadme } from "@/hooks/useIntegrationReadme";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
@@ -154,12 +156,17 @@ function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
 
 // ── Detail panel ───────────────────────────────────────────────────────────
 
+type DetailTab = "details" | "documentation";
+
 interface DetailPanelProps {
   provider: NangoProvider;
   onClose: () => void;
 }
 
 function DetailPanel({ provider, onClose }: DetailPanelProps) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
+  const { markdown, isLoading: readmeLoading } = useIntegrationReadme(provider.name);
+
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
@@ -186,49 +193,67 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Auth info */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
-              Details
-            </h3>
-            <dl className="space-y-2.5">
-              <DetailRow label="Auth mode" value={provider.auth_mode} />
-              <DetailRow label="Provider key" value={provider.name} mono />
-            </dl>
-          </section>
+        {/* Tabs */}
+        <div className="flex border-b border-[var(--color-border)] shrink-0">
+          <DetailTabButton active={activeTab === "details"} onClick={() => setActiveTab("details")}>
+            Details
+          </DetailTabButton>
+          <DetailTabButton active={activeTab === "documentation"} onClick={() => setActiveTab("documentation")}>
+            Documentation
+          </DetailTabButton>
+        </div>
 
-          {/* Categories */}
-          {provider.categories && provider.categories.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
-                Categories
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {provider.categories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)]"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            </section>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {activeTab === "details" && (
+            <div className="space-y-5">
+              {/* Auth info */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+                  Details
+                </h3>
+                <dl className="space-y-2.5">
+                  <DetailRow label="Auth mode" value={provider.auth_mode} />
+                  <DetailRow label="Provider key" value={provider.name} mono />
+                </dl>
+              </section>
+
+              {/* Categories */}
+              {provider.categories && provider.categories.length > 0 && (
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+                    Categories
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {provider.categories.map((cat) => (
+                      <span
+                        key={cat}
+                        className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)]"
+                      >
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Docs link */}
+              {provider.docs && (
+                <a
+                  href={provider.docs}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-[var(--color-brand-400)] hover:underline"
+                >
+                  <ExternalLinkIcon />
+                  View documentation
+                </a>
+              )}
+            </div>
           )}
 
-          {/* Docs link */}
-          {provider.docs && (
-            <a
-              href={provider.docs}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-[var(--color-brand-400)] hover:underline"
-            >
-              <ExternalLinkIcon />
-              View documentation
-            </a>
+          {activeTab === "documentation" && (
+            <ReadmeContent markdown={markdown} isLoading={readmeLoading} />
           )}
         </div>
 
@@ -249,6 +274,109 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
         </div>
       </aside>
     </>
+  );
+}
+
+function DetailTabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-1 px-4 py-2.5 text-xs font-medium transition-colors cursor-pointer",
+        active
+          ? "text-[var(--color-brand-400)] border-b-2 border-[var(--color-brand-500)]"
+          : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ReadmeContent({ markdown, isLoading }: { markdown: string | null; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-5 w-48 rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-3 w-full rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-3 w-5/6 rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-3 w-4/6 rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-4 w-36 rounded bg-[var(--color-bg-overlay)] mt-4" />
+        <div className="h-3 w-full rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-3 w-3/4 rounded bg-[var(--color-bg-overlay)]" />
+      </div>
+    );
+  }
+
+  if (!markdown) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          No documentation available
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          This integration does not have a readme yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Markdown
+      components={{
+        h1: ({ children }) => <h1 className="text-lg font-bold mb-3 mt-0 text-[var(--color-text-primary)]">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-base font-semibold mb-2 mt-4 text-[var(--color-text-primary)]">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-3 text-[var(--color-text-primary)]">{children}</h3>,
+        p: ({ children }) => <p className="mb-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">{children}</p>,
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--color-brand-400)] hover:underline">
+            {children}
+          </a>
+        ),
+        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1 text-sm text-[var(--color-text-secondary)]">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1 text-sm text-[var(--color-text-secondary)]">{children}</ol>,
+        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        code: ({ children, className }) => {
+          const isBlock = className?.includes("language-");
+          if (isBlock) {
+            return (
+              <code className="block bg-[var(--color-bg-overlay)] rounded-md p-3 text-xs font-mono overflow-x-auto mb-2 text-[var(--color-text-primary)]">
+                {children}
+              </code>
+            );
+          }
+          return (
+            <code className="bg-[var(--color-bg-overlay)] rounded px-1.5 py-0.5 text-xs font-mono text-[var(--color-text-primary)]">
+              {children}
+            </code>
+          );
+        },
+        pre: ({ children }) => <pre className="mb-2">{children}</pre>,
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-[var(--color-border)] pl-3 mb-2 text-[var(--color-text-secondary)] italic">
+            {children}
+          </blockquote>
+        ),
+        table: ({ children }) => (
+          <div className="overflow-x-auto mb-2">
+            <table className="w-full text-xs border-collapse">{children}</table>
+          </div>
+        ),
+        th: ({ children }) => (
+          <th className="text-left px-2 py-1.5 border-b border-[var(--color-border)] font-semibold text-[var(--color-text-primary)]">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-2 py-1.5 border-b border-[var(--color-border)] text-[var(--color-text-secondary)]">
+            {children}
+          </td>
+        ),
+        hr: () => <hr className="border-[var(--color-border)] my-4" />,
+      }}
+    >
+      {markdown}
+    </Markdown>
   );
 }
 

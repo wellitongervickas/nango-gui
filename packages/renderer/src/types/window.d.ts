@@ -5,6 +5,8 @@ import type {
   NangoDeleteConnectionRequest,
   NangoGetConnectionRequest,
   NangoGetProviderRequest,
+  NangoGetIntegrationReadmeRequest,
+  NangoGetIntegrationReadmeResult,
   NangoListConnectionsRequest,
   NangoListProvidersRequest,
   NangoProvider,
@@ -105,6 +107,9 @@ declare global {
       getProvider(
         args: NangoGetProviderRequest
       ): Promise<IpcResponse<NangoProvider>>;
+      getIntegrationReadme(
+        args: NangoGetIntegrationReadmeRequest
+      ): Promise<IpcResponse<NangoGetIntegrationReadmeResult>>;
       listSyncs(
         args: NangoListSyncsRequest
       ): Promise<IpcResponse<NangoSyncRecord[]>>;

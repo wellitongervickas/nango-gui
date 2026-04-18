@@ -19,6 +19,8 @@ import {
   type NangoListProvidersRequest,
   type NangoProvider,
   type NangoGetProviderRequest,
+  type NangoGetIntegrationReadmeRequest,
+  type NangoGetIntegrationReadmeResult,
   type NangoListSyncsRequest,
   type NangoGetSyncStatusRequest,
   type NangoTriggerSyncRequest,
@@ -498,6 +500,42 @@ export function registerIpcHandlers(): void {
           categories: p.categories,
           docs: p.docs,
         };
+      })
+  );
+
+  // ── Integration readme handler ───────────────────────────────────────────
+
+  const _readmeCache = new Map<string, { markdown: string | null; fetchedAt: number }>();
+  const README_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_INTEGRATION_README,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetIntegrationReadmeRequest
+    ): Promise<IpcResponse<NangoGetIntegrationReadmeResult>> =>
+      wrap(async () => {
+        const provider = args.provider;
+        const now = Date.now();
+        const cached = _readmeCache.get(provider);
+        if (cached && now - cached.fetchedAt < README_TTL_MS) {
+          return { markdown: cached.markdown };
+        }
+
+        // Try fetching from GitHub integration-templates repo (canonical source)
+        let markdown: string | null = null;
+        try {
+          const url = `https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/${encodeURIComponent(provider)}/README.md`;
+          const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+          if (res.ok) {
+            markdown = await res.text();
+          }
+        } catch {
+          // Network error — leave markdown null
+        }
+
+        _readmeCache.set(provider, { markdown, fetchedAt: now });
+        return { markdown };
       })
   );
 

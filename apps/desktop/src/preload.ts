@@ -8,6 +8,7 @@ import type {
   NangoCreateConnectSessionRequest,
   NangoListProvidersRequest,
   NangoGetProviderRequest,
+  NangoGetIntegrationReadmeRequest,
   NangoListSyncsRequest,
   NangoGetSyncStatusRequest,
   NangoTriggerSyncRequest,
@@ -67,6 +68,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_PROVIDERS, args),
   getProvider: (args: NangoGetProviderRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_PROVIDER, args),
+  getIntegrationReadme: (args: NangoGetIntegrationReadmeRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_INTEGRATION_README, args),
   listSyncs: (args: NangoListSyncsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_SYNCS, args),
   getSyncStatus: (args: NangoGetSyncStatusRequest) =>

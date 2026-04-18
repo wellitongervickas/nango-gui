@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   NANGO_CREATE_CONNECT_SESSION: "nango:createConnectSession",
   NANGO_LIST_PROVIDERS: "nango:listProviders",
   NANGO_GET_PROVIDER: "nango:getProvider",
+  NANGO_GET_INTEGRATION_README: "nango:getIntegrationReadme",
 
   // Sync operations
   NANGO_LIST_SYNCS: "nango:listSyncs",
@@ -230,6 +231,16 @@ export interface NangoProvider {
 
 export interface NangoGetProviderRequest {
   provider: string;
+}
+
+export interface NangoGetIntegrationReadmeRequest {
+  /** Provider key (e.g. "github", "slack"). */
+  provider: string;
+}
+
+export interface NangoGetIntegrationReadmeResult {
+  /** Markdown content of the readme, or null if none exists. */
+  markdown: string | null;
 }
 
 export type AppTheme = "light" | "dark" | "system";
