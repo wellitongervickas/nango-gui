@@ -12,6 +12,9 @@ import type {
   NangoValidateKeyResult,
   NangoCreateConnectSessionRequest,
   NangoCreateConnectSessionResult,
+  NangoSetMetadataRequest,
+  NangoCreateReconnectSessionRequest,
+  NangoCreateReconnectSessionResult,
   NangoListSyncsRequest,
   NangoGetSyncStatusRequest,
   NangoTriggerSyncRequest,
@@ -148,6 +151,8 @@ declare global {
       getConnectionHealth(
         args: NangoGetConnectionHealthRequest
       ): Promise<IpcResponse<NangoConnectionHealthData>>;
+      setMetadata(args: NangoSetMetadataRequest): Promise<IpcResponse<void>>;
+      createReconnectSession(args: NangoCreateReconnectSessionRequest): Promise<IpcResponse<NangoCreateReconnectSessionResult>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

@@ -114,6 +114,12 @@ export const IPC_CHANNELS = {
   // Nango webhook settings (outgoing webhook URL configuration)
   NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
   NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
+
+  // Connection metadata management
+  NANGO_SET_METADATA: "nango:setMetadata",
+
+  // Re-authorization (reconnect session)
+  NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -157,6 +163,8 @@ export interface NangoGetConnectionRequest {
   /** The integration ID (formerly providerConfigKey). */
   providerConfigKey: string;
   connectionId: string;
+  /** When true, forces a token refresh before returning credentials. */
+  forceRefresh?: boolean;
 }
 
 export interface NangoConnectionDetail {
@@ -165,8 +173,27 @@ export interface NangoConnectionDetail {
   provider_config_key: string;
   provider: string;
   credentials: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   created: string;
   updated_at?: string;
+}
+
+export interface NangoSetMetadataRequest {
+  providerConfigKey: string;
+  connectionId: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface NangoCreateReconnectSessionRequest {
+  providerConfigKey: string;
+  connectionId: string;
+  endUserId: string;
+  endUserDisplayName?: string;
+}
+
+export interface NangoCreateReconnectSessionResult {
+  token: string;
+  expiresAt: string;
 }
 
 export interface NangoValidateKeyRequest {

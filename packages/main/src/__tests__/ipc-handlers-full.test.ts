@@ -158,7 +158,7 @@ describe("IPC handlers", () => {
         status: "ok",
         data: { id: 42, connection_id: "conn-42", provider: "github" },
       });
-      expect(mockGetConnection).toHaveBeenCalledWith("gh", "conn-42");
+      expect(mockGetConnection).toHaveBeenCalledWith("gh", "conn-42", false);
     });
   });
 

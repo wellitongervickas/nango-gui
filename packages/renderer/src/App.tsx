@@ -10,10 +10,12 @@ import { CodePreviewPanel } from "./components/canvas/CodePreviewPanel";
 import { DryrunPanel } from "./components/canvas/DryrunPanel";
 import { DeployPanel } from "./components/deploy/DeployPanel";
 import { AiBuilderPanel } from "./components/ai/AiBuilderPanel";
+import { ConnectSearchModal } from "./components/connections/ConnectSearchModal";
 import { useCodePanelStore } from "./store/codePanelStore";
 import { useDryrunPanelStore } from "./store/dryrunPanelStore";
 import { useDeployPanelStore } from "./store/deployPanelStore";
 import { useAiBuilderPanelStore } from "./store/aiBuilderPanelStore";
+import { useConnectFlowStore } from "./store/connectFlowStore";
 import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
@@ -28,6 +30,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
+import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
 import { applyTheme } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
 import { useHashRoute } from "./lib/router";
@@ -49,6 +52,7 @@ function AppShell({ children, pageName }: { children: React.ReactNode; pageName:
       </div>
       <StatusBar />
       <ErrorToasts />
+      <ConnectSearchModal />
     </div>
   );
 }
@@ -82,6 +86,18 @@ function App() {
     }
   }, [route]);
 
+  // Global Ctrl/Cmd+K shortcut to open the Connect search modal
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        useConnectFlowStore.getState().openSearch();
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   if (route === "setup") {
     return <SetupWizard />;
   }
@@ -96,6 +112,17 @@ function App() {
 
   if (route === "connections") {
     return <AppShell pageName="Connections"><ConnectionsPage /></AppShell>;
+  }
+
+  if (route.startsWith("connections/detail/")) {
+    const segments = route.split("/");
+    const providerConfigKey = decodeURIComponent(segments[2] ?? "");
+    const connectionId = decodeURIComponent(segments[3] ?? "");
+    return (
+      <AppShell pageName="Connection Detail">
+        <ConnectionDetailPage providerConfigKey={providerConfigKey} connectionId={connectionId} />
+      </AppShell>
+    );
   }
 
   if (route === "integrations") {
@@ -166,6 +193,7 @@ function App() {
         </div>
         <StatusBar />
         <ErrorToasts />
+        <ConnectSearchModal />
       </div>
     </ReactFlowProvider>
   );

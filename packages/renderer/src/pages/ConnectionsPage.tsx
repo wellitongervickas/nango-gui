@@ -6,6 +6,7 @@ import type {
   ConnectionStatus,
 } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
+import { useConnectFlowStore } from "@/store/connectFlowStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn, searchInputClass } from "@/lib/utils";
 import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
@@ -367,19 +368,6 @@ export function ConnectionsPage() {
     fetchConnections();
   }, [fetchConnections]);
 
-  // Ctrl+K / Cmd+K shortcut to focus search
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   // Close status dropdown on outside click
   useEffect(() => {
     if (!showStatusDropdown) return;
@@ -539,9 +527,6 @@ export function ConnectionsPage() {
             placeholder="Search connections…"
             className={searchInputClass}
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-text-secondary)] bg-[var(--color-bg-overlay)] px-1.5 py-0.5 rounded border border-[var(--color-border)]">
-            ⌘K
-          </kbd>
         </div>
 
         {/* Refresh */}
@@ -554,23 +539,14 @@ export function ConnectionsPage() {
           Refresh
         </button>
 
-        {/* Connect new */}
-        <ConnectModal onConnected={() => fetchConnections()}>
-          {({ open, isLoading: connectLoading }) => (
-            <button
-              onClick={open}
-              disabled={connectLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
-            >
-              {connectLoading ? (
-                <SpinnerIcon />
-              ) : (
-                <span className="text-base leading-none">+</span>
-              )}
-              Add
-            </button>
-          )}
-        </ConnectModal>
+        {/* Connect new — opens the ⌘K search modal */}
+        <button
+          onClick={() => useConnectFlowStore.getState().openSearch()}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          <span className="text-base leading-none">+</span>
+          Add
+        </button>
       </div>
 
       {/* Error banner */}
@@ -614,17 +590,12 @@ export function ConnectionsPage() {
                 Connect your first integration to get started.
               </p>
             </div>
-            <ConnectModal onConnected={() => fetchConnections()}>
-              {({ open, isLoading: connectLoading }) => (
-                <button
-                  onClick={open}
-                  disabled={connectLoading}
-                  className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Connect your first integration
-                </button>
-              )}
-            </ConnectModal>
+            <button
+              onClick={() => useConnectFlowStore.getState().openSearch()}
+              className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              Connect your first integration
+            </button>
           </div>
         )}
 

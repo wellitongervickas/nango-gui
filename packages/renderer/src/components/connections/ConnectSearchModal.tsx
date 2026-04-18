@@ -1,0 +1,458 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Nango from "@nangohq/frontend";
+import type { ConnectUI } from "@nangohq/frontend";
+import type { ConnectUIEvent } from "@nangohq/frontend";
+import type { NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
+import { useConnectFlowStore } from "@/store/connectFlowStore";
+import { useConnectionsStore } from "@/store/connectionsStore";
+import { SearchIcon, SpinnerIcon, XIcon, PlugIcon } from "@/components/icons";
+
+type FlowState =
+  | { kind: "search" }
+  | { kind: "connecting"; provider: string }
+  | { kind: "open"; provider: string }
+  | { kind: "error"; message: string };
+
+interface SuccessToast {
+  provider: string;
+  syncCount: number;
+}
+
+export function ConnectSearchModal() {
+  const isOpen = useConnectFlowStore((s) => s.isSearchOpen);
+  const closeSearch = useConnectFlowStore((s) => s.closeSearch);
+
+  if (!isOpen) return null;
+  return <ConnectSearchModalInner onClose={closeSearch} />;
+}
+
+function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [providers, setProviders] = useState<NangoProvider[]>([]);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(true);
+  const [flowState, setFlowState] = useState<FlowState>({ kind: "search" });
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const [toast, setToast] = useState<SuccessToast | null>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const connectUIRef = useRef<ConnectUI | null>(null);
+  const closedRef = useRef(false);
+
+  const connections = useConnectionsStore((s) => s.connections);
+  const fetchConnections = useConnectionsStore((s) => s.fetchConnections);
+  const addConnection = useConnectionsStore((s) => s.addConnection);
+
+  // Load providers on mount
+  useEffect(() => {
+    if (!window.nango) return;
+    setIsLoadingProviders(true);
+    window.nango
+      .listProviders()
+      .then((res) => {
+        if (res.status === "ok") setProviders(res.data);
+      })
+      .finally(() => setIsLoadingProviders(false));
+  }, []);
+
+  // Auto-focus input
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Clean up ConnectUI on unmount
+  useEffect(() => {
+    return () => {
+      connectUIRef.current?.close();
+    };
+  }, []);
+
+  // Auto-dismiss success toast
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [toast, onClose]);
+
+  // Filter providers
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return providers;
+    return providers.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.display_name.toLowerCase().includes(q) ||
+        (p.categories ?? []).some((c) => c.toLowerCase().includes(q))
+    );
+  }, [providers, query]);
+
+  // Reset highlight when filter changes
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [filtered.length, query]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const el = listRef.current.children[highlightIdx] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlightIdx]);
+
+  // Existing connections keyed by provider name for Smart Connect
+  const connectedProviders = useMemo(() => {
+    const map = new Map<string, NangoConnectionSummary[]>();
+    for (const c of connections) {
+      const key = (c.provider ?? c.provider_config_key).toLowerCase();
+      const arr = map.get(key) ?? [];
+      arr.push(c);
+      map.set(key, arr);
+    }
+    return map;
+  }, [connections]);
+
+  const handleEvent = useCallback(
+    async (event: ConnectUIEvent) => {
+      switch (event.type) {
+        case "close":
+          closedRef.current = true;
+          connectUIRef.current?.close();
+          connectUIRef.current = null;
+          setFlowState({ kind: "search" });
+          break;
+
+        case "connect": {
+          const { connectionId, providerConfigKey } = event.payload;
+          addConnection({
+            id: 0,
+            connection_id: connectionId,
+            provider: providerConfigKey,
+            provider_config_key: providerConfigKey,
+            created: new Date().toISOString(),
+            metadata: null,
+          });
+          // Fetch full connections list and count syncs
+          await fetchConnections();
+          closedRef.current = true;
+          connectUIRef.current?.close();
+          connectUIRef.current = null;
+
+          // Count syncs for the toast
+          let syncCount = 0;
+          try {
+            const syncsRes = await window.nango?.listSyncs({
+              providerConfigKey,
+              connectionId,
+            });
+            if (syncsRes?.status === "ok") {
+              syncCount = syncsRes.data.length;
+            }
+          } catch {
+            // non-critical — just show 0
+          }
+
+          setToast({ provider: providerConfigKey, syncCount });
+          break;
+        }
+
+        case "error":
+          closedRef.current = true;
+          connectUIRef.current?.close();
+          connectUIRef.current = null;
+          setFlowState({
+            kind: "error",
+            message: event.payload.errorMessage,
+          });
+          break;
+      }
+    },
+    [addConnection, fetchConnections]
+  );
+
+  const selectProvider = useCallback(
+    async (provider: NangoProvider) => {
+      if (!window.nango) {
+        setFlowState({ kind: "error", message: "Nango API not available" });
+        return;
+      }
+
+      closedRef.current = false;
+      setFlowState({ kind: "connecting", provider: provider.display_name });
+
+      try {
+        const res = await Promise.race([
+          window.nango.createConnectSession({
+            endUserId: "local-user",
+            endUserDisplayName: "Local User",
+            allowedIntegrations: [provider.name],
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Connection timed out. Check that your Nango server is reachable.")),
+              15_000
+            )
+          ),
+        ]);
+
+        if (res.status === "error") {
+          setFlowState({ kind: "error", message: res.error });
+          return;
+        }
+
+        if (closedRef.current) return;
+
+        const nango = new Nango({ connectSessionToken: res.data.token });
+        const connectUI = nango.openConnectUI({ onEvent: handleEvent });
+        connectUIRef.current = connectUI;
+        connectUI.open();
+
+        if (!closedRef.current) {
+          setFlowState({ kind: "open", provider: provider.display_name });
+        }
+      } catch (err) {
+        setFlowState({
+          kind: "error",
+          message: err instanceof Error ? err.message : "Failed to connect",
+        });
+      }
+    },
+    [handleEvent]
+  );
+
+  // Keyboard navigation
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (flowState.kind !== "search") return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightIdx((i) => Math.min(i + 1, filtered.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightIdx((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter" && filtered[highlightIdx]) {
+        e.preventDefault();
+        selectProvider(filtered[highlightIdx]);
+      }
+    },
+    [flowState.kind, filtered, highlightIdx, selectProvider]
+  );
+
+  // ESC to close or go back to search
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (flowState.kind === "error") {
+          setFlowState({ kind: "search" });
+        } else if (flowState.kind === "open" || flowState.kind === "connecting") {
+          connectUIRef.current?.close();
+          connectUIRef.current = null;
+          closedRef.current = true;
+          setFlowState({ kind: "search" });
+        } else {
+          onClose();
+        }
+      }
+    }
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [flowState.kind, onClose]);
+
+  // Success toast overlay
+  if (toast) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+        <div className="bg-[var(--color-bg-surface)] border border-[var(--color-success)]/30 rounded-xl shadow-2xl px-6 py-4 flex items-center gap-3 animate-in slide-in-from-top-2">
+          <span className="w-8 h-8 rounded-full bg-[var(--color-success)]/15 flex items-center justify-center text-[var(--color-success)]">
+            <PlugIcon />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              {toast.provider} connected
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              {toast.syncCount > 0
+                ? `${toast.syncCount} sync${toast.syncCount === 1 ? " is" : "s are"} now running.`
+                : "No syncs configured yet."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Connecting / open overlay — show cancel button over the Nango iframe
+  if (flowState.kind === "connecting" || flowState.kind === "open") {
+    return (
+      <div
+        className="fixed inset-0 z-[9999] flex items-end justify-center pb-6"
+        onClick={() => {
+          connectUIRef.current?.close();
+          connectUIRef.current = null;
+          closedRef.current = true;
+          setFlowState({ kind: "search" });
+        }}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            connectUIRef.current?.close();
+            connectUIRef.current = null;
+            closedRef.current = true;
+            setFlowState({ kind: "search" });
+          }}
+          className="px-5 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] text-[var(--color-text)] shadow-xl hover:bg-[var(--color-bg)] transition-colors cursor-pointer"
+        >
+          {flowState.kind === "connecting" ? "Cancel" : "Close"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} />
+
+      {/* Modal */}
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
+        onKeyDown={handleKeyDown}
+      >
+        <div
+          className="w-full max-w-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Search header */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
+            <span className="text-[var(--color-text-secondary)]">
+              <SearchIcon />
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search integrations…"
+              className="flex-1 bg-transparent text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none"
+            />
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-[var(--color-text-secondary)] bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded">
+              ESC
+            </kbd>
+          </div>
+
+          {/* Error banner */}
+          {flowState.kind === "error" && (
+            <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm text-[var(--color-error)] flex items-center gap-2">
+              <span className="flex-1">{flowState.message}</span>
+              <button
+                onClick={() => setFlowState({ kind: "search" })}
+                className="shrink-0 text-[var(--color-error)]/70 hover:text-[var(--color-error)] cursor-pointer"
+              >
+                <XIcon />
+              </button>
+            </div>
+          )}
+
+          {/* Provider list */}
+          <div ref={listRef} className="max-h-[360px] overflow-y-auto py-1">
+            {isLoadingProviders && (
+              <div className="flex items-center justify-center py-8 text-[var(--color-text-secondary)]">
+                <SpinnerIcon />
+                <span className="ml-2 text-sm">Loading integrations…</span>
+              </div>
+            )}
+
+            {!isLoadingProviders && filtered.length === 0 && (
+              <div className="flex flex-col items-center py-8 gap-2">
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  {query ? `No integrations match "${query}"` : "No integrations available"}
+                </p>
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    className="text-xs text-[var(--color-brand-400)] hover:underline cursor-pointer"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            )}
+
+            {filtered.map((provider, idx) => {
+              const existing = connectedProviders.get(provider.name.toLowerCase());
+              const isHighlighted = idx === highlightIdx;
+
+              return (
+                <button
+                  key={provider.name}
+                  onClick={() => selectProvider(provider)}
+                  onMouseEnter={() => setHighlightIdx(idx)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer ${
+                    isHighlighted
+                      ? "bg-[var(--color-primary)]/10"
+                      : "hover:bg-[var(--color-bg-base)]/50"
+                  }`}
+                >
+                  {/* Provider logo */}
+                  {provider.logo_url ? (
+                    <img
+                      src={provider.logo_url}
+                      alt=""
+                      className="w-8 h-8 rounded-md object-contain bg-white p-0.5"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-md bg-[var(--color-bg-overlay)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] uppercase">
+                      {provider.display_name[0] ?? "?"}
+                    </div>
+                  )}
+
+                  {/* Provider info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                      {provider.display_name}
+                    </p>
+                    <p className="text-xs text-[var(--color-text-secondary)] truncate">
+                      {provider.auth_mode}
+                      {provider.categories?.length
+                        ? ` · ${provider.categories.slice(0, 2).join(", ")}`
+                        : ""}
+                    </p>
+                  </div>
+
+                  {/* Smart Connect — duplicate badge */}
+                  {existing && existing.length > 0 && (
+                    <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-medium whitespace-nowrap">
+                      {existing.length} connected
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Footer hint */}
+          <div className="px-4 py-2 border-t border-[var(--color-border)] flex items-center gap-4 text-[10px] text-[var(--color-text-secondary)]">
+            <span>
+              <kbd className="font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] px-1 rounded">↑↓</kbd> navigate
+            </span>
+            <span>
+              <kbd className="font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] px-1 rounded">↵</kbd> connect
+            </span>
+            <span>
+              <kbd className="font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] px-1 rounded">esc</kbd> close
+            </span>
+            <span className="ml-auto tabular-nums">
+              {!isLoadingProviders && `${filtered.length} integration${filtered.length === 1 ? "" : "s"}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

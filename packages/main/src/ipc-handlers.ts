@@ -77,6 +77,9 @@ import {
   type NangoGetConnectionHealthRequest,
   type NangoConnectionHealthData,
   type ConnectionStatus,
+  type NangoSetMetadataRequest,
+  type NangoCreateReconnectSessionRequest,
+  type NangoCreateReconnectSessionResult,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -217,6 +220,7 @@ function toConnectionDetail(raw: unknown): NangoConnectionDetail {
     provider_config_key: String(conn.provider_config_key ?? ""),
     provider: String(conn.provider ?? ""),
     credentials: (conn.credentials as Record<string, unknown>) ?? {},
+    metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
     created: String(conn.created ?? ""),
     ...(conn.updated_at != null ? { updated_at: String(conn.updated_at) } : {}),
   };
@@ -381,7 +385,8 @@ export function registerIpcHandlers(): void {
         const client = getNangoClient();
         const result = await client.getConnection(
           args.providerConfigKey,
-          args.connectionId
+          args.connectionId,
+          args.forceRefresh ?? false
         );
         return toConnectionDetail(result);
       })
@@ -396,6 +401,45 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         await client.deleteConnection(args.providerConfigKey, args.connectionId);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_SET_METADATA,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoSetMetadataRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.setMetadata(args.providerConfigKey, args.connectionId, args.metadata);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_CREATE_RECONNECT_SESSION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoCreateReconnectSessionRequest
+    ): Promise<IpcResponse<NangoCreateReconnectSessionResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await (client as unknown as {
+          createReconnectSession(args: {
+            reconnect_for_connection_id: string;
+            end_user: { id: string; display_name?: string };
+          }): Promise<{ data: { token: string; expires_at: string } }>;
+        }).createReconnectSession({
+          reconnect_for_connection_id: args.connectionId,
+          end_user: {
+            id: args.endUserId,
+            ...(args.endUserDisplayName ? { display_name: args.endUserDisplayName } : {}),
+          },
+        });
+        return {
+          token: result.data.token,
+          expiresAt: result.data.expires_at,
+        };
       })
   );
 

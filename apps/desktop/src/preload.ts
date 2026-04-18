@@ -48,6 +48,8 @@ import type {
   AiProviderSaveKeyRequest,
   AiProviderLoadKeyRequest,
   AiProviderClearKeyRequest,
+  NangoSetMetadataRequest,
+  NangoCreateReconnectSessionRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -104,6 +106,10 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_UPDATE_WEBHOOK_SETTINGS, args),
   getConnectionHealth: (args: NangoGetConnectionHealthRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_CONNECTION_HEALTH, args),
+  setMetadata: (args: NangoSetMetadataRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_METADATA, args),
+  createReconnectSession: (args: NangoCreateReconnectSessionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_RECONNECT_SESSION, args),
 });
 
 // Expose window.credentials — secure credential storage
