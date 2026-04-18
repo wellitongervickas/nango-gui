@@ -65,6 +65,7 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
   const [exporting, setExporting] = useState(false);
 
   const exportFiles = useCallback(async () => {
+    if (!window.project) return;
     const res = await window.project.showDirectoryDialog();
     if (res.status !== "ok" || !res.data.filePath) return;
     const dir = res.data.filePath;

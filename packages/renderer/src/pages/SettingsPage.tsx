@@ -63,6 +63,10 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
 
   async function handleValidateAndSave() {
     if (!newKey.trim()) return;
+    if (!window.nango || !window.credentials) {
+      setKeyError("Not running in Electron. Cannot save keys.");
+      return;
+    }
     setChangeState("validating");
     setKeyError(null);
     try {
@@ -91,6 +95,7 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
   }
 
   async function handleRemove() {
+    if (!window.credentials) return;
     const res = await window.credentials.clear();
     if (res.status === "error") return;
     // Redirect to setup wizard

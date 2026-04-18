@@ -96,6 +96,7 @@ export const useActionsStore = create<ActionsState>((set) => ({
   history: [],
 
   triggerAction: async (integrationId, connectionId, actionName, input) => {
+    if (!window.nango) return;
     set({ isExecutingAction: true, actionError: null, actionResult: null });
     const start = Date.now();
 
@@ -179,6 +180,7 @@ export const useActionsStore = create<ActionsState>((set) => ({
     endpoint,
     opts
   ) => {
+    if (!window.nango) return;
     set({
       isExecutingProxy: true,
       proxyError: null,

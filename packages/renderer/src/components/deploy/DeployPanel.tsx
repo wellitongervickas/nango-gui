@@ -102,10 +102,12 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
       setRunId(null);
     };
 
+    if (!window.cli) return;
     window.cli.onOutput(handleOutput);
     window.cli.onExit(handleExit);
 
     return () => {
+      if (!window.cli) return;
       window.cli.removeAllOutputListeners();
       window.cli.removeAllExitListeners();
     };
@@ -116,6 +118,7 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
     setStatus("running");
     setLines([{ stream: "stdout", text: `Starting nango deploy (${envLabel})...`, ts: Date.now() }]);
 
+    if (!window.cli) return;
     const args = ["deploy", envLabel];
     const result = await window.cli.run({ command: "nango", args });
 
@@ -131,7 +134,7 @@ export function DeployPanel({ onClose }: DeployPanelProps) {
   }, [environment]);
 
   const stopDeploy = useCallback(async () => {
-    if (runId) {
+    if (runId && window.cli) {
       await window.cli.abort({ runId });
       setRunId(null);
       setStatus("idle");

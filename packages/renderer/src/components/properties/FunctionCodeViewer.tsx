@@ -79,6 +79,7 @@ export function FunctionCodeViewer({ nodeType, data }: Props) {
     let cancelled = false;
     setLoading(true);
 
+    if (!window.project) { setLoading(false); return; }
     window.project
       .readFile({ filePath: sourcePath })
       .then((res) => {

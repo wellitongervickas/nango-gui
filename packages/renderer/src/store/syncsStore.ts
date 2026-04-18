@@ -81,6 +81,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
   fetchErrorCount: 0,
 
   fetchSyncs: async (connectionId, providerConfigKey) => {
+    if (!window.nango) return;
     set({
       isLoading: true,
       error: null,
@@ -114,7 +115,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
   },
 
   triggerSync: async (providerConfigKey, syncName, connectionId, fullResync) => {
-    if (get().syncActionLoading[syncName]) return;
+    if (!window.nango || get().syncActionLoading[syncName]) return;
     set((state) => ({
       syncActionLoading: { ...state.syncActionLoading, [syncName]: true },
     }));
@@ -143,7 +144,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
   },
 
   pauseSync: async (providerConfigKey, syncName, connectionId) => {
-    if (get().syncActionLoading[syncName]) return;
+    if (!window.nango || get().syncActionLoading[syncName]) return;
     set((state) => ({
       syncActionLoading: { ...state.syncActionLoading, [syncName]: true },
     }));
@@ -171,7 +172,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
   },
 
   startSync: async (providerConfigKey, syncName, connectionId) => {
-    if (get().syncActionLoading[syncName]) return;
+    if (!window.nango || get().syncActionLoading[syncName]) return;
     set((state) => ({
       syncActionLoading: { ...state.syncActionLoading, [syncName]: true },
     }));
@@ -199,7 +200,7 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
   },
 
   updateSyncFrequency: async (providerConfigKey, syncName, connectionId, frequency) => {
-    if (get().syncActionLoading[syncName]) return;
+    if (!window.nango || get().syncActionLoading[syncName]) return;
     set((state) => ({
       syncActionLoading: { ...state.syncActionLoading, [syncName]: true },
     }));

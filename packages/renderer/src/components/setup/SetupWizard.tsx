@@ -23,6 +23,7 @@ export function SetupWizard() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleValidate() {
+    if (!window.nango) { setError("Nango API not available."); return; }
     setValidating(true);
     setError(null);
     try {
@@ -44,6 +45,7 @@ export function SetupWizard() {
   }
 
   async function handleSave() {
+    if (!window.credentials) { setError("Credentials API not available."); return; }
     setValidating(true);
     setError(null);
     try {

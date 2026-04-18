@@ -66,6 +66,7 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
     const filter = opts?.filter ?? get().filter;
     const modifiedAfter = opts?.modifiedAfter ?? get().modifiedAfter;
 
+    if (!window.nango) return;
     set({
       isLoading: true,
       error: null,
@@ -103,6 +104,7 @@ export const useRecordsStore = create<RecordsState>((set, get) => ({
   },
 
   loadMore: async () => {
+    if (!window.nango) return;
     const { nextCursor, providerConfigKey, connectionId, model, filter, modifiedAfter } = get();
     if (!nextCursor || !providerConfigKey || !connectionId || !model) return;
 

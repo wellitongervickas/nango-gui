@@ -61,6 +61,7 @@ export function Toolbar() {
     async (saveAs?: boolean) => {
       let filePath = project.filePath;
 
+      if (!window.project) return;
       if (!filePath || saveAs) {
         const res = await window.project.showSaveDialog();
         if (res.status !== "ok" || !res.data.filePath) return;
@@ -94,6 +95,7 @@ export function Toolbar() {
   );
 
   const openProject = useCallback(async () => {
+    if (!window.project) return;
     const dialogRes = await window.project.showOpenDialog();
     if (dialogRes.status !== "ok" || !dialogRes.data.filePath) return;
     const filePath = dialogRes.data.filePath;

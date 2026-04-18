@@ -20,7 +20,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   fetchDashboard: async () => {
     await asyncFetch(
       set,
-      () => window.nango.getDashboard(),
+      () => window.nango?.getDashboard(),
       (data) => ({ dashboard: data, lastRefreshedAt: new Date() }),
       "Failed to load dashboard",
     );

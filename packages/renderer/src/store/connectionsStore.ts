@@ -20,7 +20,7 @@ export const useConnectionsStore = create<ConnectionsState>((set) => ({
   fetchConnections: async (integrationId?: string) => {
     await asyncFetch(
       set,
-      () => window.nango.listConnections(integrationId ? { integrationId } : undefined),
+      () => window.nango?.listConnections(integrationId ? { integrationId } : undefined),
       (data) => ({ connections: data }),
       "Failed to load connections",
     );
@@ -37,6 +37,7 @@ export const useConnectionsStore = create<ConnectionsState>((set) => ({
     })),
 
   deleteConnection: async (providerConfigKey, connectionId) => {
+    if (!window.nango) return;
     const res = await window.nango.deleteConnection({ providerConfigKey, connectionId });
     if (res.status === "error") throw new Error(res.error);
     set((state) => ({

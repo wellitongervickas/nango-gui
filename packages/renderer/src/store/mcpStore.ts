@@ -30,6 +30,7 @@ export const useMcpStore = create<McpState>((set, get) => ({
   error: null,
 
   fetchConfigs: async () => {
+    if (!window.mcp) return;
     set({ isLoading: true, error: null });
     try {
       const res = await window.mcp.listConfigs();
@@ -44,12 +45,14 @@ export const useMcpStore = create<McpState>((set, get) => ({
   },
 
   addConfig: async (name, command, args, env) => {
+    if (!window.mcp) return;
     const res = await window.mcp.addConfig({ name, command, args, env });
     if (res.status === "error") throw new Error(res.error);
     await get().fetchConfigs();
   },
 
   removeConfig: async (name) => {
+    if (!window.mcp) return;
     const res = await window.mcp.removeConfig({ name });
     if (res.status === "error") throw new Error(res.error);
     set((s) => ({
@@ -59,11 +62,13 @@ export const useMcpStore = create<McpState>((set, get) => ({
   },
 
   startServer: async (name) => {
+    if (!window.mcp) return;
     const res = await window.mcp.start({ name });
     if (res.status === "error") throw new Error(res.error);
   },
 
   stopServer: async (name) => {
+    if (!window.mcp) return;
     const res = await window.mcp.stop({ name });
     if (res.status === "error") throw new Error(res.error);
   },

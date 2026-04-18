@@ -89,6 +89,7 @@ export const useEnvironmentStore = create<EnvironmentState>((set, get) => ({
     syncUrlParam(env);
 
     try {
+      if (!window.electronApp) { set({ isSwitching: false }); return; }
       const res = await window.electronApp.updateSettings({ environment: env });
       if (res.status === "error") {
         set({ current: prev, isSwitching: false, error: res.error });

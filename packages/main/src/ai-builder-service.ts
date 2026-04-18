@@ -7,7 +7,6 @@
  * getAvailableProviders to build an integration on the canvas.
  */
 import type {
-  AiProviderType,
   AiBuilderRunRequest,
   AiBuilderRunResult,
   AiBuilderToolCallEvent,

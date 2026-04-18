@@ -16,6 +16,10 @@ export async function asyncFetch<S extends { isLoading: boolean; error: string |
   set({ isLoading: true, error: null } as Partial<S>);
   try {
     const res = await apiFn();
+    if (!res) {
+      set({ isLoading: false } as Partial<S>);
+      return;
+    }
     if (res.status === "error") {
       notifyIpcError(res);
       set({ error: res.error, isLoading: false } as Partial<S>);

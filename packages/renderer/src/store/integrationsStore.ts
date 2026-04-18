@@ -24,7 +24,7 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
   fetchProviders: async () => {
     await asyncFetch(
       set,
-      () => window.nango.listProviders(),
+      () => window.nango?.listProviders(),
       (data) => ({ providers: data }),
       "Failed to load providers",
     );

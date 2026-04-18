@@ -92,16 +92,19 @@ export function DryrunPanel({ onClose }: DryrunPanelProps) {
       setRunId(null);
     };
 
+    if (!window.cli) return;
     window.cli.onOutput(handleOutput);
     window.cli.onExit(handleExit);
 
     return () => {
+      if (!window.cli) return;
       window.cli.removeAllOutputListeners();
       window.cli.removeAllExitListeners();
     };
   }, []);
 
   const startDryrun = useCallback(async () => {
+    if (!window.cli) return;
     setStatus("running");
     setLines([{ stream: "stdout", text: "Starting nango dryrun...", ts: Date.now() }]);
 
@@ -122,7 +125,7 @@ export function DryrunPanel({ onClose }: DryrunPanelProps) {
   }, []);
 
   const stopDryrun = useCallback(async () => {
-    if (runId) {
+    if (runId && window.cli) {
       await window.cli.abort({ runId });
       setRunId(null);
       setStatus("idle");

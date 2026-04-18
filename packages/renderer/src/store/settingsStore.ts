@@ -27,6 +27,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   error: null,
 
   fetchSettings: async () => {
+    if (!window.electronApp) return;
     set({ isLoading: true, error: null });
     try {
       const res = await window.electronApp.getSettings();
@@ -47,6 +48,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const prev = get().theme;
     set({ theme });
     applyTheme(theme);
+    if (!window.electronApp) return;
     try {
       const res = await window.electronApp.updateSettings({ theme });
       if (res.status === "error") {
@@ -64,6 +66,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   updateEnvironment: async (environment) => {
     const prev = get().environment;
     set({ environment });
+    if (!window.electronApp) return;
     try {
       const res = await window.electronApp.updateSettings({ environment });
       if (res.status === "error") {

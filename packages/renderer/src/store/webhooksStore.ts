@@ -18,6 +18,7 @@ export const useWebhooksStore = create<WebhooksState>((set) => ({
   error: null,
 
   fetchSettings: async () => {
+    if (!window.nango) return;
     set({ isLoading: true, error: null });
     try {
       const res = await window.nango.getWebhookSettings();
@@ -35,6 +36,7 @@ export const useWebhooksStore = create<WebhooksState>((set) => ({
   },
 
   updateSettings: async (patch: NangoUpdateWebhookSettingsRequest) => {
+    if (!window.nango) return;
     set({ isSaving: true, error: null });
     try {
       const res = await window.nango.updateWebhookSettings(patch);
