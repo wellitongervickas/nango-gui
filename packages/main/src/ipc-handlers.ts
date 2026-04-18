@@ -821,6 +821,11 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         if (args.environment !== undefined) {
           credentialStore.saveEnvironment(args.environment);
+          // Re-initialize the Nango client so subsequent API calls use the new environment
+          const secretKey = credentialStore.load();
+          if (secretKey) {
+            await initNangoClient(secretKey);
+          }
         }
         if (args.theme !== undefined) {
           credentialStore.saveTheme(args.theme);
