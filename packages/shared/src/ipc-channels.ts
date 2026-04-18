@@ -88,6 +88,17 @@ export const IPC_CHANNELS = {
   /** Main → renderer push event: a partial token streamed from the AI endpoint. */
   NANGO_AI_STREAM_TOKEN: "nango:aiStreamToken",
 
+  // AI Integration Builder v2 — real provider-backed tool-calling loop
+  AI_BUILDER_RUN: "ai:builderRun",
+  /** Main → renderer push event: AI invoked a canvas tool (addNode, addEdge, etc.). */
+  AI_BUILDER_TOOL_CALL: "ai:builderToolCall",
+  /** Main → renderer push event: AI sent a text message to the user. */
+  AI_BUILDER_MESSAGE: "ai:builderMessage",
+  /** Save/load AI provider API keys via safeStorage. */
+  AI_PROVIDER_SAVE_KEY: "ai:providerSaveKey",
+  AI_PROVIDER_LOAD_KEY: "ai:providerLoadKey",
+  AI_PROVIDER_CLEAR_KEY: "ai:providerClearKey",
+
   // MCP server management
   MCP_LIST_CONFIGS: "mcp:listConfigs",
   MCP_ADD_CONFIG: "mcp:addConfig",
@@ -693,4 +704,99 @@ export interface NangoUpdateWebhookSettingsRequest {
   onAuthRefreshError?: boolean;
   onSyncError?: boolean;
   onAsyncActionCompletion?: boolean;
+}
+
+// ── AI Integration Builder v2 (provider-backed tool-calling) ─────────────────
+
+/** Supported external AI providers. */
+export type AiProviderType = "openai" | "anthropic";
+
+/** Request to run the AI builder conversation loop. */
+export interface AiBuilderRunRequest {
+  /** Which AI provider to use. */
+  aiProvider: AiProviderType;
+  /** User's free-form prompt describing the desired integration. */
+  prompt: string;
+  /** Conversation history for multi-turn context. Omit for first turn. */
+  conversationHistory?: AiConversationTurn[];
+  /** Current canvas state snapshot so the AI can reason about existing nodes. */
+  canvasSnapshot?: AiCanvasSnapshot;
+}
+
+/** Snapshot of the current canvas state passed to the AI for context. */
+export interface AiCanvasSnapshot {
+  nodes: AiCanvasNode[];
+  edges: AiCanvasEdge[];
+  integrationMeta?: AiIntegrationMeta;
+}
+
+export interface AiCanvasNode {
+  id: string;
+  type: string;
+  data: Record<string, unknown>;
+}
+
+export interface AiCanvasEdge {
+  id: string;
+  source: string;
+  target: string;
+  data?: Record<string, unknown>;
+}
+
+export interface AiIntegrationMeta {
+  name: string;
+  provider: string;
+  description: string;
+}
+
+/** Result of a completed AI builder conversation loop. */
+export interface AiBuilderRunResult {
+  /** All tool calls the AI made during the conversation. */
+  toolCalls: AiBuilderToolCallEvent[];
+  /** Final assistant message summarizing what was built. */
+  summary: string;
+  /** Number of conversation turns used. */
+  turnsUsed: number;
+}
+
+/** A single tool call made by the AI during the conversation loop. */
+export interface AiBuilderToolCallEvent {
+  /** Tool function name: addNode, addEdge, setIntegrationMeta, getAvailableProviders. */
+  tool: string;
+  /** The arguments the AI passed to the tool. */
+  args: Record<string, unknown>;
+  /** The result returned to the AI. */
+  result: unknown;
+}
+
+/** Streamed text message from the AI during the conversation loop. */
+export interface AiBuilderMessageEvent {
+  /** Partial or complete message text. */
+  text: string;
+  /** True when this is the final message. */
+  done: boolean;
+}
+
+/** Request to save an AI provider API key. */
+export interface AiProviderSaveKeyRequest {
+  provider: AiProviderType;
+  apiKey: string;
+}
+
+/** Request to load an AI provider API key (returns masked version for display). */
+export interface AiProviderLoadKeyRequest {
+  provider: AiProviderType;
+}
+
+/** Result of loading an AI provider key. */
+export interface AiProviderLoadKeyResult {
+  /** Whether a key is stored for this provider. */
+  exists: boolean;
+  /** Masked key for display (e.g. "••••••••ab12"), null if not stored. */
+  maskedKey: string | null;
+}
+
+/** Request to clear an AI provider API key. */
+export interface AiProviderClearKeyRequest {
+  provider: AiProviderType;
 }

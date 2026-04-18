@@ -3,6 +3,9 @@ import type {
   AiConversationTurn,
   AiGenerationResult,
   AiStreamTokenEvent,
+  AiProviderType,
+  AiBuilderToolCallEvent,
+  AiBuilderRunResult,
 } from "@nango-gui/shared";
 import { notifyIpcError } from "./notifyError";
 
@@ -31,8 +34,19 @@ interface AiState {
   /** Whether the conversation has hit the max turn limit. */
   isHistoryFull: boolean;
 
+  // ── AI Builder v2 state ─────────────────────────────────────────────────
+  /** Selected AI provider for the builder (openai or anthropic). */
+  aiProvider: AiProviderType;
+  /** Tool calls made by the AI during the current/last builder run. */
+  builderToolCalls: AiBuilderToolCallEvent[];
+  /** AI assistant message received during the builder run. */
+  builderMessage: string;
+  /** Result of the last completed builder run. */
+  builderResult: AiBuilderRunResult | null;
+
   setProvider(provider: string): void;
   setPrompt(prompt: string): void;
+  setAiProvider(aiProvider: AiProviderType): void;
 
   /**
    * Invoke the AI generate endpoint and update state.
@@ -45,8 +59,20 @@ interface AiState {
    */
   refine(): Promise<void>;
 
+  /**
+   * Run the AI builder v2 conversation loop with tool-calling.
+   * The AI calls canvas tools (addNode, addEdge, etc.) directly.
+   */
+  runBuilder(): Promise<void>;
+
   /** Append a streaming token to partialOutput. Called by the stream listener. */
   applyStreamToken(event: AiStreamTokenEvent): void;
+
+  /** Record a tool call from the AI builder v2 stream. */
+  applyBuilderToolCall(event: AiBuilderToolCallEvent): void;
+
+  /** Record a text message from the AI builder v2 stream. */
+  applyBuilderMessage(text: string, done: boolean): void;
 
   /** Reset the conversation and all generated state to start fresh. */
   resetConversation(): void;
@@ -65,8 +91,15 @@ export const useAiStore = create<AiState>((set, get) => ({
   panelError: null,
   isHistoryFull: false,
 
+  // AI Builder v2 defaults
+  aiProvider: "anthropic" as AiProviderType,
+  builderToolCalls: [],
+  builderMessage: "",
+  builderResult: null,
+
   setProvider: (provider) => set({ provider }),
   setPrompt: (prompt) => set({ prompt }),
+  setAiProvider: (aiProvider) => set({ aiProvider }),
 
   generate: async () => {
     const { provider, prompt, conversationHistory } = get();
@@ -153,11 +186,69 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
+  runBuilder: async () => {
+    const { aiProvider, prompt, conversationHistory } = get();
+    if (!prompt.trim()) return;
+    if (!window.aiBuilder?.run) return;
+
+    set({
+      isGenerating: true,
+      partialOutput: "",
+      panelError: null,
+      builderToolCalls: [],
+      builderMessage: "",
+      builderResult: null,
+    });
+
+    const res = await window.aiBuilder.run({
+      aiProvider,
+      prompt: prompt.trim(),
+      conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+    });
+
+    if (res.status === "ok") {
+      const newHistory: AiConversationTurn[] = [
+        ...conversationHistory,
+        { role: "user" as const, content: prompt.trim() },
+        { role: "assistant" as const, content: res.data.summary },
+      ].slice(-MAX_TURNS);
+
+      set({
+        isGenerating: false,
+        partialOutput: "",
+        builderResult: res.data,
+        builderMessage: res.data.summary,
+        conversationHistory: newHistory,
+        isHistoryFull: newHistory.length >= MAX_TURNS,
+        prompt: "",
+      });
+    } else {
+      notifyIpcError(res);
+      set({
+        isGenerating: false,
+        partialOutput: "",
+        panelError: res.errorCode === "UNKNOWN" ? res.error : null,
+      });
+    }
+  },
+
   applyStreamToken: (event) => {
     if (event.done && event.result) {
       set({ partialOutput: "" });
     } else {
       set((s) => ({ partialOutput: s.partialOutput + event.token }));
+    }
+  },
+
+  applyBuilderToolCall: (event) => {
+    set((s) => ({ builderToolCalls: [...s.builderToolCalls, event] }));
+  },
+
+  applyBuilderMessage: (text, done) => {
+    if (done) {
+      set({ builderMessage: text });
+    } else {
+      set((s) => ({ partialOutput: s.partialOutput + text }));
     }
   },
 
@@ -171,6 +262,9 @@ export const useAiStore = create<AiState>((set, get) => ({
       conversationHistory: [],
       panelError: null,
       isHistoryFull: false,
+      builderToolCalls: [],
+      builderMessage: "",
+      builderResult: null,
     }),
 
   clearPanelError: () => set({ panelError: null }),

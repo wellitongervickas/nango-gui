@@ -67,6 +67,14 @@ import type {
   McpStatusChangedEvent,
   NangoWebhookSettings,
   NangoUpdateWebhookSettingsRequest,
+  AiBuilderRunRequest,
+  AiBuilderRunResult,
+  AiBuilderToolCallEvent,
+  AiBuilderMessageEvent,
+  AiProviderSaveKeyRequest,
+  AiProviderLoadKeyRequest,
+  AiProviderLoadKeyResult,
+  AiProviderClearKeyRequest,
 } from "@nango-gui/shared";
 
 declare global {
@@ -193,6 +201,15 @@ declare global {
       stop(args: McpStopRequest): Promise<IpcResponse<void>>;
       onStatusChange(listener: (event: McpStatusChangedEvent) => void): void;
       removeAllStatusChangeListeners(): void;
+    };
+    aiBuilder: {
+      run(args: AiBuilderRunRequest): Promise<IpcResponse<AiBuilderRunResult>>;
+      onToolCall(listener: (event: AiBuilderToolCallEvent) => void): void;
+      onMessage(listener: (event: AiBuilderMessageEvent) => void): void;
+      removeAllListeners(): void;
+      saveProviderKey(args: AiProviderSaveKeyRequest): Promise<IpcResponse<void>>;
+      loadProviderKey(args: AiProviderLoadKeyRequest): Promise<IpcResponse<AiProviderLoadKeyResult>>;
+      clearProviderKey(args: AiProviderClearKeyRequest): Promise<IpcResponse<void>>;
     };
   }
 }

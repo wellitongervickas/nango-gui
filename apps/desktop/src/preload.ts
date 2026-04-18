@@ -41,6 +41,12 @@ import type {
   McpStartRequest,
   McpStopRequest,
   McpStatusChangedEvent,
+  AiBuilderRunRequest,
+  AiBuilderToolCallEvent,
+  AiBuilderMessageEvent,
+  AiProviderSaveKeyRequest,
+  AiProviderLoadKeyRequest,
+  AiProviderClearKeyRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -217,6 +223,34 @@ contextBridge.exposeInMainWorld("mcp", {
   },
   removeAllStatusChangeListeners: () =>
     ipcRenderer.removeAllListeners(IPC_CHANNELS.MCP_STATUS_CHANGED),
+});
+
+// Expose window.aiBuilder — AI Integration Builder v2 (tool-calling loop)
+contextBridge.exposeInMainWorld("aiBuilder", {
+  run: (args: AiBuilderRunRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_BUILDER_RUN, args),
+  onToolCall: (listener: (event: AiBuilderToolCallEvent) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.AI_BUILDER_TOOL_CALL,
+      (_evt, data: AiBuilderToolCallEvent) => listener(data)
+    );
+  },
+  onMessage: (listener: (event: AiBuilderMessageEvent) => void) => {
+    ipcRenderer.on(
+      IPC_CHANNELS.AI_BUILDER_MESSAGE,
+      (_evt, data: AiBuilderMessageEvent) => listener(data)
+    );
+  },
+  removeAllListeners: () => {
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.AI_BUILDER_TOOL_CALL);
+    ipcRenderer.removeAllListeners(IPC_CHANNELS.AI_BUILDER_MESSAGE);
+  },
+  saveProviderKey: (args: AiProviderSaveKeyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_PROVIDER_SAVE_KEY, args),
+  loadProviderKey: (args: AiProviderLoadKeyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_PROVIDER_LOAD_KEY, args),
+  clearProviderKey: (args: AiProviderClearKeyRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_PROVIDER_CLEAR_KEY, args),
 });
 
 export {};
