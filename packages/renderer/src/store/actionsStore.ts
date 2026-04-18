@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { NangoProxyMethod } from "@nango-gui/shared";
+import type { NangoProxyMethod, AsyncActionStatus } from "@nango-gui/shared";
 import { notifyIpcError } from "./notifyError";
 
 // ── History entry types ────────────────────────────────────────────────────
@@ -47,6 +47,12 @@ interface ActionsState {
   isExecutingAction: boolean;
   actionError: string | null;
 
+  // Async action runner
+  asyncJobId: string | null;
+  asyncStatus: AsyncActionStatus | null;
+  asyncPollCount: number;
+  isPollingAsync: boolean;
+
   // Proxy tester
   proxyStatus: number | null;
   proxyHeaders: Record<string, string> | null;
@@ -64,6 +70,13 @@ interface ActionsState {
     actionName: string,
     input: Record<string, unknown>
   ) => Promise<void>;
+  triggerActionAsync: (
+    integrationId: string,
+    connectionId: string,
+    actionName: string,
+    input: Record<string, unknown>
+  ) => Promise<void>;
+  cancelAsyncPolling: () => void;
   sendProxyRequest: (
     integrationId: string,
     connectionId: string,
@@ -82,10 +95,27 @@ interface ActionsState {
 
 let _nextId = 1;
 
-export const useActionsStore = create<ActionsState>((set) => ({
+const ASYNC_POLL_INTERVAL_MS = 2000;
+const ASYNC_MAX_RETRIES = 60;
+
+let _asyncPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function clearAsyncPollTimer() {
+  if (_asyncPollTimer !== null) {
+    clearInterval(_asyncPollTimer);
+    _asyncPollTimer = null;
+  }
+}
+
+export const useActionsStore = create<ActionsState>((set, get) => ({
   actionResult: null,
   isExecutingAction: false,
   actionError: null,
+
+  asyncJobId: null,
+  asyncStatus: null,
+  asyncPollCount: 0,
+  isPollingAsync: false,
 
   proxyStatus: null,
   proxyHeaders: null,
@@ -171,6 +201,198 @@ export const useActionsStore = create<ActionsState>((set) => ({
         history: [entry, ...s.history].slice(0, MAX_HISTORY),
       }));
     }
+  },
+
+  triggerActionAsync: async (integrationId, connectionId, actionName, input) => {
+    if (!window.nango) return;
+    clearAsyncPollTimer();
+    set({
+      isExecutingAction: true,
+      actionError: null,
+      actionResult: null,
+      asyncJobId: null,
+      asyncStatus: null,
+      asyncPollCount: 0,
+      isPollingAsync: false,
+    });
+    const start = Date.now();
+
+    try {
+      const res = await window.nango.triggerActionAsync({
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+      });
+
+      if (res.status === "error") {
+        notifyIpcError(res);
+        const entry: ActionHistoryEntry = {
+          id: String(_nextId++),
+          type: "action",
+          timestamp: new Date().toISOString(),
+          integrationId,
+          connectionId,
+          actionName,
+          input,
+          result: null,
+          error: res.error,
+          durationMs: Date.now() - start,
+        };
+        set((s) => ({
+          actionError: res.error,
+          isExecutingAction: false,
+          history: [entry, ...s.history].slice(0, MAX_HISTORY),
+        }));
+        return;
+      }
+
+      const jobId = res.data.id;
+      set({
+        asyncJobId: jobId,
+        asyncStatus: "pending",
+        isExecutingAction: false,
+        isPollingAsync: true,
+        asyncPollCount: 0,
+      });
+
+      // Start polling for the result
+      _asyncPollTimer = setInterval(async () => {
+        const state = get();
+        if (!state.isPollingAsync || !window.nango) {
+          clearAsyncPollTimer();
+          return;
+        }
+
+        const pollCount = state.asyncPollCount + 1;
+        set({ asyncPollCount: pollCount });
+
+        if (pollCount > ASYNC_MAX_RETRIES) {
+          clearAsyncPollTimer();
+          const errorMsg = "Async action timed out after max retries";
+          const entry: ActionHistoryEntry = {
+            id: String(_nextId++),
+            type: "action",
+            timestamp: new Date().toISOString(),
+            integrationId,
+            connectionId,
+            actionName,
+            input,
+            result: null,
+            error: errorMsg,
+            durationMs: Date.now() - start,
+          };
+          set((s) => ({
+            isPollingAsync: false,
+            asyncStatus: "error",
+            actionError: errorMsg,
+            history: [entry, ...s.history].slice(0, MAX_HISTORY),
+          }));
+          return;
+        }
+
+        try {
+          const pollRes = await window.nango.getAsyncActionResult({ id: jobId });
+
+          if (pollRes.status === "error") {
+            clearAsyncPollTimer();
+            notifyIpcError(pollRes);
+            const entry: ActionHistoryEntry = {
+              id: String(_nextId++),
+              type: "action",
+              timestamp: new Date().toISOString(),
+              integrationId,
+              connectionId,
+              actionName,
+              input,
+              result: null,
+              error: pollRes.error,
+              durationMs: Date.now() - start,
+            };
+            set((s) => ({
+              isPollingAsync: false,
+              asyncStatus: "error",
+              actionError: pollRes.error,
+              history: [entry, ...s.history].slice(0, MAX_HISTORY),
+            }));
+            return;
+          }
+
+          const { status: asyncStatus, output, error } = pollRes.data;
+
+          if (asyncStatus === "complete") {
+            clearAsyncPollTimer();
+            const entry: ActionHistoryEntry = {
+              id: String(_nextId++),
+              type: "action",
+              timestamp: new Date().toISOString(),
+              integrationId,
+              connectionId,
+              actionName,
+              input,
+              result: output ?? null,
+              error: null,
+              durationMs: Date.now() - start,
+            };
+            set((s) => ({
+              isPollingAsync: false,
+              asyncStatus: "complete",
+              actionResult: output,
+              history: [entry, ...s.history].slice(0, MAX_HISTORY),
+            }));
+          } else if (asyncStatus === "error") {
+            clearAsyncPollTimer();
+            const errorMsg = error ?? "Async action failed";
+            const entry: ActionHistoryEntry = {
+              id: String(_nextId++),
+              type: "action",
+              timestamp: new Date().toISOString(),
+              integrationId,
+              connectionId,
+              actionName,
+              input,
+              result: null,
+              error: errorMsg,
+              durationMs: Date.now() - start,
+            };
+            set((s) => ({
+              isPollingAsync: false,
+              asyncStatus: "error",
+              actionError: errorMsg,
+              history: [entry, ...s.history].slice(0, MAX_HISTORY),
+            }));
+          }
+          // "pending" — keep polling
+        } catch {
+          // Network or IPC error during poll — keep trying
+        }
+      }, ASYNC_POLL_INTERVAL_MS);
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to trigger async action";
+      const entry: ActionHistoryEntry = {
+        id: String(_nextId++),
+        type: "action",
+        timestamp: new Date().toISOString(),
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+        result: null,
+        error: errorMsg,
+        durationMs: Date.now() - start,
+      };
+      set((s) => ({
+        actionError: errorMsg,
+        isExecutingAction: false,
+        history: [entry, ...s.history].slice(0, MAX_HISTORY),
+      }));
+    }
+  },
+
+  cancelAsyncPolling: () => {
+    clearAsyncPollTimer();
+    set({ isPollingAsync: false, asyncStatus: null, asyncJobId: null, asyncPollCount: 0 });
   },
 
   sendProxyRequest: async (
@@ -284,7 +506,17 @@ export const useActionsStore = create<ActionsState>((set) => ({
   },
 
   clearHistory: () => set({ history: [] }),
-  clearActionResult: () => set({ actionResult: null, actionError: null }),
+  clearActionResult: () => {
+    clearAsyncPollTimer();
+    set({
+      actionResult: null,
+      actionError: null,
+      asyncJobId: null,
+      asyncStatus: null,
+      asyncPollCount: 0,
+      isPollingAsync: false,
+    });
+  },
   clearProxyResult: () =>
     set({
       proxyStatus: null,

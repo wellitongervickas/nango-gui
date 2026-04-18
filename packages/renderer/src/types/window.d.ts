@@ -24,6 +24,10 @@ import type {
   NangoListRecordsResult,
   NangoTriggerActionRequest,
   NangoTriggerActionResult,
+  NangoTriggerActionAsyncRequest,
+  NangoTriggerActionAsyncResult,
+  NangoGetAsyncActionResultRequest,
+  NangoGetAsyncActionResultResult,
   NangoProxyRequest,
   NangoProxyResult,
   NangoDashboardData,
@@ -137,6 +141,12 @@ declare global {
       triggerAction(
         args: NangoTriggerActionRequest
       ): Promise<IpcResponse<NangoTriggerActionResult>>;
+      triggerActionAsync(
+        args: NangoTriggerActionAsyncRequest
+      ): Promise<IpcResponse<NangoTriggerActionAsyncResult>>;
+      getAsyncActionResult(
+        args: NangoGetAsyncActionResultRequest
+      ): Promise<IpcResponse<NangoGetAsyncActionResultResult>>;
       proxyRequest(
         args: NangoProxyRequest
       ): Promise<IpcResponse<NangoProxyResult>>;

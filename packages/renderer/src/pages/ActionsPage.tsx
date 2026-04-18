@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { NangoProxyMethod } from "@nango-gui/shared";
+import type { NangoProxyMethod, AsyncActionStatus } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import {
   useActionsStore,
@@ -222,6 +222,110 @@ function KeyValueEditor({
   );
 }
 
+// ── Async Status Indicator ─────────────────────────────────────────────────
+
+const ASYNC_STATUS_STEPS: { key: AsyncActionStatus; label: string }[] = [
+  { key: "pending", label: "Pending" },
+  { key: "complete", label: "Done" },
+];
+
+function AsyncStatusIndicator({
+  status,
+  pollCount,
+  onCancel,
+}: {
+  status: AsyncActionStatus;
+  pollCount: number;
+  onCancel: () => void;
+}) {
+  const isError = status === "error";
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+      {/* Status pipeline */}
+      <div className="flex items-center gap-2">
+        {ASYNC_STATUS_STEPS.map((step, idx) => {
+          const isActive =
+            step.key === status ||
+            (status === "pending" && step.key === "pending");
+          const isDone =
+            step.key === "pending" && status === "complete";
+
+          return (
+            <div key={step.key} className="flex items-center gap-2">
+              {idx > 0 && (
+                <div
+                  className={cn(
+                    "w-6 h-px",
+                    isDone || status === "complete"
+                      ? "bg-[var(--color-success)]"
+                      : "bg-[var(--color-border)]"
+                  )}
+                />
+              )}
+              <div className="flex items-center gap-1.5">
+                <div
+                  className={cn(
+                    "w-2 h-2 rounded-full",
+                    isDone
+                      ? "bg-[var(--color-success)]"
+                      : isActive && !isError
+                        ? "bg-[var(--color-brand-500)] animate-pulse"
+                        : isError && step.key === status
+                          ? "bg-[var(--color-error)]"
+                          : "bg-[var(--color-border)]"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-xs",
+                    isActive
+                      ? "text-[var(--color-text-primary)] font-medium"
+                      : "text-[var(--color-text-secondary)]"
+                  )}
+                >
+                  {step.label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Poll count */}
+      {status === "pending" && (
+        <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+          Poll {pollCount}/60
+        </span>
+      )}
+
+      {/* Cancel button */}
+      {status === "pending" && (
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors cursor-pointer ml-auto"
+        >
+          <XIcon /> Cancel
+        </button>
+      )}
+
+      {/* Error indicator */}
+      {isError && (
+        <span className="text-xs text-[var(--color-error)] font-medium ml-auto">
+          Failed
+        </span>
+      )}
+
+      {/* Complete indicator */}
+      {status === "complete" && (
+        <span className="text-xs text-[var(--color-success)] font-medium ml-auto">
+          Complete
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Actions Runner Tab ─────────────────────────────────────────────────────
 
 function ActionsRunnerTab({
@@ -231,23 +335,35 @@ function ActionsRunnerTab({
 }) {
   const [actionName, setActionName] = useState("");
   const [inputJson, setInputJson] = useState("{}");
+  const [asyncMode, setAsyncMode] = useState(false);
 
   const {
     actionResult,
     isExecutingAction,
     actionError,
+    asyncStatus,
+    asyncPollCount,
+    isPollingAsync,
     triggerAction,
+    triggerActionAsync,
+    cancelAsyncPolling,
     clearActionResult,
   } = useActionsStore();
 
   const jsonValid = isValidJson(inputJson);
+  const isBusy = isExecutingAction || isPollingAsync;
 
   const handleRun = useCallback(() => {
-    if (!selectedConnection || !actionName.trim() || !jsonValid) return;
+    if (!selectedConnection || !actionName.trim() || !jsonValid || isBusy) return;
     const [integrationId, connectionId] = selectedConnection.split("::");
     if (!integrationId || !connectionId) return;
-    triggerAction(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
-  }, [selectedConnection, actionName, inputJson, jsonValid, triggerAction]);
+
+    if (asyncMode) {
+      triggerActionAsync(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
+    } else {
+      triggerAction(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
+    }
+  }, [selectedConnection, actionName, inputJson, jsonValid, isBusy, asyncMode, triggerAction, triggerActionAsync]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -290,17 +406,41 @@ function ActionsRunnerTab({
         )}
       </div>
 
-      {/* Run Button */}
+      {/* Run Button + Async Toggle */}
       <div className="flex items-center gap-3">
         <button
           onClick={handleRun}
-          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isExecutingAction}
+          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isBusy}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
         >
-          {isExecutingAction ? <SpinnerIcon /> : <PlayIcon />}
-          Run Action
+          {isBusy ? <SpinnerIcon /> : <PlayIcon />}
+          {asyncMode ? "Run Async" : "Run Action"}
         </button>
-        {(actionResult !== null || actionError) && (
+
+        {/* Async toggle */}
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={asyncMode}
+            onClick={() => setAsyncMode((v) => !v)}
+            disabled={isBusy}
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors cursor-pointer disabled:opacity-50",
+              asyncMode ? "bg-[var(--color-brand-500)]" : "bg-[var(--color-border)]"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                asyncMode ? "translate-x-4" : "translate-x-0"
+              )}
+            />
+          </button>
+          <span className="text-xs text-[var(--color-text-secondary)]">Async</span>
+        </label>
+
+        {(actionResult !== null || actionError) && !isPollingAsync && (
           <button
             onClick={clearActionResult}
             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
@@ -309,6 +449,15 @@ function ActionsRunnerTab({
           </button>
         )}
       </div>
+
+      {/* Async Status Indicator */}
+      {asyncStatus !== null && (
+        <AsyncStatusIndicator
+          status={asyncStatus}
+          pollCount={asyncPollCount}
+          onCancel={cancelAsyncPolling}
+        />
+      )}
 
       {/* Error */}
       {actionError && <ErrorBanner message={actionError} />}

@@ -34,6 +34,10 @@ import {
   type NangoDashboardTopConnection,
   type NangoTriggerActionRequest,
   type NangoTriggerActionResult,
+  type NangoTriggerActionAsyncRequest,
+  type NangoTriggerActionAsyncResult,
+  type NangoGetAsyncActionResultRequest,
+  type NangoGetAsyncActionResultResult,
   type NangoProxyRequest,
   type NangoProxyResult,
   type CredentialsSaveRequest,
@@ -667,6 +671,53 @@ export function registerIpcHandlers(): void {
           args.input
         );
         return { result };
+      })
+  );
+
+  // ── Async action trigger handler ─────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_TRIGGER_ACTION_ASYNC,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoTriggerActionAsyncRequest
+    ): Promise<IpcResponse<NangoTriggerActionAsyncResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const { id, statusUrl } = await client.triggerActionAsync(
+          args.integrationId,
+          args.connectionId,
+          args.actionName,
+          args.input
+        );
+        return { id, statusUrl };
+      })
+  );
+
+  // ── Async action result handler ─────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_ASYNC_ACTION_RESULT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetAsyncActionResultRequest
+    ): Promise<IpcResponse<NangoGetAsyncActionResultResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        try {
+          const output = await client.getAsyncActionResult({ id: args.id });
+          return { status: "complete" as const, output };
+        } catch (err: unknown) {
+          // Nango returns 404/202 while the action is still running
+          const status = (err as { status?: number })?.status;
+          if (status === 404 || status === 202) {
+            return { status: "pending" as const };
+          }
+          return {
+            status: "error" as const,
+            error: err instanceof Error ? err.message : "Unknown async action error",
+          };
+        }
       })
   );
 

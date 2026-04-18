@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
 
   // Actions & Proxy
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
+  NANGO_TRIGGER_ACTION_ASYNC: "nango:triggerActionAsync",
+  NANGO_GET_ASYNC_ACTION_RESULT: "nango:getAsyncActionResult",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
 
   // App settings (env + theme + version info)
@@ -358,6 +360,30 @@ export interface NangoTriggerActionRequest {
 
 export interface NangoTriggerActionResult {
   result: unknown;
+}
+
+export interface NangoTriggerActionAsyncRequest {
+  connectionId: string;
+  integrationId: string;
+  actionName: string;
+  input: Record<string, unknown>;
+}
+
+export interface NangoTriggerActionAsyncResult {
+  id: string;
+  statusUrl: string;
+}
+
+export interface NangoGetAsyncActionResultRequest {
+  id: string;
+}
+
+export type AsyncActionStatus = "pending" | "complete" | "error";
+
+export interface NangoGetAsyncActionResultResult {
+  status: AsyncActionStatus;
+  output?: unknown;
+  error?: string;
 }
 
 export type NangoProxyMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
