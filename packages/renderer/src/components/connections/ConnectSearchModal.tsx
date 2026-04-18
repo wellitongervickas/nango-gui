@@ -2,13 +2,48 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI } from "@nangohq/frontend";
 import type { ConnectUIEvent } from "@nangohq/frontend";
-import type { NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
+import type { AdvancedConnectionConfig, NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectFlowStore } from "@/store/connectFlowStore";
 import { useConnectionsStore } from "@/store/connectionsStore";
-import { SearchIcon, SpinnerIcon, XIcon, PlugIcon } from "@/components/icons";
+import { SearchIcon, SpinnerIcon, XIcon, PlugIcon, ChevronIcon } from "@/components/icons";
+import { AdvancedConnectionForm, validateAdvancedConfig } from "./AdvancedConnectionForm";
+
+const ADVANCED_CONFIG_KEY = "nango-gui:advanced-connection-config";
+
+function loadAdvancedConfig(providerName: string): AdvancedConnectionConfig {
+  try {
+    const raw = localStorage.getItem(ADVANCED_CONFIG_KEY);
+    if (!raw) return {};
+    const store = JSON.parse(raw) as Record<string, AdvancedConnectionConfig>;
+    return store[providerName] ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAdvancedConfig(providerName: string, cfg: AdvancedConnectionConfig) {
+  try {
+    const raw = localStorage.getItem(ADVANCED_CONFIG_KEY);
+    const store: Record<string, AdvancedConnectionConfig> = raw ? JSON.parse(raw) : {};
+    const isEmpty =
+      !cfg.oauthClientId &&
+      !cfg.oauthClientSecret &&
+      !(cfg.userScopes ?? []).length &&
+      !Object.keys(cfg.authParams ?? {}).some(Boolean);
+    if (isEmpty) {
+      delete store[providerName];
+    } else {
+      store[providerName] = cfg;
+    }
+    localStorage.setItem(ADVANCED_CONFIG_KEY, JSON.stringify(store));
+  } catch {
+    // non-critical
+  }
+}
 
 type FlowState =
   | { kind: "search" }
+  | { kind: "configure"; provider: NangoProvider }
   | { kind: "connecting"; provider: string }
   | { kind: "open"; provider: string }
   | { kind: "error"; message: string };
@@ -33,6 +68,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
   const [flowState, setFlowState] = useState<FlowState>({ kind: "search" });
   const [highlightIdx, setHighlightIdx] = useState(0);
   const [toast, setToast] = useState<SuccessToast | null>(null);
+  const [advancedConfig, setAdvancedConfig] = useState<AdvancedConnectionConfig>({});
+  const [advancedErrors, setAdvancedErrors] = useState<ReturnType<typeof validateAdvancedConfig>>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -55,10 +92,12 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
       .finally(() => setIsLoadingProviders(false));
   }, []);
 
-  // Auto-focus input
+  // Auto-focus input when in search state
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (flowState.kind === "search") {
+      inputRef.current?.focus();
+    }
+  }, [flowState.kind]);
 
   // Clean up ConnectUI on unmount
   useEffect(() => {
@@ -171,22 +210,51 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
     [addConnection, fetchConnections]
   );
 
-  const selectProvider = useCallback(
-    async (provider: NangoProvider) => {
+  // Select a provider → show configure step
+  const selectProvider = useCallback((provider: NangoProvider) => {
+    const saved = loadAdvancedConfig(provider.name);
+    setAdvancedConfig(saved);
+    setAdvancedErrors({});
+    setFlowState({ kind: "configure", provider });
+  }, []);
+
+  // Launch ConnectUI after configure step
+  const launchConnect = useCallback(
+    async (provider: NangoProvider, cfg: AdvancedConnectionConfig) => {
       if (!window.nango) {
         setFlowState({ kind: "error", message: "Nango API not available" });
         return;
       }
 
+      // Validate before proceeding
+      const errs = validateAdvancedConfig(cfg);
+      if (Object.keys(errs).length > 0) {
+        setAdvancedErrors(errs);
+        return;
+      }
+
+      // Persist for reconnection flows
+      saveAdvancedConfig(provider.name, cfg);
+
       closedRef.current = false;
       setFlowState({ kind: "connecting", provider: provider.display_name });
 
       try {
+        // Build integrationsConfigDefaults only when advanced config is non-empty
+        const hasAdvanced =
+          cfg.oauthClientId ||
+          cfg.oauthClientSecret ||
+          (cfg.userScopes ?? []).length > 0 ||
+          Object.keys(cfg.authParams ?? {}).some(Boolean);
+
         const res = await Promise.race([
           window.nango.createConnectSession({
             endUserId: "local-user",
             endUserDisplayName: "Local User",
             allowedIntegrations: [provider.name],
+            ...(hasAdvanced
+              ? { integrationsConfigDefaults: { [provider.name]: cfg } }
+              : {}),
           }),
           new Promise<never>((_, reject) =>
             setTimeout(
@@ -221,7 +289,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
     [handleEvent]
   );
 
-  // Keyboard navigation
+  // Keyboard navigation (search state only)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (flowState.kind !== "search") return;
@@ -240,11 +308,13 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
     [flowState.kind, filtered, highlightIdx, selectProvider]
   );
 
-  // ESC to close or go back to search
+  // ESC handling
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
       if (e.key === "Escape") {
         if (flowState.kind === "error") {
+          setFlowState({ kind: "search" });
+        } else if (flowState.kind === "configure") {
           setFlowState({ kind: "search" });
         } else if (flowState.kind === "open" || flowState.kind === "connecting") {
           connectUIRef.current?.close();
@@ -308,6 +378,122 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
           {flowState.kind === "connecting" ? "Cancel" : "Close"}
         </button>
       </div>
+    );
+  }
+
+  // Configure step — show provider info + advanced section before launching
+  if (flowState.kind === "configure") {
+    const { provider } = flowState;
+    const existing = connectedProviders.get(provider.name.toLowerCase());
+
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-50 bg-black/50"
+          onClick={() => setFlowState({ kind: "search" })}
+        />
+
+        {/* Modal */}
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+          <div
+            className="w-full max-w-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
+              <button
+                onClick={() => setFlowState({ kind: "search" })}
+                className="shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+                aria-label="Back to search"
+              >
+                <ChevronIcon direction="left" />
+              </button>
+              <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
+                Configure connection
+              </span>
+              <button
+                onClick={onClose}
+                className="shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <XIcon />
+              </button>
+            </div>
+
+            {/* Provider summary */}
+            <div className="px-4 pt-4 flex items-center gap-3">
+              {provider.logo_url ? (
+                <img
+                  src={provider.logo_url}
+                  alt=""
+                  className="w-10 h-10 rounded-lg object-contain bg-white p-0.5"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-[var(--color-bg-overlay)] flex items-center justify-center text-sm font-semibold text-[var(--color-text-secondary)] uppercase">
+                  {provider.display_name[0] ?? "?"}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  {provider.display_name}
+                </p>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  {provider.auth_mode}
+                  {provider.categories?.length
+                    ? ` · ${provider.categories.slice(0, 2).join(", ")}`
+                    : ""}
+                </p>
+              </div>
+              {existing && existing.length > 0 && (
+                <span className="ml-auto shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-[var(--color-warning)]/15 text-[var(--color-warning)] font-medium">
+                  {existing.length} connected
+                </span>
+              )}
+            </div>
+
+            {/* Error banner */}
+            {flowState.kind === ("error" as FlowState["kind"]) && (
+              <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm text-[var(--color-error)] flex items-center gap-2">
+                <span className="flex-1">An error occurred. Go back and try again.</span>
+              </div>
+            )}
+
+            {/* Advanced section */}
+            <div className="px-4 pt-3 pb-4">
+              <AdvancedConnectionForm
+                providerName={provider.display_name}
+                value={advancedConfig}
+                onChange={(cfg) => {
+                  setAdvancedConfig(cfg);
+                  setAdvancedErrors({});
+                }}
+                errors={advancedErrors}
+              />
+            </div>
+
+            {/* Connect button */}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => launchConnect(provider, advancedConfig)}
+                className="w-full py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-400)] text-white hover:bg-[var(--color-brand-400)]/90 transition-colors cursor-pointer"
+              >
+                Connect to {provider.display_name}
+              </button>
+            </div>
+
+            {/* Footer hint */}
+            <div className="px-4 py-2 border-t border-[var(--color-border)] flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
+              <span>
+                <kbd className="font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] px-1 rounded">esc</kbd> back
+              </span>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 

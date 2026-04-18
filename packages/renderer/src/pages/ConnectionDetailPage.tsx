@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI, ConnectUIEvent } from "@nangohq/frontend";
-import type { NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
+import type { AdvancedConnectionConfig, NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
 import { navigate } from "@/lib/router";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
@@ -15,6 +15,19 @@ import {
   PauseIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+
+const ADVANCED_CONFIG_KEY = "nango-gui:advanced-connection-config";
+
+function loadSavedAdvancedConfig(providerName: string): AdvancedConnectionConfig {
+  try {
+    const raw = localStorage.getItem(ADVANCED_CONFIG_KEY);
+    if (!raw) return {};
+    const store = JSON.parse(raw) as Record<string, AdvancedConnectionConfig>;
+    return store[providerName] ?? {};
+  } catch {
+    return {};
+  }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -787,16 +800,29 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
     }
   }
 
-  // Re-authorize via reconnect session
+  // Re-authorize via reconnect session — pre-populate advanced config from localStorage
   async function handleReAuthorize() {
     if (!window.nango) return;
     setIsReAuthorizing(true);
+
+    // Load any advanced config that was saved when this provider was first connected
+    const savedCfg = loadSavedAdvancedConfig(providerConfigKey);
+    const hasAdvanced =
+      savedCfg.oauthClientId ||
+      savedCfg.oauthClientSecret ||
+      (savedCfg.userScopes ?? []).length > 0 ||
+      Object.keys(savedCfg.authParams ?? {}).some(Boolean);
+    const configDefaults = hasAdvanced
+      ? { [providerConfigKey]: savedCfg }
+      : undefined;
+
     try {
       const res = await window.nango.createReconnectSession({
         providerConfigKey,
         connectionId,
         endUserId: "local-user",
         endUserDisplayName: "Local User",
+        ...(configDefaults ? { integrationsConfigDefaults: configDefaults } : {}),
       });
       if (res.status === "error") {
         // Fall back to standard connect session restricted to this integration
@@ -804,6 +830,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           endUserId: "local-user",
           endUserDisplayName: "Local User",
           allowedIntegrations: [providerConfigKey],
+          ...(configDefaults ? { integrationsConfigDefaults: configDefaults } : {}),
         });
         if (fallbackRes.status === "error") {
           setDetailError(fallbackRes.error);
@@ -826,6 +853,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           endUserId: "local-user",
           endUserDisplayName: "Local User",
           allowedIntegrations: [providerConfigKey],
+          ...(configDefaults ? { integrationsConfigDefaults: configDefaults } : {}),
         });
         if (fallbackRes.status === "error") {
           setDetailError(fallbackRes.error);

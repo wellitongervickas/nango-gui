@@ -189,6 +189,8 @@ export interface NangoCreateReconnectSessionRequest {
   connectionId: string;
   endUserId: string;
   endUserDisplayName?: string;
+  /** Advanced configuration to pass to the reconnect session. */
+  integrationsConfigDefaults?: Record<string, AdvancedConnectionConfig>;
 }
 
 export interface NangoCreateReconnectSessionResult {
@@ -222,6 +224,18 @@ export interface AppSetEnvironmentRequest {
   environment: NangoEnvironment;
 }
 
+/** Advanced per-integration configuration for a connect session. */
+export interface AdvancedConnectionConfig {
+  /** Additional authorization parameters (e.g. tenant ID, workspace). */
+  authParams?: Record<string, string>;
+  /** Custom OAuth scopes to request (replaces provider defaults). */
+  userScopes?: string[];
+  /** Override the registered OAuth client ID for this connection. */
+  oauthClientId?: string;
+  /** Override the registered OAuth client secret for this connection. */
+  oauthClientSecret?: string;
+}
+
 export interface NangoCreateConnectSessionRequest {
   /** Stable end-user identifier (e.g. app user ID). */
   endUserId: string;
@@ -229,6 +243,11 @@ export interface NangoCreateConnectSessionRequest {
   endUserDisplayName?: string;
   /** Restrict which integrations appear in the Connect UI. */
   allowedIntegrations?: string[];
+  /**
+   * Per-integration advanced configuration. Keys are provider config keys
+   * (integration IDs). Values override auth params, scopes, and dev app creds.
+   */
+  integrationsConfigDefaults?: Record<string, AdvancedConnectionConfig>;
 }
 
 export interface NangoCreateConnectSessionResult {

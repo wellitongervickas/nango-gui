@@ -424,10 +424,40 @@ export function registerIpcHandlers(): void {
     ): Promise<IpcResponse<NangoCreateReconnectSessionResult>> =>
       wrap(async () => {
         const client = getNangoClient();
+        // Build per-integration config defaults from the advanced connection config.
+        const integrations_config_defaults = args.integrationsConfigDefaults
+          ? Object.fromEntries(
+              Object.entries(args.integrationsConfigDefaults).map(([key, cfg]) => [
+                key,
+                {
+                  ...(cfg.userScopes?.length
+                    ? { user_scopes: cfg.userScopes.join(" ") }
+                    : {}),
+                  ...(cfg.authParams && Object.keys(cfg.authParams).length
+                    ? { authorization_params: cfg.authParams }
+                    : {}),
+                  ...((cfg.oauthClientId || cfg.oauthClientSecret)
+                    ? {
+                        connection_config: {
+                          ...(cfg.oauthClientId
+                            ? { oauth_client_id_override: cfg.oauthClientId }
+                            : {}),
+                          ...(cfg.oauthClientSecret
+                            ? { oauth_client_secret_override: cfg.oauthClientSecret }
+                            : {}),
+                        },
+                      }
+                    : {}),
+                },
+              ])
+            )
+          : undefined;
+
         const result = await (client as unknown as {
           createReconnectSession(args: {
             reconnect_for_connection_id: string;
             end_user: { id: string; display_name?: string };
+            integrations_config_defaults?: Record<string, unknown>;
           }): Promise<{ data: { token: string; expires_at: string } }>;
         }).createReconnectSession({
           reconnect_for_connection_id: args.connectionId,
@@ -435,6 +465,7 @@ export function registerIpcHandlers(): void {
             id: args.endUserId,
             ...(args.endUserDisplayName ? { display_name: args.endUserDisplayName } : {}),
           },
+          ...(integrations_config_defaults ? { integrations_config_defaults } : {}),
         });
         return {
           token: result.data.token,
@@ -463,6 +494,35 @@ export function registerIpcHandlers(): void {
     ): Promise<IpcResponse<NangoCreateConnectSessionResult>> =>
       wrap(async () => {
         const client = getNangoClient();
+        // Build per-integration config defaults from the advanced connection config.
+        const integrations_config_defaults = args.integrationsConfigDefaults
+          ? Object.fromEntries(
+              Object.entries(args.integrationsConfigDefaults).map(([key, cfg]) => [
+                key,
+                {
+                  ...(cfg.userScopes?.length
+                    ? { user_scopes: cfg.userScopes.join(" ") }
+                    : {}),
+                  ...(cfg.authParams && Object.keys(cfg.authParams).length
+                    ? { authorization_params: cfg.authParams }
+                    : {}),
+                  ...((cfg.oauthClientId || cfg.oauthClientSecret)
+                    ? {
+                        connection_config: {
+                          ...(cfg.oauthClientId
+                            ? { oauth_client_id_override: cfg.oauthClientId }
+                            : {}),
+                          ...(cfg.oauthClientSecret
+                            ? { oauth_client_secret_override: cfg.oauthClientSecret }
+                            : {}),
+                        },
+                      }
+                    : {}),
+                },
+              ])
+            )
+          : undefined;
+
         const result = await client.createConnectSession({
           end_user: {
             id: args.endUserId,
@@ -472,6 +532,9 @@ export function registerIpcHandlers(): void {
           },
           ...(args.allowedIntegrations
             ? { allowed_integrations: args.allowedIntegrations }
+            : {}),
+          ...(integrations_config_defaults
+            ? { integrations_config_defaults }
             : {}),
         });
         return {
