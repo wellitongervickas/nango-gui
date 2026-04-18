@@ -207,7 +207,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function guessAuthType(detail: NangoConnectionDetail): string {
-  const creds = detail.credentials as Record<string, unknown>;
+  const creds = detail.credentials as Record<string, unknown> | undefined;
+  if (!creds) return "Unknown";
   if (creds.access_token) return "OAuth 2.0";
   if (creds.api_key) return "API Key";
   if (creds.username) return "Basic Auth";

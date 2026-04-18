@@ -57,9 +57,9 @@ function exportCsv(records: NangoRecord[], columns: string[]) {
   const rows = records.map((r) =>
     allCols
       .map((col) => {
-        if (col === "first_seen_at") return escapeCell(String(r._nango_metadata.first_seen_at));
-        if (col === "last_modified_at") return escapeCell(String(r._nango_metadata.last_modified_at));
-        if (col === "last_action") return escapeCell(String(r._nango_metadata.last_action));
+        if (col === "first_seen_at") return escapeCell(String(r._nango_metadata?.first_seen_at ?? ""));
+        if (col === "last_modified_at") return escapeCell(String(r._nango_metadata?.last_modified_at ?? ""));
+        if (col === "last_action") return escapeCell(String(r._nango_metadata?.last_action ?? ""));
         const v = r[col];
         const s = v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
         return escapeCell(s);
@@ -117,7 +117,7 @@ function RecordDetailPanel({ record, onClose }: { record: NangoRecord; onClose: 
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-[var(--color-border)] shrink-0">
           <div>
-            <ActionBadge action={record._nango_metadata.last_action} />
+            <ActionBadge action={record._nango_metadata?.last_action ?? "unknown"} />
             <h2 className="text-base font-semibold text-[var(--color-text-primary)] font-mono mt-1">
               {String(record.id)}
             </h2>
@@ -139,11 +139,11 @@ function RecordDetailPanel({ record, onClose }: { record: NangoRecord; onClose: 
               Nango Metadata
             </h3>
             <dl className="space-y-2">
-              <MetaRow label="First seen" value={formatDate(record._nango_metadata.first_seen_at)} />
-              <MetaRow label="Last modified" value={formatDate(record._nango_metadata.last_modified_at)} />
-              <MetaRow label="Last action" value={record._nango_metadata.last_action} />
-              <MetaRow label="Deleted at" value={record._nango_metadata.deleted_at ? formatDate(record._nango_metadata.deleted_at) : "—"} />
-              <MetaRow label="Cursor" value={record._nango_metadata.cursor} />
+              <MetaRow label="First seen" value={record._nango_metadata?.first_seen_at ? formatDate(record._nango_metadata.first_seen_at) : "—"} />
+              <MetaRow label="Last modified" value={record._nango_metadata?.last_modified_at ? formatDate(record._nango_metadata.last_modified_at) : "—"} />
+              <MetaRow label="Last action" value={record._nango_metadata?.last_action ?? "—"} />
+              <MetaRow label="Deleted at" value={record._nango_metadata?.deleted_at ? formatDate(record._nango_metadata.deleted_at) : "—"} />
+              <MetaRow label="Cursor" value={record._nango_metadata?.cursor ?? "—"} />
             </dl>
           </section>
 
@@ -483,10 +483,10 @@ export function RecordsPage() {
                       </td>
                     ))}
                     <td className="px-3 py-2">
-                      <ActionBadge action={record._nango_metadata.last_action} />
+                      <ActionBadge action={record._nango_metadata?.last_action ?? "unknown"} />
                     </td>
                     <td className="px-3 py-2 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">
-                      {formatDate(record._nango_metadata.last_modified_at)}
+                      {record._nango_metadata?.last_modified_at ? formatDate(record._nango_metadata.last_modified_at) : "—"}
                     </td>
                   </tr>
                 ))}
