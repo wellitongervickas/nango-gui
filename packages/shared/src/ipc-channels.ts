@@ -39,6 +39,9 @@ export const IPC_CHANNELS = {
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
 
+  // Connection health
+  NANGO_GET_CONNECTION_HEALTH: "nango:getConnectionHealth",
+
   // App settings (env + theme + version info)
   APP_GET_SETTINGS: "app:getSettings",
   APP_UPDATE_SETTINGS: "app:updateSettings",
@@ -799,4 +802,25 @@ export interface AiProviderLoadKeyResult {
 /** Request to clear an AI provider API key. */
 export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
+}
+
+// ── Connection Health ─────────────────────────────────────────────────────
+
+export type ConnectionStatus = "active" | "syncing" | "broken" | "expired";
+
+export interface NangoGetConnectionHealthRequest {
+  providerConfigKey: string;
+  connectionId: string;
+}
+
+export interface NangoConnectionHealthData {
+  status: ConnectionStatus;
+  /** 0–100 health score based on sync success rate, last seen, error frequency, token age. */
+  healthScore: number;
+  /** ISO timestamp of the most recent activity (sync finish or connection update). */
+  lastSeen: string | null;
+  /** Number of total syncs for this connection. */
+  syncCount: number;
+  /** Number of syncs currently in error state. */
+  errorCount: number;
 }

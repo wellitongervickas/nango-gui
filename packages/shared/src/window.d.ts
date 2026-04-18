@@ -20,6 +20,8 @@ import type {
   NangoUpdateSyncFrequencyRequest,
   NangoUpdateSyncFrequencyResult,
   NangoSyncRecord,
+  NangoGetConnectionHealthRequest,
+  NangoConnectionHealthData,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -128,6 +130,9 @@ declare global {
       getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
       /** Update Nango outgoing webhook settings (partial patch). */
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
+      getConnectionHealth(
+        args: NangoGetConnectionHealthRequest
+      ): Promise<IpcResponse<NangoConnectionHealthData>>;
     };
     credentials: {
       save(

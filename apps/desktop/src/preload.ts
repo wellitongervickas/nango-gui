@@ -17,6 +17,7 @@ import type {
   NangoListRecordsRequest,
   NangoTriggerActionRequest,
   NangoProxyRequest,
+  NangoGetConnectionHealthRequest,
   CredentialsSaveRequest,
   AppSetEnvironmentRequest,
   AppUpdateSettingsRequest,
@@ -101,6 +102,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_WEBHOOK_SETTINGS),
   updateWebhookSettings: (args: NangoUpdateWebhookSettingsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_UPDATE_WEBHOOK_SETTINGS, args),
+  getConnectionHealth: (args: NangoGetConnectionHealthRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_CONNECTION_HEALTH, args),
 });
 
 // Expose window.credentials — secure credential storage

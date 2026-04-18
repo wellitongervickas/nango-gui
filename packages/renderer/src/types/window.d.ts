@@ -27,6 +27,8 @@ import type {
   NangoProxyRequest,
   NangoProxyResult,
   NangoDashboardData,
+  NangoGetConnectionHealthRequest,
+  NangoConnectionHealthData,
   CredentialsSaveRequest,
   CredentialsExistsResult,
   AppGetEnvironmentResult,
@@ -143,6 +145,9 @@ declare global {
       getDashboard(): Promise<IpcResponse<NangoDashboardData>>;
       getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
+      getConnectionHealth(
+        args: NangoGetConnectionHealthRequest
+      ): Promise<IpcResponse<NangoConnectionHealthData>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

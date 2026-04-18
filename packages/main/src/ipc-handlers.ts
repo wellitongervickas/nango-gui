@@ -74,6 +74,9 @@ import {
   type McpRemoveConfigRequest,
   type McpStartRequest,
   type McpStopRequest,
+  type NangoGetConnectionHealthRequest,
+  type NangoConnectionHealthData,
+  type ConnectionStatus,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -731,6 +734,128 @@ export function registerIpcHandlers(): void {
         const topConnections = rankTopConnections(connections, syncCounts);
 
         return { ...stats, recentErrors, topConnections };
+      })
+  );
+
+  // ── Connection health handler ───────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_CONNECTION_HEALTH,
+    async (
+      _event,
+      args: NangoGetConnectionHealthRequest
+    ): Promise<IpcResponse<NangoConnectionHealthData>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+
+        // Fetch connection detail for token/credential age
+        const connDetail = await client.getConnection(
+          args.providerConfigKey,
+          args.connectionId
+        );
+        const detail = connDetail as unknown as {
+          created: string;
+          updated_at?: string;
+          credentials?: Record<string, unknown>;
+        };
+
+        // Fetch sync status for this connection
+        let syncs: Array<{
+          name?: string;
+          status?: string;
+          finishedAt?: string;
+        }> = [];
+        try {
+          const result = await client.syncStatus(
+            args.providerConfigKey,
+            [],
+            args.connectionId
+          );
+          syncs = ((result as { syncs?: unknown[] }).syncs ?? []) as typeof syncs;
+        } catch {
+          // Connection may not have syncs configured
+        }
+
+        // Determine status
+        let status: ConnectionStatus = "active";
+        const hasRunning = syncs.some((s) => s.status === "RUNNING");
+        const hasError = syncs.some(
+          (s) => s.status === "ERROR" || s.status === "STOPPED"
+        );
+        const allSuccess =
+          syncs.length === 0 ||
+          syncs.every((s) => s.status === "SUCCESS" || s.status === "PAUSED");
+
+        // Check for expired credentials
+        const creds = (detail.credentials ?? {}) as Record<string, unknown>;
+        const expiresAt = creds.expires_at as string | undefined;
+        const isExpired =
+          expiresAt != null && new Date(expiresAt).getTime() < Date.now();
+
+        if (isExpired) {
+          status = "expired";
+        } else if (hasRunning) {
+          status = "syncing";
+        } else if (hasError) {
+          status = "broken";
+        } else if (allSuccess) {
+          status = "active";
+        }
+
+        // Compute health score (0–100)
+        let score = 100;
+
+        // Factor 1: Sync success rate (40 points)
+        const errorCount = syncs.filter(
+          (s) => s.status === "ERROR" || s.status === "STOPPED"
+        ).length;
+        const totalSyncs = syncs.length;
+        if (totalSyncs > 0) {
+          const successRate = 1 - errorCount / totalSyncs;
+          score -= Math.round((1 - successRate) * 40);
+        }
+
+        // Factor 2: Last seen recency (25 points)
+        const lastFinished = syncs
+          .map((s) => s.finishedAt)
+          .filter(Boolean)
+          .sort()
+          .pop();
+        const lastSeen =
+          lastFinished ?? detail.updated_at ?? detail.created ?? null;
+        if (lastSeen) {
+          const ageMs = Date.now() - new Date(lastSeen).getTime();
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          if (ageDays > 7) score -= 25;
+          else if (ageDays > 3) score -= 15;
+          else if (ageDays > 1) score -= 5;
+        } else {
+          score -= 15; // No activity data
+        }
+
+        // Factor 3: Error frequency penalty (20 points)
+        if (errorCount > 0) {
+          score -= Math.min(20, errorCount * 10);
+        }
+
+        // Factor 4: Token age (15 points)
+        if (isExpired) {
+          score -= 15;
+        } else if (detail.created) {
+          const tokenAgeDays =
+            (Date.now() - new Date(detail.created).getTime()) /
+            (1000 * 60 * 60 * 24);
+          if (tokenAgeDays > 90) score -= 10;
+          else if (tokenAgeDays > 30) score -= 5;
+        }
+
+        return {
+          status,
+          healthScore: Math.max(0, Math.min(100, score)),
+          lastSeen,
+          syncCount: totalSyncs,
+          errorCount,
+        };
       })
   );
 

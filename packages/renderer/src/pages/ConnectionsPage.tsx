@@ -1,15 +1,92 @@
-import { useEffect, useMemo, useState } from "react";
-import type { NangoConnectionDetail, NangoConnectionSummary } from "@nango-gui/shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import type {
+  NangoConnectionDetail,
+  NangoConnectionSummary,
+  ConnectionStatus,
+} from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn, searchInputClass } from "@/lib/utils";
 import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 
+function FilterIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  );
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type SortKey = "provider" | "connection_id" | "created";
 type SortDir = "asc" | "desc";
+
+const ROW_HEIGHT = 52;
+
+const STATUS_OPTIONS: { value: ConnectionStatus | null; label: string }[] = [
+  { value: null, label: "All statuses" },
+  { value: "active", label: "Active" },
+  { value: "syncing", label: "Syncing" },
+  { value: "broken", label: "Broken" },
+  { value: "expired", label: "Expired" },
+];
+
+// ── Status badge ──────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: ConnectionStatus | undefined }) {
+  if (!status) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-secondary)] animate-pulse" />
+        ...
+      </span>
+    );
+  }
+
+  const config: Record<ConnectionStatus, { color: string; bgClass: string; label: string; pulse?: boolean }> = {
+    active: { color: "var(--color-success)", bgClass: "bg-[var(--color-success)]/15 text-[var(--color-success)]", label: "active" },
+    syncing: { color: "var(--color-brand-400)", bgClass: "bg-[var(--color-brand-400)]/15 text-[var(--color-brand-400)]", label: "syncing", pulse: true },
+    broken: { color: "var(--color-warning, #f59e0b)", bgClass: "bg-[#f59e0b]/15 text-[#f59e0b]", label: "broken" },
+    expired: { color: "var(--color-error)", bgClass: "bg-[var(--color-error)]/15 text-[var(--color-error)]", label: "expired" },
+  };
+
+  const c = config[status];
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full", c.bgClass)}>
+      <span
+        className={cn("w-1.5 h-1.5 rounded-full", c.pulse && "animate-pulse")}
+        style={{ backgroundColor: c.color }}
+      />
+      {c.label}
+    </span>
+  );
+}
+
+// ── Health score bar ──────────────────────────────────────────────────────
+
+function HealthBar({ score }: { score: number | undefined }) {
+  if (score == null) {
+    return <div className="w-full h-1 rounded-full bg-[var(--color-bg-overlay)]" />;
+  }
+
+  let color: string;
+  if (score >= 80) color = "var(--color-success)";
+  else if (score >= 60) color = "#22c55e"; // green-500
+  else if (score >= 40) color = "#f59e0b"; // amber-500
+  else color = "var(--color-error)";
+
+  return (
+    <div className="relative w-full h-1 rounded-full bg-[var(--color-bg-overlay)] overflow-hidden">
+      <div
+        className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+        style={{ width: `${score}%`, backgroundColor: color }}
+      />
+    </div>
+  );
+}
 
 // ── Skeleton ───────────────────────────────────────────────────────────────
 
@@ -85,6 +162,9 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
   const [detail, setDetail] = useState<NangoConnectionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const healthData = useConnectionsStore((s) =>
+    s.healthData[`${connection.provider_config_key}:${connection.connection_id}`]
+  );
 
   useEffect(() => {
     setIsLoading(true);
@@ -113,9 +193,12 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
         <div className="flex items-start justify-between p-5 border-b border-[var(--color-border)] shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)] font-medium">
-                active
-              </span>
+              <StatusBadge status={healthData?.status} />
+              {healthData && (
+                <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                  {healthData.healthScore}/100
+                </span>
+              )}
             </div>
             <h2 className="text-base font-semibold text-[var(--color-text-primary)] font-mono">
               {connection.connection_id}
@@ -133,6 +216,27 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
           </button>
         </div>
 
+        {/* Health bar */}
+        {healthData && (
+          <div className="px-5 pt-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-[var(--color-text-secondary)]">Health</span>
+              <span className={cn(
+                "text-xs font-semibold tabular-nums",
+                healthData.healthScore >= 60 ? "text-[var(--color-success)]" : "text-[#f59e0b]"
+              )}>
+                {healthData.healthScore}%
+              </span>
+            </div>
+            <HealthBar score={healthData.healthScore} />
+            {healthData.healthScore < 60 && (
+              <p className="text-xs text-[#f59e0b] mt-1.5">
+                Health score below threshold — check sync errors and token status.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Meta */}
@@ -146,6 +250,15 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
               <Row label="Created" value={formatDate(connection.created)} />
               {detail?.updated_at && (
                 <Row label="Last updated" value={formatDate(detail.updated_at)} />
+              )}
+              {healthData && (
+                <>
+                  <Row label="Syncs" value={String(healthData.syncCount)} />
+                  <Row label="Errors" value={String(healthData.errorCount)} />
+                  {healthData.lastSeen && (
+                    <Row label="Last seen" value={formatDate(healthData.lastSeen)} />
+                  )}
+                </>
               )}
             </dl>
           </section>
@@ -226,8 +339,17 @@ function formatDate(iso: string): string {
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export function ConnectionsPage() {
-  const { connections, isLoading, error, fetchConnections, deleteConnection } =
-    useConnectionsStore();
+  const {
+    connections,
+    isLoading,
+    error,
+    healthData,
+    statusFilter,
+    fetchConnections,
+    deleteConnection,
+    fetchConnectionHealth,
+    setStatusFilter,
+  } = useConnectionsStore();
 
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
@@ -236,20 +358,60 @@ export function ConnectionsPage() {
   const [pendingDelete, setPendingDelete] = useState<NangoConnectionSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
 
+  // Ctrl+K / Cmd+K shortcut to focus search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Close status dropdown on outside click
+  useEffect(() => {
+    if (!showStatusDropdown) return;
+    function handleClick() {
+      setShowStatusDropdown(false);
+    }
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [showStatusDropdown]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return connections
-      .filter((c) =>
-        !q ||
-        c.connection_id.toLowerCase().includes(q) ||
-        c.provider_config_key.toLowerCase().includes(q) ||
-        (c.provider ?? "").toLowerCase().includes(q)
-      )
+      .filter((c) => {
+        // Text search
+        if (
+          q &&
+          !c.connection_id.toLowerCase().includes(q) &&
+          !c.provider_config_key.toLowerCase().includes(q) &&
+          !(c.provider ?? "").toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+        // Status filter
+        if (statusFilter) {
+          const key = `${c.provider_config_key}:${c.connection_id}`;
+          const health = healthData[key];
+          if (!health) return true; // Show while loading
+          return health.status === statusFilter;
+        }
+        return true;
+      })
       .sort((a, b) => {
         let av = "", bv = "";
         if (sortKey === "provider") { av = a.provider_config_key; bv = b.provider_config_key; }
@@ -258,7 +420,26 @@ export function ConnectionsPage() {
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [connections, search, sortKey, sortDir]);
+  }, [connections, search, sortKey, sortDir, statusFilter, healthData]);
+
+  // TanStack Virtual
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  // Lazily fetch health data for visible connections
+  const visibleItems = rowVirtualizer.getVirtualItems();
+  useEffect(() => {
+    for (const item of visibleItems) {
+      const conn = filtered[item.index];
+      if (conn) {
+        fetchConnectionHealth(conn.provider_config_key, conn.connection_id);
+      }
+    }
+  }, [visibleItems, filtered, fetchConnectionHealth]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -284,6 +465,12 @@ export function ConnectionsPage() {
     }
   }
 
+  const handleRowClick = useCallback((conn: NangoConnectionSummary) => {
+    setSelected((s) =>
+      s?.connection_id === conn.connection_id && s?.provider_config_key === conn.provider_config_key ? null : conn
+    );
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-base)] relative">
       {/* Header bar */}
@@ -295,19 +482,68 @@ export function ConnectionsPage() {
           {!isLoading && `${filtered.length} of ${connections.length}`}
         </span>
         <div className="flex-1" />
+
+        {/* Status filter dropdown */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStatusDropdown((v) => !v);
+            }}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors cursor-pointer",
+              statusFilter
+                ? "border-[var(--color-brand-500)] text-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10"
+                : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+            )}
+          >
+            <FilterIcon />
+            {statusFilter ? STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label : "Status"}
+          </button>
+          {showStatusDropdown && (
+            <div
+              className="absolute top-full right-0 mt-1 w-40 bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-lg shadow-xl z-20 py-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value ?? "all"}
+                  onClick={() => {
+                    setStatusFilter(opt.value);
+                    setShowStatusDropdown(false);
+                  }}
+                  className={cn(
+                    "w-full text-left px-3 py-1.5 text-xs transition-colors cursor-pointer",
+                    statusFilter === opt.value
+                      ? "text-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10"
+                      : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Search */}
         <div className="relative w-64">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]">
             <SearchIcon />
           </span>
           <input
+            ref={searchInputRef}
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search connections…"
             className={searchInputClass}
           />
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--color-text-secondary)] bg-[var(--color-bg-overlay)] px-1.5 py-0.5 rounded border border-[var(--color-border)]">
+            ⌘K
+          </kbd>
         </div>
+
         {/* Refresh */}
         <button
           onClick={() => fetchConnections()}
@@ -317,6 +553,7 @@ export function ConnectionsPage() {
           <RefreshIcon />
           Refresh
         </button>
+
         {/* Connect new */}
         <ConnectModal onConnected={() => fetchConnections()}>
           {({ open, isLoading: connectLoading }) => (
@@ -330,7 +567,7 @@ export function ConnectionsPage() {
               ) : (
                 <span className="text-base leading-none">+</span>
               )}
-              Connect
+              Add
             </button>
           )}
         </ConnectModal>
@@ -341,18 +578,21 @@ export function ConnectionsPage() {
       {deleteError && <ErrorBanner message={deleteError} className="mx-6 mt-4 shrink-0" />}
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Column headers */}
-        {!isLoading && connections.length > 0 && (
-          <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] sticky top-0 z-10">
-            <div className="w-8 shrink-0" />
-            <SortHeader label="Provider" sortKey="provider" current={sortKey} dir={sortDir} onToggle={toggleSort} className="flex-1" />
-            <SortHeader label="Connection ID" sortKey="connection_id" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-48" />
-            <div className="w-16 text-xs text-[var(--color-text-secondary)]">Status</div>
-            <SortHeader label="Created" sortKey="created" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
-          </div>
-        )}
+      {/* Column headers */}
+      {!isLoading && connections.length > 0 && (
+        <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] shrink-0">
+          <div className="w-8 shrink-0" />
+          <SortHeader label="Provider" sortKey="provider" current={sortKey} dir={sortDir} onToggle={toggleSort} className="flex-1" />
+          <SortHeader label="Connection ID" sortKey="connection_id" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-48" />
+          <div className="w-20 text-xs text-[var(--color-text-secondary)]">Status</div>
+          <div className="w-16 text-xs text-[var(--color-text-secondary)]">Health</div>
+          <SortHeader label="Created" sortKey="created" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
+          <div className="w-7" />
+        </div>
+      )}
 
+      {/* Virtual list area */}
+      <div ref={parentRef} className="flex-1 overflow-y-auto">
         {/* Loading */}
         {isLoading && (
           <>
@@ -388,28 +628,65 @@ export function ConnectionsPage() {
           </div>
         )}
 
-        {/* No search results */}
+        {/* No search/filter results */}
         {!isLoading && connections.length > 0 && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
-            <p className="text-sm text-[var(--color-text-secondary)]">No connections match "{search}"</p>
-            <button onClick={() => setSearch("")} className="text-xs text-[var(--color-brand-400)] hover:underline cursor-pointer">
-              Clear search
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              No connections match {search ? `"${search}"` : "this filter"}
+            </p>
+            <button
+              onClick={() => {
+                setSearch("");
+                setStatusFilter(null);
+              }}
+              className="text-xs text-[var(--color-brand-400)] hover:underline cursor-pointer"
+            >
+              Clear filters
             </button>
           </div>
         )}
 
-        {/* Rows */}
-        {filtered.map((conn) => (
-          <ConnectionRow
-            key={`${conn.provider_config_key}:${conn.connection_id}`}
-            connection={conn}
-            isSelected={selected?.connection_id === conn.connection_id && selected?.provider_config_key === conn.provider_config_key}
-            onClick={() => setSelected((s) =>
-              s?.connection_id === conn.connection_id && s?.provider_config_key === conn.provider_config_key ? null : conn
-            )}
-            onDelete={() => setPendingDelete(conn)}
-          />
-        ))}
+        {/* Virtual rows */}
+        {filtered.length > 0 && (
+          <div
+            style={{
+              height: rowVirtualizer.getTotalSize(),
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const conn = filtered[virtualRow.index];
+              if (!conn) return null;
+              const key = `${conn.provider_config_key}:${conn.connection_id}`;
+              const health = healthData[key];
+              return (
+                <div
+                  key={key}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: virtualRow.size,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <ConnectionRow
+                    connection={conn}
+                    health={health}
+                    isSelected={
+                      selected?.connection_id === conn.connection_id &&
+                      selected?.provider_config_key === conn.provider_config_key
+                    }
+                    onClick={() => handleRowClick(conn)}
+                    onDelete={() => setPendingDelete(conn)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Detail panel */}
@@ -471,17 +748,15 @@ function SortHeader({
 
 // ── ConnectionRow ──────────────────────────────────────────────────────────
 
-function ConnectionRow({
-  connection,
-  isSelected,
-  onClick,
-  onDelete,
-}: {
+interface ConnectionRowProps {
   connection: NangoConnectionSummary;
+  health: import("@nango-gui/shared").NangoConnectionHealthData | undefined;
   isSelected: boolean;
   onClick: () => void;
   onDelete: () => void;
-}) {
+}
+
+function ConnectionRow({ connection, health, isSelected, onClick, onDelete }: ConnectionRowProps) {
   return (
     <div
       role="button"
@@ -489,7 +764,7 @@ function ConnectionRow({
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
       className={cn(
-        "flex items-center gap-4 px-4 py-3 border-b border-[var(--color-border)] cursor-pointer transition-colors group",
+        "flex items-center gap-4 px-4 h-full border-b border-[var(--color-border)] cursor-pointer transition-colors group",
         isSelected
           ? "bg-[var(--color-brand-500)]/10"
           : "hover:bg-[var(--color-bg-surface)]"
@@ -518,11 +793,16 @@ function ConnectionRow({
       </div>
 
       {/* Status */}
-      <div className="w-16">
-        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
-          active
-        </span>
+      <div className="w-20">
+        <StatusBadge status={health?.status} />
+      </div>
+
+      {/* Health bar */}
+      <div className="w-16 flex flex-col gap-0.5">
+        <HealthBar score={health?.healthScore} />
+        {health && health.healthScore < 60 && (
+          <span className="text-[9px] text-[#f59e0b] leading-none">low</span>
+        )}
       </div>
 
       {/* Created */}
