@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { NangoProvider } from "@nango-gui/shared";
+import type { NangoProvider, AiProviderType } from "@nango-gui/shared";
 import { useAiStore } from "@/store/aiStore";
 import { useFlowStore } from "@/store/flowStore";
 import { definitionToFlow } from "@/lib/graph-converter";
@@ -51,7 +51,233 @@ function DiffIcon() {
   );
 }
 
-// ── Provider selector ────────────────────────────────────────────────────────
+function KeyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
+      <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
+
+// ── AI provider selector ────────────────────────────────────────────────────
+
+const AI_PROVIDERS: { value: AiProviderType; label: string }[] = [
+  { value: "anthropic", label: "Anthropic Claude" },
+  { value: "openai", label: "OpenAI GPT-4o" },
+];
+
+interface AiProviderSelectorProps {
+  value: AiProviderType;
+  onChange: (v: AiProviderType) => void;
+  disabled: boolean;
+}
+
+function AiProviderSelector({ value, onChange, disabled }: AiProviderSelectorProps) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as AiProviderType)}
+      disabled={disabled}
+      className={cn(
+        "w-full px-3 py-2 text-sm rounded-md appearance-none",
+        "bg-[var(--color-bg-overlay)] border border-[var(--color-border)]",
+        "text-[var(--color-text-primary)]",
+        "focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+        "disabled:opacity-50 disabled:cursor-not-allowed"
+      )}
+      aria-label="AI Provider"
+    >
+      {AI_PROVIDERS.map((p) => (
+        <option key={p.value} value={p.value}>{p.label}</option>
+      ))}
+    </select>
+  );
+}
+
+// ── API key manager ─────────────────────────────────────────────────────────
+
+interface ApiKeyManagerProps {
+  provider: AiProviderType;
+  disabled: boolean;
+}
+
+function ApiKeyManager({ provider, disabled }: ApiKeyManagerProps) {
+  const [maskedKey, setMaskedKey] = useState<string | null>(null);
+  const [keyExists, setKeyExists] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [newKey, setNewKey] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const loadKeyStatus = useCallback(async () => {
+    if (!window.aiBuilder?.loadProviderKey) return;
+    setLoading(true);
+    try {
+      const res = await window.aiBuilder.loadProviderKey({ provider });
+      if (res.status === "ok") {
+        setKeyExists(res.data.exists);
+        setMaskedKey(res.data.maskedKey);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [provider]);
+
+  useEffect(() => {
+    loadKeyStatus();
+  }, [loadKeyStatus]);
+
+  async function handleSave() {
+    if (!newKey.trim() || !window.aiBuilder?.saveProviderKey) return;
+    setSaving(true);
+    try {
+      const res = await window.aiBuilder.saveProviderKey({ provider, apiKey: newKey.trim() });
+      if (res.status === "ok") {
+        setNewKey("");
+        await loadKeyStatus();
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleClear() {
+    if (!window.aiBuilder?.clearProviderKey) return;
+    try {
+      const res = await window.aiBuilder.clearProviderKey({ provider });
+      if (res.status === "ok") {
+        setKeyExists(false);
+        setMaskedKey(null);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (loading) {
+    return (
+      <p className="text-[10px] text-[var(--color-text-secondary)] animate-pulse">
+        Checking API key…
+      </p>
+    );
+  }
+
+  if (keyExists) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <KeyIcon />
+          <span className="text-xs text-[var(--color-text-secondary)] truncate">
+            {maskedKey}
+          </span>
+        </div>
+        <button
+          onClick={handleClear}
+          disabled={disabled}
+          title="Remove API key"
+          className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <TrashIcon />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-warning)]">
+        <span>⚠</span>
+        <span>No API key configured</span>
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="password"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+          disabled={disabled || saving}
+          placeholder={provider === "openai" ? "sk-..." : "sk-ant-..."}
+          className={cn(
+            "flex-1 px-2.5 py-1.5 text-xs rounded-md",
+            "bg-[var(--color-bg-overlay)] border border-[var(--color-border)]",
+            "text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]",
+            "focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+          aria-label="API key"
+        />
+        <button
+          onClick={handleSave}
+          disabled={disabled || saving || !newKey.trim()}
+          className={cn(
+            "px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer",
+            newKey.trim() && !saving
+              ? "bg-[var(--color-primary)] text-white hover:opacity-90"
+              : "opacity-40 cursor-not-allowed bg-[var(--color-primary)] text-white"
+          )}
+        >
+          {saving ? "…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Builder tool calls display ──────────────────────────────────────────────
+
+function BuilderToolCalls() {
+  const toolCalls = useAiStore((s) => s.builderToolCalls);
+  const builderMessage = useAiStore((s) => s.builderMessage);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [toolCalls, builderMessage]);
+
+  if (toolCalls.length === 0 && !builderMessage) return null;
+
+  return (
+    <div className="px-3 py-2 border-t border-[var(--color-border)] space-y-2">
+      <p className="text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider">
+        Builder Activity
+      </p>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+        {toolCalls.map((tc, i) => (
+          <div key={i} className="text-xs rounded-md bg-[var(--color-bg-overlay)] px-2.5 py-1.5">
+            <span className="font-mono text-[var(--color-primary)]">{tc.tool}</span>
+            <span className="text-[var(--color-text-secondary)] ml-1">
+              {tc.tool === "addNode" && `→ ${(tc.args.type as string) ?? "node"}`}
+              {tc.tool === "addEdge" && `→ ${tc.args.from as string} → ${tc.args.to as string}`}
+              {tc.tool === "setIntegrationMeta" && `→ ${(tc.args.name as string) ?? ""}`}
+              {tc.tool === "getAvailableProviders" && (tc.args.search ? `→ "${tc.args.search as string}"` : "")}
+            </span>
+          </div>
+        ))}
+        {builderMessage && (
+          <div className="text-xs rounded-md bg-[var(--color-bg-overlay)] px-2.5 py-2">
+            <p className="text-[var(--color-text-primary)] whitespace-pre-wrap leading-snug">
+              {builderMessage}
+            </p>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+    </div>
+  );
+}
+
+// ── Nango provider selector ─────────────────────────────────────────────────
 
 interface ProviderSelectorProps {
   value: string;
@@ -290,10 +516,16 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
   const panelError = useAiStore((s) => s.panelError);
   const clearPanelError = useAiStore((s) => s.clearPanelError);
   const isHistoryFull = useAiStore((s) => s.isHistoryFull);
-  const generate = useAiStore((s) => s.generate);
-  const refine = useAiStore((s) => s.refine);
   const resetConversation = useAiStore((s) => s.resetConversation);
   const applyStreamToken = useAiStore((s) => s.applyStreamToken);
+
+  // AI Builder v2
+  const aiProvider = useAiStore((s) => s.aiProvider);
+  const setAiProvider = useAiStore((s) => s.setAiProvider);
+  const runBuilder = useAiStore((s) => s.runBuilder);
+  const applyBuilderToolCall = useAiStore((s) => s.applyBuilderToolCall);
+  const applyBuilderMessage = useAiStore((s) => s.applyBuilderMessage);
+  const builderResult = useAiStore((s) => s.builderResult);
 
   const pushHistory = useFlowStore((s) => s.pushHistory);
   const existingNodes = useFlowStore((s) => s.nodes);
@@ -303,7 +535,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isRefinement = generatedDefinition !== null;
 
-  // Register AI stream token listener
+  // Register AI stream token listener (v1)
   useEffect(() => {
     if (!window.nango?.onAiStreamToken) return;
     window.nango.onAiStreamToken(applyStreamToken);
@@ -311,6 +543,18 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
       window.nango?.removeAllAiStreamListeners?.();
     };
   }, [applyStreamToken]);
+
+  // Register AI builder v2 event listeners
+  useEffect(() => {
+    if (!window.aiBuilder?.onToolCall || !window.aiBuilder?.onMessage) return;
+    window.aiBuilder.onToolCall(applyBuilderToolCall);
+    window.aiBuilder.onMessage((event) => {
+      applyBuilderMessage(event.text, event.done);
+    });
+    return () => {
+      window.aiBuilder?.removeAllListeners?.();
+    };
+  }, [applyBuilderToolCall, applyBuilderMessage]);
 
   // Auto-focus textarea when panel opens
   useEffect(() => {
@@ -330,13 +574,10 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
   );
 
   function handleSubmit() {
-    if (!provider.trim() || !prompt.trim() || isGenerating) return;
+    if (!prompt.trim() || isGenerating) return;
     clearPanelError();
-    if (isRefinement) {
-      refine();
-    } else {
-      generate();
-    }
+    // Use v2 builder (tool-calling) — requires AI provider key, not Nango provider
+    runBuilder();
   }
 
   /** Merge generated definition into the flow canvas, preserving existing nodes. */
@@ -371,7 +612,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
     }
   }
 
-  const canSubmit = provider.trim().length > 0 && prompt.trim().length > 0 && !isGenerating;
+  const canSubmit = prompt.trim().length > 0 && !isGenerating;
 
   return (
     <div className="flex flex-col h-full border-l border-[var(--color-border)] bg-[var(--color-bg-surface)]">
@@ -424,10 +665,30 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
-        {/* Provider selector */}
+        {/* AI provider + API key */}
+        <div className="px-3 py-3 border-b border-[var(--color-border)] space-y-3">
+          <div>
+            <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+              AI Provider
+            </label>
+            <AiProviderSelector
+              value={aiProvider}
+              onChange={setAiProvider}
+              disabled={isGenerating}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+              API Key
+            </label>
+            <ApiKeyManager provider={aiProvider} disabled={isGenerating} />
+          </div>
+        </div>
+
+        {/* Nango integration provider selector */}
         <div className="px-3 py-3 border-b border-[var(--color-border)]">
           <label className="block text-[10px] font-medium text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
-            Provider
+            Integration Provider
           </label>
           <ProviderSelector
             value={provider}
@@ -439,7 +700,10 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
         {/* Conversation history */}
         <ConversationHistory />
 
-        {/* Generated summary */}
+        {/* Builder tool calls */}
+        <BuilderToolCalls />
+
+        {/* Generated summary (v1 path) */}
         <GeneratedSummary />
 
         {/* Streaming output */}
@@ -520,7 +784,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
 
       {/* Footer actions */}
       <div className="shrink-0 px-3 py-3 border-t border-[var(--color-border)] flex items-center gap-2">
-        {generatedDefinition && !isHistoryFull && (
+        {builderResult && !isHistoryFull && (
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
@@ -536,7 +800,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
           </button>
         )}
 
-        {!generatedDefinition && (
+        {!builderResult && (
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
@@ -548,7 +812,7 @@ export function AiBuilderPanel({ onClose }: AiBuilderPanelProps) {
             )}
           >
             <SparklesIcon />
-            {isGenerating ? "Generating…" : "Generate"}
+            {isGenerating ? "Building…" : "Build"}
           </button>
         )}
 
