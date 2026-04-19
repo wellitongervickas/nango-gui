@@ -357,7 +357,7 @@ function SyncsSection({ syncs, isLoading, error, providerConfigKey, connectionId
   );
 }
 
-// ── Metadata section ──────────────────────────────────────────────────────
+// ── Metadata section (raw JSON) ───────────────────────────────────────────
 
 interface MetadataSectionProps {
   metadata: Record<string, unknown> | null;
@@ -961,6 +961,12 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           error={syncsError}
           providerConfigKey={providerConfigKey}
           connectionId={connectionId}
+        />
+
+        {/* Connection Tags */}
+        <TagsSection
+          metadata={currentMetadata}
+          onSave={handleSaveMetadata}
         />
 
         {/* Metadata */}

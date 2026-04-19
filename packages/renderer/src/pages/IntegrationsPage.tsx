@@ -3,7 +3,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { NangoProvider } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
-import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon } from "@/components/icons";
+import { ImportTemplateModal } from "@/components/templates/ImportTemplateModal";
+import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
 
@@ -345,6 +346,7 @@ export function IntegrationsPage() {
   } = useIntegrationsStore();
 
   const [selected, setSelected] = useState<NangoProvider | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     fetchProviders();
@@ -378,6 +380,14 @@ export function IntegrationsPage() {
           {!isLoading && `${filtered.length} providers`}
         </span>
         <div className="flex-1" />
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface)] transition-colors cursor-pointer"
+          title="Import an integration template via nango clone"
+        >
+          <DownloadIcon />
+          Import Template
+        </button>
         <div className="relative w-64">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]">
             <SearchIcon />
@@ -466,6 +476,11 @@ export function IntegrationsPage() {
           provider={selected}
           onClose={() => setSelected(null)}
         />
+      )}
+
+      {/* Import Template modal */}
+      {showImportModal && (
+        <ImportTemplateModal onClose={() => setShowImportModal(false)} />
       )}
     </div>
   );
