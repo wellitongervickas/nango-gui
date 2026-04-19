@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI } from "@nangohq/frontend";
-import type { ConnectUIEvent } from "@nangohq/frontend";
+import type { ConnectUIEvent, AuthErrorType } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectFlowStore } from "@/store/connectFlowStore";
 import { useConnectionsStore } from "@/store/connectionsStore";
@@ -44,9 +44,63 @@ function saveAdvancedConfig(providerName: string, cfg: AdvancedConnectionConfig)
 type FlowState =
   | { kind: "search" }
   | { kind: "configure"; provider: NangoProvider }
-  | { kind: "connecting"; provider: string }
-  | { kind: "open"; provider: string }
+  | { kind: "connecting"; provider: NangoProvider }
+  | { kind: "open"; provider: NangoProvider }
   | { kind: "error"; message: string };
+
+type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "authParams";
+
+interface ConnectError {
+  errorType: AuthErrorType;
+  message: string;
+  highlightField?: HighlightField;
+}
+
+/** Maps Nango AuthErrorType codes to developer-friendly messages. */
+function getFriendlyErrorMessage(errorType: AuthErrorType, rawMessage: string): string {
+  switch (errorType) {
+    case "connection_validation_failed":
+      return "Validation failed: the credentials were rejected by the provider. Check your client ID, secret, or auth params and retry.";
+    case "missing_credentials":
+      return "Missing required credentials. Fill in all required fields and retry.";
+    case "blocked_by_browser":
+      return "The OAuth popup was blocked by your browser. Allow popups for this window and try again.";
+    case "window_closed":
+      return "The authorization window was closed before completing. Click Connect to try again.";
+    case "connection_test_failed":
+      return "The provider accepted the credentials but the API connectivity check failed. The integration may have permission or network issues.";
+    case "missing_connect_session_token":
+      return "The session token expired. Click Connect to start a fresh authorization.";
+    case "invalid_host_url":
+      return "Invalid Nango server URL. Check your server URL in the app settings.";
+    case "resource_capped":
+      return "You have reached the connection limit for this integration.";
+    case "missing_auth_token":
+      return "Authorization token missing. Retry the connection.";
+    case "unknown_error":
+    default:
+      return rawMessage || "An unexpected error occurred. Try again or check Nango server logs.";
+  }
+}
+
+/**
+ * Best-effort field identification from error type + message.
+ * Returns undefined when the source field is not identifiable.
+ */
+function getErrorHighlightField(
+  errorType: AuthErrorType,
+  rawMessage: string
+): HighlightField | undefined {
+  if (errorType === "connection_validation_failed") {
+    const msg = rawMessage.toLowerCase();
+    if (msg.includes("client_secret") || msg.includes("client secret")) return "oauthClientSecret";
+    if (msg.includes("client_id") || msg.includes("client id")) return "oauthClientId";
+    if (msg.includes("scope")) return "userScopes";
+    if (msg.includes("param")) return "authParams";
+  }
+  if (errorType === "missing_credentials") return "oauthClientId";
+  return undefined;
+}
 
 interface SuccessToast {
   provider: string;
@@ -70,11 +124,14 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
   const [toast, setToast] = useState<SuccessToast | null>(null);
   const [advancedConfig, setAdvancedConfig] = useState<AdvancedConnectionConfig>({});
   const [advancedErrors, setAdvancedErrors] = useState<ReturnType<typeof validateAdvancedConfig>>({});
+  const [connectError, setConnectError] = useState<ConnectError | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const connectUIRef = useRef<ConnectUI | null>(null);
   const closedRef = useRef(false);
+  /** Tracks the full provider object during connecting/open so we can return to configure on error. */
+  const lastProviderRef = useRef<NangoProvider | null>(null);
 
   const connections = useConnectionsStore((s) => s.connections);
   const fetchConnections = useConnectionsStore((s) => s.fetchConnections);
@@ -196,15 +253,25 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
           break;
         }
 
-        case "error":
+        case "error": {
           closedRef.current = true;
           connectUIRef.current?.close();
           connectUIRef.current = null;
-          setFlowState({
-            kind: "error",
-            message: event.payload.errorMessage,
-          });
+          const { errorType, errorMessage } = event.payload;
+          const err: ConnectError = {
+            errorType,
+            message: getFriendlyErrorMessage(errorType, errorMessage),
+            highlightField: getErrorHighlightField(errorType, errorMessage),
+          };
+          // Return to the configure step so the user can adjust settings and retry.
+          if (lastProviderRef.current) {
+            setConnectError(err);
+            setFlowState({ kind: "configure", provider: lastProviderRef.current });
+          } else {
+            setFlowState({ kind: "error", message: err.message });
+          }
           break;
+        }
       }
     },
     [addConnection, fetchConnections]
@@ -215,6 +282,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
     const saved = loadAdvancedConfig(provider.name);
     setAdvancedConfig(saved);
     setAdvancedErrors({});
+    setConnectError(null);
+    lastProviderRef.current = provider;
     setFlowState({ kind: "configure", provider });
   }, []);
 
@@ -237,7 +306,9 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
       saveAdvancedConfig(provider.name, cfg);
 
       closedRef.current = false;
-      setFlowState({ kind: "connecting", provider: provider.display_name });
+      setConnectError(null);
+      lastProviderRef.current = provider;
+      setFlowState({ kind: "connecting", provider });
 
       try {
         // Build integrationsConfigDefaults only when advanced config is non-empty
@@ -277,7 +348,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
         connectUI.open();
 
         if (!closedRef.current) {
-          setFlowState({ kind: "open", provider: provider.display_name });
+          setFlowState({ kind: "open", provider });
         }
       } catch (err) {
         setFlowState({
@@ -455,10 +526,11 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            {/* Error banner */}
-            {flowState.kind === ("error" as FlowState["kind"]) && (
-              <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm text-[var(--color-error)] flex items-center gap-2">
-                <span className="flex-1">An error occurred. Go back and try again.</span>
+            {/* Inline validation error — shown when Connect UI returns an error */}
+            {connectError && (
+              <div className="mx-4 mt-3 px-3 py-2.5 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm text-[var(--color-error)] space-y-1">
+                <p className="font-medium">Authorization failed</p>
+                <p className="text-xs leading-relaxed opacity-90">{connectError.message}</p>
               </div>
             )}
 
@@ -472,16 +544,17 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
                   setAdvancedErrors({});
                 }}
                 errors={advancedErrors}
+                serverHighlightField={connectError?.highlightField}
               />
             </div>
 
-            {/* Connect button */}
+            {/* Connect button (changes label to "Retry" after an error) */}
             <div className="px-4 pb-4">
               <button
                 onClick={() => launchConnect(provider, advancedConfig)}
                 className="w-full py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-400)] text-white hover:bg-[var(--color-brand-400)]/90 transition-colors cursor-pointer"
               >
-                Connect to {provider.display_name}
+                {connectError ? `Retry — ${provider.display_name}` : `Connect to ${provider.display_name}`}
               </button>
             </div>
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AdvancedConnectionConfig } from "@nango-gui/shared";
 import { ChevronIcon, XIcon } from "@/components/icons";
 
@@ -12,12 +12,19 @@ interface ValidationErrors {
   userScopes?: string;
 }
 
+type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "authParams";
+
 interface AdvancedConnectionFormProps {
   providerName: string;
   value: AdvancedConnectionConfig;
   onChange: (cfg: AdvancedConnectionConfig) => void;
-  /** Validation errors to surface inline. */
+  /** Client-side validation errors to surface inline. */
   errors?: ValidationErrors;
+  /**
+   * Field to visually highlight — set when the server identified a specific
+   * field as the source of a validation error.
+   */
+  serverHighlightField?: HighlightField;
 }
 
 function kvPairsFromRecord(record: Record<string, string> | undefined): KVPair[] {
@@ -68,8 +75,15 @@ export function AdvancedConnectionForm({
   value,
   onChange,
   errors = {},
+  serverHighlightField,
 }: AdvancedConnectionFormProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  // Auto-expand when the server identified a specific field that needs attention.
+  const [isOpen, setIsOpen] = useState(() => serverHighlightField !== undefined);
+
+  // If serverHighlightField changes (e.g. new error arrives), expand the form.
+  useEffect(() => {
+    if (serverHighlightField !== undefined) setIsOpen(true);
+  }, [serverHighlightField]);
 
   // Local state for the key-value auth params editor
   const [kvPairs, setKvPairs] = useState<KVPair[]>(() =>
@@ -151,7 +165,7 @@ export function AdvancedConnectionForm({
       {isOpen && (
         <div className="px-4 pb-4 space-y-5 border-t border-[var(--color-border)]">
           {/* ── Auth Params ─────────────────────────────────────────────── */}
-          <div className="mt-4 space-y-2">
+          <div className={`mt-4 space-y-2 rounded-md transition-colors ${serverHighlightField === "authParams" ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                 Auth Params
@@ -203,7 +217,7 @@ export function AdvancedConnectionForm({
           </div>
 
           {/* ── Custom OAuth Scopes ──────────────────────────────────────── */}
-          <div className="space-y-1.5">
+          <div className={`space-y-1.5 rounded-md transition-colors ${serverHighlightField === "userScopes" ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                 Custom OAuth Scopes
@@ -223,7 +237,7 @@ export function AdvancedConnectionForm({
           </div>
 
           {/* ── Developer App Credentials ────────────────────────────────── */}
-          <div className="space-y-1.5">
+          <div className={`space-y-1.5 rounded-md transition-colors ${(serverHighlightField === "oauthClientId" || serverHighlightField === "oauthClientSecret") ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                 Developer App Credentials
