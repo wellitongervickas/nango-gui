@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { NangoProxyMethod } from "@nango-gui/shared";
+import type { AsyncActionStatus, NangoProxyMethod } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import {
   useActionsStore,
@@ -106,6 +106,51 @@ function ConnectionSelector({
         ))}
       </select>
     </div>
+  );
+}
+
+// ── Async Status Badge ────────────────────────────────────────────────────
+
+const ASYNC_STATUS_STYLES: Record<AsyncActionStatus, string> = {
+  pending: "bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]",
+  running: "bg-[var(--color-brand-500)]/15 text-[var(--color-brand-400)]",
+  succeeded: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  failed: "bg-[var(--color-error)]/15 text-[var(--color-error)]",
+};
+
+const ASYNC_STATUS_LABELS: Record<AsyncActionStatus, string> = {
+  pending: "Pending",
+  running: "Running",
+  succeeded: "Succeeded",
+  failed: "Failed",
+};
+
+function AsyncStatusBadge({
+  status,
+  retryCount,
+}: {
+  status: AsyncActionStatus;
+  retryCount?: number;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-semibold",
+          ASYNC_STATUS_STYLES[status]
+        )}
+      >
+        {(status === "pending" || status === "running") && (
+          <SpinnerIcon />
+        )}
+        {ASYNC_STATUS_LABELS[status]}
+      </span>
+      {retryCount != null && retryCount > 0 && (
+        <span className="text-xs text-[var(--color-text-secondary)]">
+          {retryCount} {retryCount === 1 ? "retry" : "retries"}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -231,12 +276,16 @@ function ActionsRunnerTab({
 }) {
   const [actionName, setActionName] = useState("");
   const [inputJson, setInputJson] = useState("{}");
+  const [asyncMode, setAsyncMode] = useState(false);
 
   const {
     actionResult,
     isExecutingAction,
     actionError,
+    asyncActionStatus,
+    asyncActionRetryCount,
     triggerAction,
+    triggerActionAsync,
     clearActionResult,
   } = useActionsStore();
 
@@ -246,24 +295,56 @@ function ActionsRunnerTab({
     if (!selectedConnection || !actionName.trim() || !jsonValid) return;
     const [integrationId, connectionId] = selectedConnection.split("::");
     if (!integrationId || !connectionId) return;
-    triggerAction(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
-  }, [selectedConnection, actionName, inputJson, jsonValid, triggerAction]);
+    const parsed = parseJsonSafe(inputJson);
+    if (asyncMode) {
+      triggerActionAsync(integrationId, connectionId, actionName.trim(), parsed);
+    } else {
+      triggerAction(integrationId, connectionId, actionName.trim(), parsed);
+    }
+  }, [selectedConnection, actionName, inputJson, jsonValid, asyncMode, triggerAction, triggerActionAsync]);
+
+  const isInFlight = isExecutingAction;
+  const showAsyncStatus = asyncMode && asyncActionStatus !== null && isInFlight;
+  const showResult = actionResult !== null && !actionError;
+  const showClear = (actionResult !== null || actionError) && !isInFlight;
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Action Name */}
-      <div>
-        <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-          Action Name
+      {/* Action Name + Async toggle */}
+      <div className="flex items-end gap-4">
+        <div className="flex-1">
+          <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+            Action Name
+          </label>
+          <input
+            type="text"
+            value={actionName}
+            onChange={(e) => setActionName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRun()}
+            placeholder="e.g. create-contact"
+            className="w-full px-3 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors font-mono"
+          />
+        </div>
+
+        {/* Async mode toggle */}
+        <label className="flex items-center gap-2 pb-1.5 cursor-pointer select-none shrink-0">
+          <div
+            onClick={() => !isInFlight && setAsyncMode((p) => !p)}
+            className={cn(
+              "relative w-9 h-5 rounded-full transition-colors",
+              asyncMode ? "bg-[var(--color-brand-500)]" : "bg-[var(--color-border)]",
+              isInFlight ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform",
+                asyncMode ? "translate-x-4" : "translate-x-0"
+              )}
+            />
+          </div>
+          <span className="text-xs text-[var(--color-text-secondary)]">Async</span>
         </label>
-        <input
-          type="text"
-          value={actionName}
-          onChange={(e) => setActionName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleRun()}
-          placeholder="e.g. create-contact"
-          className="w-full px-3 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:outline-none focus:border-[var(--color-border-focus)] transition-colors font-mono"
-        />
       </div>
 
       {/* JSON Input */}
@@ -290,17 +371,17 @@ function ActionsRunnerTab({
         )}
       </div>
 
-      {/* Run Button */}
+      {/* Run Button row */}
       <div className="flex items-center gap-3">
         <button
           onClick={handleRun}
-          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isExecutingAction}
+          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isInFlight}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
         >
-          {isExecutingAction ? <SpinnerIcon /> : <PlayIcon />}
-          Run Action
+          {isInFlight ? <SpinnerIcon /> : <PlayIcon />}
+          {asyncMode ? "Run Async" : "Run Action"}
         </button>
-        {(actionResult !== null || actionError) && (
+        {showClear && (
           <button
             onClick={clearActionResult}
             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
@@ -310,12 +391,37 @@ function ActionsRunnerTab({
         )}
       </div>
 
+      {/* Async status indicator (shown while polling) */}
+      {showAsyncStatus && asyncActionStatus && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)]">
+          <AsyncStatusBadge
+            status={asyncActionStatus}
+            retryCount={asyncActionRetryCount}
+          />
+          {(asyncActionStatus === "pending" || asyncActionStatus === "running") && (
+            <span className="text-xs text-[var(--color-text-secondary)]">
+              Polling for result every 2s…
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Error */}
       {actionError && <ErrorBanner message={actionError} />}
 
       {/* Result */}
-      {actionResult !== null && !actionError && (
-        <JsonViewer data={actionResult} label="Result" />
+      {showResult && (
+        <div className="flex flex-col gap-3">
+          {asyncMode && asyncActionStatus === "succeeded" && (
+            <div className="flex items-center gap-2">
+              <AsyncStatusBadge
+                status="succeeded"
+                retryCount={asyncActionRetryCount}
+              />
+            </div>
+          )}
+          <JsonViewer data={actionResult} label="Result" />
+        </div>
       )}
     </div>
   );

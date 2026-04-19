@@ -16,6 +16,8 @@ import type {
   NangoUpdateSyncFrequencyRequest,
   NangoListRecordsRequest,
   NangoTriggerActionRequest,
+  NangoTriggerActionAsyncRequest,
+  NangoGetAsyncActionResultRequest,
   NangoProxyRequest,
   NangoGetConnectionHealthRequest,
   CredentialsSaveRequest,
@@ -84,6 +86,10 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_RECORDS, args),
   triggerAction: (args: NangoTriggerActionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_TRIGGER_ACTION, args),
+  triggerActionAsync: (args: NangoTriggerActionAsyncRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_TRIGGER_ACTION_ASYNC, args),
+  getAsyncActionResult: (args: NangoGetAsyncActionResultRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_ASYNC_ACTION_RESULT, args),
   proxyRequest: (args: NangoProxyRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_PROXY_REQUEST, args),
   getDashboard: () =>

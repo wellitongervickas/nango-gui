@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
 
   // Actions & Proxy
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
+  NANGO_TRIGGER_ACTION_ASYNC: "nango:triggerActionAsync",
+  NANGO_GET_ASYNC_ACTION_RESULT: "nango:getAsyncActionResult",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
 
   // Connection health
@@ -421,6 +423,35 @@ export interface NangoTriggerActionRequest {
 
 export interface NangoTriggerActionResult {
   result: unknown;
+}
+
+export interface NangoTriggerActionAsyncRequest {
+  connectionId: string;
+  integrationId: string;
+  actionName: string;
+  input: Record<string, unknown>;
+}
+
+export interface NangoTriggerActionAsyncResult {
+  id: string;
+  statusUrl: string;
+}
+
+export interface NangoGetAsyncActionResultRequest {
+  id?: string;
+  statusUrl?: string;
+}
+
+export type AsyncActionStatus = "pending" | "running" | "succeeded" | "failed";
+
+export interface NangoAsyncActionResultData {
+  status: AsyncActionStatus;
+  /** Set when status is "succeeded". */
+  result?: unknown;
+  /** Set when status is "failed". */
+  error?: string;
+  /** Number of automatic retries attempted so far. */
+  retryCount?: number;
 }
 
 export type NangoProxyMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

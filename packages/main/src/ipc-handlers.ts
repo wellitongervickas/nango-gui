@@ -34,6 +34,10 @@ import {
   type NangoDashboardTopConnection,
   type NangoTriggerActionRequest,
   type NangoTriggerActionResult,
+  type NangoTriggerActionAsyncRequest,
+  type NangoTriggerActionAsyncResult,
+  type NangoGetAsyncActionResultRequest,
+  type NangoAsyncActionResultData,
   type NangoProxyRequest,
   type NangoProxyResult,
   type CredentialsSaveRequest,
@@ -861,6 +865,41 @@ export function registerIpcHandlers(): void {
           args.input
         );
         return { result };
+      })
+  );
+
+  // ── Async action trigger handler ─────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_TRIGGER_ACTION_ASYNC,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoTriggerActionAsyncRequest
+    ): Promise<IpcResponse<NangoTriggerActionAsyncResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.triggerActionAsync(
+          args.integrationId,
+          args.connectionId,
+          args.actionName,
+          args.input
+        );
+        return result;
+      })
+  );
+
+  // ── Async action result poll handler ─────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_ASYNC_ACTION_RESULT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetAsyncActionResultRequest
+    ): Promise<IpcResponse<NangoAsyncActionResultData>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.getAsyncActionResult(args);
+        return result as NangoAsyncActionResultData;
       })
   );
 
