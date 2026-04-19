@@ -31,6 +31,7 @@ import { WebhooksPage } from "./pages/WebhooksPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
+import { AiBuilderPage } from "./pages/AiBuilderPage";
 import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
 import { applyTheme } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
@@ -80,9 +81,9 @@ function App() {
     useEnvironmentStore.getState().initialize();
   }, []);
 
-  // Auto-open AI Builder panel when navigating via ai-builder route
+  // Legacy: auto-open AI Builder panel when navigating via ai-builder route on canvas
   useEffect(() => {
-    if (route === "ai-builder") {
+    if (route === "ai-builder-panel") {
       useAiBuilderPanelStore.getState().open();
     }
   }, [route]);
@@ -156,6 +157,10 @@ function App() {
 
   if (route === "mcp") {
     return <AppShell pageName="MCP Servers"><McpPage /></AppShell>;
+  }
+
+  if (route === "ai-builder") {
+    return <AppShell pageName="AI Builder"><AiBuilderPage /></AppShell>;
   }
 
   // Canvas (default route) — uses ReactFlowProvider + extra panels
