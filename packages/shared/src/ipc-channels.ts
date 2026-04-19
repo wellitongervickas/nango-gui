@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
 
   // Actions & Proxy
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
+  NANGO_TRIGGER_ACTION_ASYNC: "nango:triggerActionAsync",
+  NANGO_GET_ASYNC_ACTION_RESULT: "nango:getAsyncActionResult",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
 
   // Connection health
@@ -234,6 +236,10 @@ export interface AdvancedConnectionConfig {
   oauthClientId?: string;
   /** Override the registered OAuth client secret for this connection. */
   oauthClientSecret?: string;
+  /** MCP server URL endpoint (used when auth_mode is MCP). */
+  mcpServerUrl?: string;
+  /** API key or token for authenticating to the MCP server. */
+  mcpApiKey?: string;
 }
 
 export interface NangoCreateConnectSessionRequest {
@@ -409,6 +415,34 @@ export interface NangoTriggerActionRequest {
 
 export interface NangoTriggerActionResult {
   result: unknown;
+}
+
+/** Returned by triggerActionAsync — the Nango task ID and poll URL. */
+export interface NangoTriggerAsyncActionResult {
+  id: string;
+  statusUrl: string;
+}
+
+/** Lifecycle status of an async Nango action task. */
+export type NangoAsyncActionStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "SUCCESS"
+  | "ERROR"
+  | "PAUSED"
+  | "STOPPED";
+
+export interface NangoGetAsyncActionResultRequest {
+  id: string;
+  statusUrl?: string;
+}
+
+/** Shape returned by GET /action/{id} — result or error is only present on terminal status. */
+export interface NangoAsyncActionPollResponse {
+  status: NangoAsyncActionStatus;
+  result?: unknown;
+  error?: string;
+  retryCount?: number;
 }
 
 export type NangoProxyMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

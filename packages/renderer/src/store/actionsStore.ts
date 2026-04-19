@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { NangoProxyMethod } from "@nango-gui/shared";
+import type { NangoProxyMethod, NangoAsyncActionStatus } from "@nango-gui/shared";
 import { notifyIpcError } from "./notifyError";
 
 // ── History entry types ────────────────────────────────────────────────────
@@ -15,6 +15,11 @@ export interface ActionHistoryEntry {
   result: unknown | null;
   error: string | null;
   durationMs: number;
+  /** Present when the action was triggered asynchronously. */
+  isAsync?: boolean;
+  taskId?: string;
+  taskStatus?: NangoAsyncActionStatus;
+  retryCount?: number;
 }
 
 export interface ProxyHistoryEntry {
@@ -42,10 +47,18 @@ const MAX_HISTORY = 20;
 // ── Store interface ────────────────────────────────────────────────────────
 
 interface ActionsState {
-  // Action runner
+  // Action runner (sync)
   actionResult: unknown | null;
   isExecutingAction: boolean;
   actionError: string | null;
+
+  // Async action runner
+  asyncTaskId: string | null;
+  asyncTaskStatus: NangoAsyncActionStatus | null;
+  asyncTaskResult: unknown | null;
+  asyncTaskError: string | null;
+  asyncTaskRetryCount: number;
+  isExecutingAsyncAction: boolean;
 
   // Proxy tester
   proxyStatus: number | null;
@@ -64,6 +77,13 @@ interface ActionsState {
     actionName: string,
     input: Record<string, unknown>
   ) => Promise<void>;
+  triggerActionAsync: (
+    integrationId: string,
+    connectionId: string,
+    actionName: string,
+    input: Record<string, unknown>
+  ) => Promise<void>;
+  clearAsyncResult: () => void;
   sendProxyRequest: (
     integrationId: string,
     connectionId: string,
@@ -82,10 +102,20 @@ interface ActionsState {
 
 let _nextId = 1;
 
-export const useActionsStore = create<ActionsState>((set) => ({
+const ASYNC_POLL_INTERVAL_MS = 2000;
+const ASYNC_MAX_POLLS = 60; // 2 minutes
+
+export const useActionsStore = create<ActionsState>((set, get) => ({
   actionResult: null,
   isExecutingAction: false,
   actionError: null,
+
+  asyncTaskId: null,
+  asyncTaskStatus: null,
+  asyncTaskResult: null,
+  asyncTaskError: null,
+  asyncTaskRetryCount: 0,
+  isExecutingAsyncAction: false,
 
   proxyStatus: null,
   proxyHeaders: null,
@@ -172,6 +202,199 @@ export const useActionsStore = create<ActionsState>((set) => ({
       }));
     }
   },
+
+  triggerActionAsync: async (integrationId, connectionId, actionName, input) => {
+    if (!window.nango) return;
+    set({
+      isExecutingAsyncAction: true,
+      asyncTaskId: null,
+      asyncTaskStatus: "PENDING",
+      asyncTaskResult: null,
+      asyncTaskError: null,
+      asyncTaskRetryCount: 0,
+    });
+    const start = Date.now();
+
+    try {
+      const res = await window.nango.triggerActionAsync({
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+      });
+
+      if (res.status === "error") {
+        notifyIpcError(res);
+        const durationMs = Date.now() - start;
+        const entry: ActionHistoryEntry = {
+          id: String(_nextId++),
+          type: "action",
+          timestamp: new Date().toISOString(),
+          integrationId,
+          connectionId,
+          actionName,
+          input,
+          result: null,
+          error: res.error,
+          durationMs,
+          isAsync: true,
+        };
+        set((s) => ({
+          asyncTaskError: res.error,
+          asyncTaskStatus: "ERROR",
+          isExecutingAsyncAction: false,
+          history: [entry, ...s.history].slice(0, MAX_HISTORY),
+        }));
+        return;
+      }
+
+      const { id, statusUrl } = res.data;
+      set({ asyncTaskId: id, asyncTaskStatus: "RUNNING" });
+
+      // Add a RUNNING entry to history immediately so user sees it
+      const runningEntry: ActionHistoryEntry = {
+        id: String(_nextId++),
+        type: "action",
+        timestamp: new Date().toISOString(),
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+        result: null,
+        error: null,
+        durationMs: 0,
+        isAsync: true,
+        taskId: id,
+        taskStatus: "RUNNING",
+      };
+      set((s) => ({ history: [runningEntry, ...s.history].slice(0, MAX_HISTORY) }));
+
+      // Poll for result
+      let polls = 0;
+      const historyId = runningEntry.id;
+
+      const poll = async (): Promise<void> => {
+        if (polls >= ASYNC_MAX_POLLS) {
+          const durationMs = Date.now() - start;
+          set((s) => ({
+            asyncTaskStatus: "ERROR",
+            asyncTaskError: "Polling timed out after 2 minutes",
+            isExecutingAsyncAction: false,
+            history: s.history.map((e) =>
+              e.id === historyId
+                ? { ...e, error: "Polling timed out", taskStatus: "ERROR" as NangoAsyncActionStatus, durationMs }
+                : e
+            ),
+          }));
+          return;
+        }
+
+        // Check if user cleared the result between polls
+        if (!get().isExecutingAsyncAction) return;
+
+        polls++;
+        await new Promise((r) => setTimeout(r, ASYNC_POLL_INTERVAL_MS));
+
+        try {
+          const pollRes = await window.nango!.getAsyncActionResult({ id, statusUrl });
+
+          if (pollRes.status === "error") {
+            notifyIpcError(pollRes);
+            const durationMs = Date.now() - start;
+            set((s) => ({
+              asyncTaskStatus: "ERROR",
+              asyncTaskError: pollRes.error,
+              isExecutingAsyncAction: false,
+              history: s.history.map((e) =>
+                e.id === historyId
+                  ? { ...e, error: pollRes.error, taskStatus: "ERROR" as NangoAsyncActionStatus, durationMs }
+                  : e
+              ),
+            }));
+            return;
+          }
+
+          const { status, result, error, retryCount } = pollRes.data;
+
+          set({ asyncTaskStatus: status, asyncTaskRetryCount: retryCount ?? 0 });
+          if (retryCount !== undefined) {
+            set((s) => ({
+              history: s.history.map((e) =>
+                e.id === historyId ? { ...e, retryCount, taskStatus: status } : e
+              ),
+            }));
+          }
+
+          const isTerminal = status === "SUCCESS" || status === "ERROR" || status === "PAUSED" || status === "STOPPED";
+          if (isTerminal) {
+            const durationMs = Date.now() - start;
+            const taskError = status !== "SUCCESS" ? (error ?? `Action ${status.toLowerCase()}`) : null;
+            set((s) => ({
+              asyncTaskResult: result ?? null,
+              asyncTaskError: taskError,
+              isExecutingAsyncAction: false,
+              history: s.history.map((e) =>
+                e.id === historyId
+                  ? { ...e, result: result ?? null, error: taskError, taskStatus: status, durationMs }
+                  : e
+              ),
+            }));
+            return;
+          }
+
+          // Still running — continue polling
+          await poll();
+        } catch (err) {
+          const durationMs = Date.now() - start;
+          const errorMsg = err instanceof Error ? err.message : "Poll failed";
+          set((s) => ({
+            asyncTaskStatus: "ERROR",
+            asyncTaskError: errorMsg,
+            isExecutingAsyncAction: false,
+            history: s.history.map((e) =>
+              e.id === historyId
+                ? { ...e, error: errorMsg, taskStatus: "ERROR" as NangoAsyncActionStatus, durationMs }
+                : e
+            ),
+          }));
+        }
+      };
+
+      await poll();
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorMsg = err instanceof Error ? err.message : "Failed to trigger async action";
+      const entry: ActionHistoryEntry = {
+        id: String(_nextId++),
+        type: "action",
+        timestamp: new Date().toISOString(),
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+        result: null,
+        error: errorMsg,
+        durationMs,
+        isAsync: true,
+      };
+      set((s) => ({
+        asyncTaskError: errorMsg,
+        asyncTaskStatus: "ERROR",
+        isExecutingAsyncAction: false,
+        history: [entry, ...s.history].slice(0, MAX_HISTORY),
+      }));
+    }
+  },
+
+  clearAsyncResult: () =>
+    set({
+      asyncTaskId: null,
+      asyncTaskStatus: null,
+      asyncTaskResult: null,
+      asyncTaskError: null,
+      asyncTaskRetryCount: 0,
+      isExecutingAsyncAction: false,
+    }),
 
   sendProxyRequest: async (
     integrationId,

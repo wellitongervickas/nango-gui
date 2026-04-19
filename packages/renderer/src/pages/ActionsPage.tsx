@@ -222,6 +222,31 @@ function KeyValueEditor({
   );
 }
 
+// ── Async status badge ─────────────────────────────────────────────────────
+
+const ASYNC_STATUS_STYLES: Record<string, string> = {
+  PENDING: "bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]",
+  RUNNING: "bg-[var(--color-brand-500)]/15 text-[var(--color-brand-400)]",
+  SUCCESS: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  ERROR: "bg-[var(--color-error)]/15 text-[var(--color-error)]",
+  PAUSED: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  STOPPED: "bg-[var(--color-text-secondary)]/15 text-[var(--color-text-secondary)]",
+};
+
+function AsyncStatusBadge({ status }: { status: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-semibold",
+        ASYNC_STATUS_STYLES[status] ?? ASYNC_STATUS_STYLES["STOPPED"]
+      )}
+    >
+      {(status === "PENDING" || status === "RUNNING") && <SpinnerIcon />}
+      {status}
+    </span>
+  );
+}
+
 // ── Actions Runner Tab ─────────────────────────────────────────────────────
 
 function ActionsRunnerTab({
@@ -231,6 +256,7 @@ function ActionsRunnerTab({
 }) {
   const [actionName, setActionName] = useState("");
   const [inputJson, setInputJson] = useState("{}");
+  const [isAsyncMode, setIsAsyncMode] = useState(false);
 
   const {
     actionResult,
@@ -238,16 +264,36 @@ function ActionsRunnerTab({
     actionError,
     triggerAction,
     clearActionResult,
+    asyncTaskId,
+    asyncTaskStatus,
+    asyncTaskResult,
+    asyncTaskError,
+    asyncTaskRetryCount,
+    isExecutingAsyncAction,
+    triggerActionAsync,
+    clearAsyncResult,
   } = useActionsStore();
 
   const jsonValid = isValidJson(inputJson);
+  const isRunning = isAsyncMode ? isExecutingAsyncAction : isExecutingAction;
 
   const handleRun = useCallback(() => {
     if (!selectedConnection || !actionName.trim() || !jsonValid) return;
     const [integrationId, connectionId] = selectedConnection.split("::");
     if (!integrationId || !connectionId) return;
-    triggerAction(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
-  }, [selectedConnection, actionName, inputJson, jsonValid, triggerAction]);
+    const input = parseJsonSafe(inputJson);
+    if (isAsyncMode) {
+      void triggerActionAsync(integrationId, connectionId, actionName.trim(), input);
+    } else {
+      void triggerAction(integrationId, connectionId, actionName.trim(), input);
+    }
+  }, [selectedConnection, actionName, inputJson, jsonValid, isAsyncMode, triggerAction, triggerActionAsync]);
+
+  const hasResult = isAsyncMode
+    ? asyncTaskStatus !== null
+    : actionResult !== null || actionError !== null;
+
+  const handleClear = isAsyncMode ? clearAsyncResult : clearActionResult;
 
   return (
     <div className="flex flex-col gap-5">
@@ -290,19 +336,35 @@ function ActionsRunnerTab({
         )}
       </div>
 
-      {/* Run Button */}
+      {/* Run Button + Async toggle */}
       <div className="flex items-center gap-3">
         <button
           onClick={handleRun}
-          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isExecutingAction}
+          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isRunning}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
         >
-          {isExecutingAction ? <SpinnerIcon /> : <PlayIcon />}
+          {isRunning ? <SpinnerIcon /> : <PlayIcon />}
           Run Action
         </button>
-        {(actionResult !== null || actionError) && (
+
+        {/* Async mode toggle */}
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isAsyncMode}
+            onChange={(e) => {
+              setIsAsyncMode(e.target.checked);
+              clearActionResult();
+              clearAsyncResult();
+            }}
+            className="w-3.5 h-3.5 accent-[var(--color-brand-500)]"
+          />
+          <span className="text-xs text-[var(--color-text-secondary)]">Async</span>
+        </label>
+
+        {hasResult && !isRunning && (
           <button
-            onClick={clearActionResult}
+            onClick={handleClear}
             className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
           >
             Clear result
@@ -310,12 +372,49 @@ function ActionsRunnerTab({
         )}
       </div>
 
-      {/* Error */}
-      {actionError && <ErrorBanner message={actionError} />}
+      {/* ── Sync result ─────────────────────────────────────────────────── */}
+      {!isAsyncMode && (
+        <>
+          {actionError && <ErrorBanner message={actionError} />}
+          {actionResult !== null && !actionError && (
+            <JsonViewer data={actionResult} label="Result" />
+          )}
+        </>
+      )}
 
-      {/* Result */}
-      {actionResult !== null && !actionError && (
-        <JsonViewer data={actionResult} label="Result" />
+      {/* ── Async result ─────────────────────────────────────────────────── */}
+      {isAsyncMode && asyncTaskStatus !== null && (
+        <div className="space-y-3 p-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+          {/* Status row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <AsyncStatusBadge status={asyncTaskStatus} />
+            {asyncTaskId && (
+              <span className="text-xs font-mono text-[var(--color-text-secondary)]">
+                Task: {asyncTaskId}
+              </span>
+            )}
+            {asyncTaskRetryCount > 0 && (
+              <span className="text-xs text-[var(--color-warning)]">
+                Retried {asyncTaskRetryCount}×
+              </span>
+            )}
+          </div>
+
+          {/* Live hint while running */}
+          {(asyncTaskStatus === "PENDING" || asyncTaskStatus === "RUNNING") && (
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Polling every 2 s… result will appear when the action completes.
+            </p>
+          )}
+
+          {/* Error */}
+          {asyncTaskError && <ErrorBanner message={asyncTaskError} />}
+
+          {/* Result */}
+          {asyncTaskResult !== null && asyncTaskStatus === "SUCCESS" && (
+            <JsonViewer data={asyncTaskResult} label="Result" />
+          )}
+        </div>
       )}
     </div>
   );
@@ -563,26 +662,50 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
   const isError = entry.error !== null;
 
   if (entry.type === "action") {
+    const taskStatus = entry.isAsync ? entry.taskStatus : undefined;
+    const dotColor = isError
+      ? "bg-[var(--color-error)]"
+      : taskStatus === "RUNNING" || taskStatus === "PENDING"
+        ? "bg-[var(--color-brand-400)] animate-pulse"
+        : "bg-[var(--color-success)]";
+
     return (
       <div className="px-4 py-2.5 border-b border-[var(--color-border)] hover:bg-[var(--color-bg-overlay)] transition-colors">
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "w-1.5 h-1.5 rounded-full shrink-0",
-              isError ? "bg-[var(--color-error)]" : "bg-[var(--color-success)]"
-            )}
-          />
-          <span className="text-xs font-mono text-[var(--color-text-primary)] truncate">
+          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />
+          <span className="text-xs font-mono text-[var(--color-text-primary)] truncate flex-1">
             {entry.actionName}
           </span>
+          {entry.isAsync && (
+            <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-[var(--color-brand-500)]/15 text-[var(--color-brand-400)] uppercase tracking-wide shrink-0">
+              async
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2 mt-1 ml-3.5">
+        <div className="flex items-center gap-2 mt-1 ml-3.5 flex-wrap">
+          {taskStatus && (
+            <span
+              className={cn(
+                "text-[9px] font-semibold px-1 py-0.5 rounded uppercase tracking-wide",
+                ASYNC_STATUS_STYLES[taskStatus] ?? ""
+              )}
+            >
+              {taskStatus}
+            </span>
+          )}
           <span className="text-[10px] text-[var(--color-text-secondary)]">
             {formatTimestamp(entry.timestamp)}
           </span>
-          <span className="text-[10px] text-[var(--color-text-secondary)]">
-            {entry.durationMs}ms
-          </span>
+          {entry.durationMs > 0 && (
+            <span className="text-[10px] text-[var(--color-text-secondary)]">
+              {entry.durationMs}ms
+            </span>
+          )}
+          {entry.retryCount !== undefined && entry.retryCount > 0 && (
+            <span className="text-[10px] text-[var(--color-warning)]">
+              {entry.retryCount}× retried
+            </span>
+          )}
         </div>
       </div>
     );
