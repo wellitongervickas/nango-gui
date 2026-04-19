@@ -30,6 +30,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
+import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
 import { applyTheme } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
@@ -139,6 +140,10 @@ function App() {
 
   if (route === "actions") {
     return <AppShell pageName="Actions"><ActionsPage /></AppShell>;
+  }
+
+  if (route === "playground") {
+    return <AppShell pageName="Playground"><PlaygroundPage /></AppShell>;
   }
 
   if (route === "webhooks") {

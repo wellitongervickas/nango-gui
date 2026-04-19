@@ -18,6 +18,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Canvas", route: "canvas" },
       { label: "AI Builder", route: "ai-builder" },
+      { label: "Playground", route: "playground" },
     ],
   },
   {
