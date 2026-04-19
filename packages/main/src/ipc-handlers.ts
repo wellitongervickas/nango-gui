@@ -90,6 +90,7 @@ import {
   type NangoValidateConnectionRequest,
   type NangoValidateConnectionResult,
   type ConnectionHealthStatus,
+  type NangoListMcpIntegrationsResult,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -683,20 +684,6 @@ export function registerIpcHandlers(): void {
     return models;
   }
 
-  /** Map a nango.yaml type string to a JSON Schema type. */
-  function nangoTypeToJsonSchema(t: string): Record<string, unknown> {
-    const trimmed = t.replace(/\s/g, "");
-    if (trimmed === "string") return { type: "string" };
-    if (trimmed === "boolean") return { type: "boolean" };
-    if (trimmed === "number" || trimmed === "integer") return { type: "number" };
-    if (trimmed === "date") return { type: "string", format: "date-time" };
-    if (trimmed.endsWith("[]")) {
-      return { type: "array", items: nangoTypeToJsonSchema(trimmed.slice(0, -2)) };
-    }
-    // fallback: treat as string
-    return { type: "string" };
-  }
-
   /** Map a nango.yaml type string to a TypeScript type. */
   function nangoTypeToTs(t: string): string {
     const trimmed = t.replace(/\s/g, "");
@@ -705,26 +692,6 @@ export function registerIpcHandlers(): void {
     if (trimmed === "date") return "string";
     if (trimmed.endsWith("[]")) return `${nangoTypeToTs(trimmed.slice(0, -2))}[]`;
     return "string";
-  }
-
-  function generateJsonSchema(models: Record<string, Record<string, string>>, provider: string): string {
-    const definitions: Record<string, unknown> = {};
-    for (const [name, fields] of Object.entries(models)) {
-      const properties: Record<string, unknown> = {};
-      for (const [field, type] of Object.entries(fields)) {
-        properties[field] = nangoTypeToJsonSchema(type);
-      }
-      definitions[name] = {
-        type: "object",
-        properties,
-        required: Object.keys(fields),
-      };
-    }
-    return JSON.stringify(
-      { $schema: "http://json-schema.org/draft-07/schema#", title: `${provider} models`, definitions },
-      null,
-      2
-    );
   }
 
   function generateTypescript(models: Record<string, Record<string, string>>): string {
@@ -808,10 +775,6 @@ export function registerIpcHandlers(): void {
         let filename: string;
 
         switch (format) {
-          case "json-schema":
-            content = generateJsonSchema(models, provider);
-            filename = `${base}.json`;
-            break;
           case "typescript":
             content = generateTypescript(models);
             filename = `${base}.d.ts`;
@@ -1186,7 +1149,7 @@ export function registerIpcHandlers(): void {
         maskedKey: credentialStore.loadMaskedKey(),
         appVersion: app.getVersion(),
         electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.69.49",
+        nangoSdkVersion: "0.70.1",
       }))
   );
 
@@ -1746,6 +1709,39 @@ export function registerIpcHandlers(): void {
           },
           { headers: { Authorization: `Bearer ${client.secretKey}` } }
         );
+      })
+  );
+
+  // ── List MCP-capable integrations (batch summary) ─────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LIST_MCP_INTEGRATIONS,
+    async (
+      _event: IpcMainInvokeEvent
+    ): Promise<IpcResponse<NangoListMcpIntegrationsResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const configs = (await client.getScriptsConfig()) as Array<{
+          providerConfigKey: string;
+          provider?: string;
+          actions: Array<{
+            enabled?: boolean;
+          }>;
+        }>;
+
+        const integrations = configs
+          .filter((c) => c.actions && c.actions.length > 0)
+          .map((c) => ({
+            providerConfigKey: c.providerConfigKey,
+            provider: c.provider ?? c.providerConfigKey,
+            toolCount: c.actions.length,
+            enabledCount: c.actions.filter((a) => a.enabled).length,
+          }));
+
+        return {
+          integrations,
+          mcpEndpoint: `${client.serverUrl}/mcp`,
+        };
       })
   );
 }

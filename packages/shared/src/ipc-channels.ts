@@ -125,6 +125,7 @@ export const IPC_CHANNELS = {
   // MCP tool configuration (Nango Actions as MCP tools)
   NANGO_GET_MCP_TOOLS: "nango:getMcpTools",
   NANGO_SET_MCP_TOOL_ENABLED: "nango:setMcpToolEnabled",
+  NANGO_LIST_MCP_INTEGRATIONS: "nango:listMcpIntegrations",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -256,7 +257,7 @@ export interface NangoGetIntegrationReadmeResult {
 
 // ── Typed model download ──────────────────────────────────────────────────
 
-export type ModelDownloadFormat = "json-schema" | "typescript" | "zod";
+export type ModelDownloadFormat = "typescript" | "zod";
 
 export interface NangoGetProviderModelsRequest {
   /** Provider key (e.g. "github", "slack"). */
@@ -910,6 +911,24 @@ export interface NangoSetMcpToolEnabledRequest {
   scriptName: string;
   /** Whether to enable or disable the action. */
   enabled: boolean;
+}
+
+/** Summary of an integration that has MCP-capable actions. */
+export interface McpIntegrationSummary {
+  /** The integration ID (providerConfigKey). */
+  providerConfigKey: string;
+  /** The underlying provider (e.g. "hubspot"). */
+  provider: string;
+  /** Number of actions available as MCP tools. */
+  toolCount: number;
+  /** Number of currently enabled MCP tools. */
+  enabledCount: number;
+}
+
+export interface NangoListMcpIntegrationsResult {
+  integrations: McpIntegrationSummary[];
+  /** The MCP server endpoint URL. */
+  mcpEndpoint: string;
 }
 
 // ── Connection credential health validation ──────────────────────────────────

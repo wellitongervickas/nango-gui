@@ -78,6 +78,7 @@ import type {
   NangoGetMcpToolsRequest,
   NangoGetMcpToolsResult,
   NangoSetMcpToolEnabledRequest,
+  NangoListMcpIntegrationsResult,
   AiBuilderRunRequest,
   AiBuilderRunResult,
   AiBuilderToolCallEvent,
@@ -172,6 +173,7 @@ declare global {
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
       getMcpTools(args: NangoGetMcpToolsRequest): Promise<IpcResponse<NangoGetMcpToolsResult>>;
       setMcpToolEnabled(args: NangoSetMcpToolEnabledRequest): Promise<IpcResponse<void>>;
+      listMcpIntegrations(): Promise<IpcResponse<NangoListMcpIntegrationsResult>>;
       createJwtConnection(args: NangoCreateJwtConnectionRequest): Promise<IpcResponse<NangoCreateJwtConnectionResult>>;
       validateConnection(args: NangoValidateConnectionRequest): Promise<IpcResponse<NangoValidateConnectionResult>>;
     };

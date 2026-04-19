@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NangoConnectionDetail, NangoConnectionSummary, ConnectionHealthStatus } from "@nango-gui/shared";
+import type { NangoConnectionDetail, NangoConnectionSummary, ConnectionHealthStatus, McpToolEntry } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { useCredentialHealthStore } from "@/store/credentialHealthStore";
+import { useMcpIntegrations } from "@/hooks/useMcpIntegrations";
+import { useIntegrationMcpTools } from "@/hooks/useIntegrationMcpTools";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn, searchInputClass } from "@/lib/utils";
-import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon, ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon } from "@/components/icons";
+import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon, ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon, CopyIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -158,15 +160,168 @@ function CredentialHealthSection({
   );
 }
 
+// ── MCP badge ─────────────────────────────────────────────────────────────
+
+function McpBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-brand-500)]/15 text-[var(--color-brand-400)] font-medium">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+      </svg>
+      MCP
+    </span>
+  );
+}
+
+// ── MCP Endpoint Section (detail panel) ───────────────────────────────────
+
+function McpEndpointSection({ mcpEndpoint }: { mcpEndpoint: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(mcpEndpoint);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        MCP Endpoint
+      </h3>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 text-xs font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md px-3 py-2 text-[var(--color-text-primary)] truncate">
+          {mcpEndpoint}
+        </code>
+        <button
+          onClick={handleCopy}
+          title="Copy MCP endpoint URL"
+          className="shrink-0 p-2 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
+      </div>
+      {copied && (
+        <p className="text-[10px] text-[var(--color-brand-400)] mt-1">Copied!</p>
+      )}
+    </section>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+// ── MCP Tools Section (detail panel) ──────────────────────────────────────
+
+function McpToolsSection({ providerConfigKey }: { providerConfigKey: string }) {
+  const { tools, isLoading, error, toggleTool } = useIntegrationMcpTools(providerConfigKey);
+
+  if (isLoading) {
+    return (
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+          MCP Tools
+        </h3>
+        <div className="space-y-2 animate-pulse">
+          <div className="h-8 rounded bg-[var(--color-bg-overlay)]" />
+          <div className="h-8 rounded bg-[var(--color-bg-overlay)]" />
+          <div className="h-8 rounded bg-[var(--color-bg-overlay)]" />
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+          MCP Tools
+        </h3>
+        <p className="text-xs text-[var(--color-text-secondary)]">{error}</p>
+      </section>
+    );
+  }
+
+  if (tools.length === 0) return null;
+
+  const enabledCount = tools.filter((t) => t.enabled).length;
+
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">
+        MCP Tools
+      </h3>
+      <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+        {enabledCount} of {tools.length} action{tools.length !== 1 ? "s" : ""} enabled
+      </p>
+      <div className="space-y-1.5">
+        {tools.map((tool) => (
+          <McpToolToggle key={tool.id} tool={tool} onToggle={toggleTool} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function McpToolToggle({ tool, onToggle }: { tool: McpToolEntry; onToggle: (t: McpToolEntry) => Promise<void> }) {
+  const [toggling, setToggling] = useState(false);
+
+  async function handleToggle() {
+    setToggling(true);
+    try { await onToggle(tool); } finally { setToggling(false); }
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">{tool.name}</p>
+        {tool.description && (
+          <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">{tool.description}</p>
+        )}
+      </div>
+      {tool.preBuilt && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)] shrink-0">
+          pre-built
+        </span>
+      )}
+      <button
+        onClick={handleToggle}
+        disabled={toggling || tool.id === 0}
+        title={tool.enabled ? "Disable MCP tool" : "Enable MCP tool"}
+        className={cn(
+          "relative shrink-0 w-8 h-[18px] rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+          tool.enabled
+            ? "bg-[var(--color-brand-500)]"
+            : "bg-[var(--color-bg-overlay)] border border-[var(--color-border)]"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 w-3.5 h-3.5 rounded-full transition-transform bg-white shadow-sm",
+            tool.enabled ? "translate-x-[17px]" : "translate-x-0.5"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ── Detail panel ───────────────────────────────────────────────────────────
 
 interface DetailPanelProps {
   connection: NangoConnectionSummary;
+  isMcp: boolean;
+  mcpEndpoint: string | null;
   onClose: () => void;
   onDelete: (connection: NangoConnectionSummary) => void;
 }
 
-function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
+function DetailPanel({ connection, isMcp, mcpEndpoint, onClose, onDelete }: DetailPanelProps) {
   const [detail, setDetail] = useState<NangoConnectionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +356,7 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
               <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)] font-medium">
                 active
               </span>
+              {isMcp && <McpBadge />}
             </div>
             <h2 className="text-base font-semibold text-[var(--color-text-primary)] font-mono">
               {connection.connection_id}
@@ -240,6 +396,16 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
             providerConfigKey={connection.provider_config_key}
             connectionId={connection.connection_id}
           />
+
+          {/* MCP Endpoint */}
+          {isMcp && mcpEndpoint && (
+            <McpEndpointSection mcpEndpoint={mcpEndpoint} />
+          )}
+
+          {/* MCP Tools */}
+          {isMcp && (
+            <McpToolsSection providerConfigKey={connection.provider_config_key} />
+          )}
 
           {/* Raw metadata */}
           {isLoading ? (
@@ -319,6 +485,7 @@ function formatDate(iso: string): string {
 export function ConnectionsPage() {
   const { connections, isLoading, error, fetchConnections, deleteConnection } =
     useConnectionsStore();
+  const { mcpProviderKeys, mcpEndpoint } = useMcpIntegrations();
 
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
@@ -439,7 +606,7 @@ export function ConnectionsPage() {
             <div className="w-8 shrink-0" />
             <SortHeader label="Provider" sortKey="provider" current={sortKey} dir={sortDir} onToggle={toggleSort} className="flex-1" />
             <SortHeader label="Connection ID" sortKey="connection_id" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-48" />
-            <div className="w-16 text-xs text-[var(--color-text-secondary)]">Status</div>
+            <div className="w-28 text-xs text-[var(--color-text-secondary)]">Status</div>
             <SortHeader label="Created" sortKey="created" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
           </div>
         )}
@@ -494,6 +661,7 @@ export function ConnectionsPage() {
           <ConnectionRow
             key={`${conn.provider_config_key}:${conn.connection_id}`}
             connection={conn}
+            isMcp={mcpProviderKeys.has(conn.provider_config_key)}
             isSelected={selected?.connection_id === conn.connection_id && selected?.provider_config_key === conn.provider_config_key}
             onClick={() => setSelected((s) =>
               s?.connection_id === conn.connection_id && s?.provider_config_key === conn.provider_config_key ? null : conn
@@ -507,6 +675,8 @@ export function ConnectionsPage() {
       {selected && (
         <DetailPanel
           connection={selected}
+          isMcp={mcpProviderKeys.has(selected.provider_config_key)}
+          mcpEndpoint={mcpEndpoint}
           onClose={() => setSelected(null)}
           onDelete={(c) => { setSelected(null); setPendingDelete(c); }}
         />
@@ -564,11 +734,13 @@ function SortHeader({
 
 function ConnectionRow({
   connection,
+  isMcp,
   isSelected,
   onClick,
   onDelete,
 }: {
   connection: NangoConnectionSummary;
+  isMcp: boolean;
   isSelected: boolean;
   onClick: () => void;
   onDelete: () => void;
@@ -623,11 +795,12 @@ function ConnectionRow({
         </div>
 
         {/* Status */}
-        <div className="w-16">
+        <div className="w-28 flex items-center gap-1.5">
           <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)]">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
             active
           </span>
+          {isMcp && <McpBadge />}
         </div>
 
         {/* Created */}

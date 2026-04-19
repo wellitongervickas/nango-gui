@@ -68,6 +68,28 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderLoadKeyResult,
   AiProviderClearKeyRequest,
+  NangoGetMcpToolsRequest,
+  NangoGetMcpToolsResult,
+  NangoSetMcpToolEnabledRequest,
+  NangoListMcpIntegrationsResult,
+  NangoGetIntegrationReadmeRequest,
+  NangoGetIntegrationReadmeResult,
+  NangoGetProviderModelsRequest,
+  NangoGetProviderModelsResult,
+  NangoListRecordsRequest,
+  NangoListRecordsResult,
+  NangoTriggerActionRequest,
+  NangoTriggerActionResult,
+  NangoTriggerActionAsyncRequest,
+  NangoTriggerActionAsyncResult,
+  NangoGetAsyncActionResultRequest,
+  NangoGetAsyncActionResultResult,
+  NangoProxyRequest,
+  NangoProxyResult,
+  NangoCreateJwtConnectionRequest,
+  NangoCreateJwtConnectionResult,
+  NangoValidateConnectionRequest,
+  NangoValidateConnectionResult,
 } from "./ipc-channels.js";
 
 declare global {
@@ -128,6 +150,32 @@ declare global {
       getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
       /** Update Nango outgoing webhook settings (partial patch). */
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
+      /** Fetch the integration readme markdown. */
+      getIntegrationReadme(args: NangoGetIntegrationReadmeRequest): Promise<IpcResponse<NangoGetIntegrationReadmeResult>>;
+      /** Download typed provider models. */
+      getProviderModels(args: NangoGetProviderModelsRequest): Promise<IpcResponse<NangoGetProviderModelsResult>>;
+      /** List records for a connection. */
+      listRecords(args: NangoListRecordsRequest): Promise<IpcResponse<NangoListRecordsResult>>;
+      /** Trigger an action synchronously. */
+      triggerAction(args: NangoTriggerActionRequest): Promise<IpcResponse<NangoTriggerActionResult>>;
+      /** Trigger an action asynchronously. */
+      triggerActionAsync(args: NangoTriggerActionAsyncRequest): Promise<IpcResponse<NangoTriggerActionAsyncResult>>;
+      /** Get the result of an async action. */
+      getAsyncActionResult(args: NangoGetAsyncActionResultRequest): Promise<IpcResponse<NangoGetAsyncActionResultResult>>;
+      /** Proxy a request through Nango. */
+      proxyRequest(args: NangoProxyRequest): Promise<IpcResponse<NangoProxyResult>>;
+      /** Fetch dashboard data. */
+      getDashboard(): Promise<IpcResponse<unknown>>;
+      /** Fetch MCP tools for a provider. */
+      getMcpTools(args: NangoGetMcpToolsRequest): Promise<IpcResponse<NangoGetMcpToolsResult>>;
+      /** Enable or disable an MCP tool. */
+      setMcpToolEnabled(args: NangoSetMcpToolEnabledRequest): Promise<IpcResponse<void>>;
+      /** List all integrations that have MCP-capable actions. */
+      listMcpIntegrations(): Promise<IpcResponse<NangoListMcpIntegrationsResult>>;
+      /** Create a JWT Bearer connection. */
+      createJwtConnection(args: NangoCreateJwtConnectionRequest): Promise<IpcResponse<NangoCreateJwtConnectionResult>>;
+      /** Validate a connection's credentials. */
+      validateConnection(args: NangoValidateConnectionRequest): Promise<IpcResponse<NangoValidateConnectionResult>>;
     };
     credentials: {
       save(

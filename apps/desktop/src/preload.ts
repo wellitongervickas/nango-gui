@@ -121,6 +121,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_MCP_TOOLS, args),
   setMcpToolEnabled: (args: NangoSetMcpToolEnabledRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_MCP_TOOL_ENABLED, args),
+  listMcpIntegrations: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_MCP_INTEGRATIONS),
   createJwtConnection: (args: NangoCreateJwtConnectionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_JWT_CONNECTION, args),
   validateConnection: (args: NangoValidateConnectionRequest) =>

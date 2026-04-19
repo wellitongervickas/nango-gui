@@ -7,6 +7,7 @@ import { useIntegrationReadme } from "@/hooks/useIntegrationReadme";
 import { useProviderModels } from "@/hooks/useProviderModels";
 import { useIntegrationMcpTools } from "@/hooks/useIntegrationMcpTools";
 import { ConnectModal } from "@/components/connections/ConnectModal";
+import { JwtBearerConnectModal } from "@/components/connections/JwtBearerConnectModal";
 import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon, ChevronDownIcon, CopyIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
@@ -288,18 +289,36 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
 
         {/* CTA */}
         <div className="p-4 border-t border-[var(--color-border)] shrink-0">
-          <ConnectModal>
-            {({ open, isLoading }) => (
-              <button
-                onClick={open}
-                disabled={isLoading}
-                className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isLoading && <SpinnerIcon />}
-                Connect {provider.display_name}
-              </button>
-            )}
-          </ConnectModal>
+          {isJwtAuthMode(provider.auth_mode) ? (
+            <JwtBearerConnectModal
+              providerConfigKey={provider.name}
+              displayName={provider.display_name}
+            >
+              {({ open, isLoading }) => (
+                <button
+                  onClick={open}
+                  disabled={isLoading}
+                  className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoading && <SpinnerIcon />}
+                  Connect {provider.display_name} (JWT)
+                </button>
+              )}
+            </JwtBearerConnectModal>
+          ) : (
+            <ConnectModal>
+              {({ open, isLoading }) => (
+                <button
+                  onClick={open}
+                  disabled={isLoading}
+                  className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoading && <SpinnerIcon />}
+                  Connect {provider.display_name}
+                </button>
+              )}
+            </ConnectModal>
+          )}
         </div>
       </aside>
     </>
@@ -412,7 +431,6 @@ function ReadmeContent({ markdown, isLoading }: { markdown: string | null; isLoa
 // ── Models download content ───────────────────────────────────────────────
 
 const MODEL_FORMATS: { format: ModelDownloadFormat; label: string; ext: string }[] = [
-  { format: "json-schema", label: "JSON Schema", ext: ".json" },
   { format: "typescript", label: "TypeScript Types", ext: ".d.ts" },
   { format: "zod", label: "Zod Schema", ext: ".ts" },
 ];
@@ -673,6 +691,10 @@ function DetailRow({ label, value, mono = false }: { label: string; value: strin
       <dd className={cn("text-sm text-[var(--color-text-primary)] text-right truncate", mono && "font-mono")}>{value}</dd>
     </div>
   );
+}
+
+function isJwtAuthMode(mode: string): boolean {
+  return mode.toLowerCase().includes("jwt");
 }
 
 // ── Virtualized grid ───────────────────────────────────────────────────────
