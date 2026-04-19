@@ -278,7 +278,7 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
                 Metadata
               </h3>
               <pre className="text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg p-4 overflow-auto max-h-60 text-[var(--color-text-secondary)] font-mono">
-                {JSON.stringify(detail.credentials ?? {}, null, 2)}
+                {JSON.stringify(detail.metadata ?? {}, null, 2)}
               </pre>
             </section>
           ) : null}
@@ -382,14 +382,18 @@ export function ConnectionsPage() {
     const q = search.toLowerCase().trim();
     return connections
       .filter((c) => {
-        // Text search
-        if (
-          q &&
-          !c.connection_id.toLowerCase().includes(q) &&
-          !c.provider_config_key.toLowerCase().includes(q) &&
-          !(c.provider ?? "").toLowerCase().includes(q)
-        ) {
-          return false;
+        // Text search (connection id, provider, and metadata/tag values)
+        if (q) {
+          const matchesBase =
+            c.connection_id.toLowerCase().includes(q) ||
+            c.provider_config_key.toLowerCase().includes(q) ||
+            (c.provider ?? "").toLowerCase().includes(q);
+          const matchesTags = c.metadata
+            ? Object.values(c.metadata).some(
+                (v) => typeof v === "string" && v.toLowerCase().includes(q)
+              )
+            : false;
+          if (!matchesBase && !matchesTags) return false;
         }
         // Status filter
         if (statusFilter) {

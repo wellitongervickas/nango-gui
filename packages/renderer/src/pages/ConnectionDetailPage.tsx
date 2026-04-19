@@ -357,7 +357,144 @@ function SyncsSection({ syncs, isLoading, error, providerConfigKey, connectionId
   );
 }
 
-// ── Metadata section ──────────────────────────────────────────────────────
+// ── Tags section (Connection Tags) ───────────────────────────────────────
+
+interface TagsSectionProps {
+  metadata: Record<string, unknown> | null;
+  onSave: (metadata: Record<string, unknown>) => Promise<void>;
+}
+
+function TagsSection({ metadata, onSave }: TagsSectionProps) {
+  const tags = metadata ?? {};
+  const entries = Object.entries(tags).filter(
+    ([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean",
+  ) as [string, string | number | boolean][];
+
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function saveTag(key: string, value: string) {
+    setIsSaving(true);
+    try {
+      await onSave({ ...tags, [key]: value });
+    } finally {
+      setIsSaving(false);
+      setEditingKey(null);
+    }
+  }
+
+  async function removeTag(key: string) {
+    setIsSaving(true);
+    try {
+      const next = { ...tags };
+      delete next[key];
+      await onSave(next);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function addTag() {
+    const k = newKey.trim();
+    if (!k) return;
+    setIsSaving(true);
+    try {
+      await onSave({ ...tags, [k]: newValue });
+      setNewKey("");
+      setNewValue("");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6">
+      <h2 className="text-sm font-semibold text-[var(--color-text)] mb-4">Connection Tags</h2>
+
+      {entries.length === 0 && (
+        <p className="text-xs text-[var(--color-text-muted)] mb-4">No tags set. Add key-value tags below.</p>
+      )}
+
+      {entries.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {entries.map(([key, value]) => (
+            <div key={key} className="flex items-center gap-2 group">
+              <span className="text-xs font-mono font-medium text-[var(--color-text-secondary)] min-w-[100px] shrink-0">
+                {key}
+              </span>
+              {editingKey === key ? (
+                <>
+                  <input
+                    autoFocus
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveTag(key, editValue);
+                      if (e.key === "Escape") setEditingKey(null);
+                    }}
+                    className="flex-1 px-2 py-1 text-xs rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] font-mono"
+                    disabled={isSaving}
+                  />
+                  <button
+                    onClick={() => saveTag(key, editValue)}
+                    disabled={isSaving}
+                    className="text-[10px] px-2 py-1 rounded bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span
+                    onClick={() => { setEditingKey(key); setEditValue(String(value)); }}
+                    className="flex-1 text-xs font-mono text-[var(--color-text)] cursor-pointer hover:bg-[var(--color-bg)]/50 px-2 py-1 rounded"
+                  >
+                    {String(value)}
+                  </span>
+                  <button
+                    onClick={() => removeTag(key)}
+                    className="text-[10px] px-2 py-1 rounded text-[var(--color-error)] opacity-0 group-hover:opacity-100 hover:bg-[var(--color-error)]/10 transition-opacity cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add new tag */}
+      <div className="flex items-center gap-2 pt-2 border-t border-[var(--color-border)]">
+        <input
+          placeholder="Key"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          className="w-[120px] px-2 py-1.5 text-xs rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] font-mono placeholder:text-[var(--color-text-muted)]"
+        />
+        <input
+          placeholder="Value"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") addTag(); }}
+          className="flex-1 px-2 py-1.5 text-xs rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] font-mono placeholder:text-[var(--color-text-muted)]"
+        />
+        <button
+          onClick={addTag}
+          disabled={!newKey.trim() || isSaving}
+          className="px-3 py-1.5 text-xs rounded bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50 cursor-pointer"
+        >
+          Add
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ── Metadata section (raw JSON) ───────────────────────────────────────────
 
 interface MetadataSectionProps {
   metadata: Record<string, unknown> | null;
@@ -961,6 +1098,12 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           error={syncsError}
           providerConfigKey={providerConfigKey}
           connectionId={connectionId}
+        />
+
+        {/* Connection Tags */}
+        <TagsSection
+          metadata={currentMetadata}
+          onSave={handleSaveMetadata}
         />
 
         {/* Metadata */}
