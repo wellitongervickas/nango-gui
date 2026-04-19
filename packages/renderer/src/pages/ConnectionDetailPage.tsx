@@ -15,6 +15,8 @@ import {
   PauseIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { useWebhooksStore } from "@/store/webhooksStore";
+import type { WebhookConflictStrategy } from "@nango-gui/shared";
 
 const ADVANCED_CONFIG_KEY = "nango-gui:advanced-connection-config";
 
@@ -353,6 +355,75 @@ function SyncsSection({ syncs, isLoading, error, providerConfigKey, connectionId
           ))}
         </>
       )}
+    </section>
+  );
+}
+
+// ── Webhook Conflict Strategy section ──────────────────────────────────────
+
+const STRATEGY_OPTIONS: {
+  value: import("@nango-gui/shared").WebhookConflictStrategy;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "deep_merge",
+    label: "Deep Merge",
+    description: "Partial webhook updates are automatically merged into the existing record.",
+  },
+  {
+    value: "custom_update",
+    label: "Custom Update",
+    description: "Fetch the full record by ID and apply your own merge logic before saving.",
+  },
+  {
+    value: "most_recent_wins",
+    label: "Most Recent Wins",
+    description: "The most recent update (webhook or poll) always overwrites the record.",
+  },
+];
+
+interface WebhookConflictSectionProps {
+  strategy: import("@nango-gui/shared").WebhookConflictStrategy;
+  isSaving: boolean;
+  onStrategyChange: (strategy: import("@nango-gui/shared").WebhookConflictStrategy) => void;
+}
+
+function WebhookConflictSection({ strategy, isSaving, onStrategyChange }: WebhookConflictSectionProps) {
+  return (
+    <section className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl p-5">
+      <SectionHeader title="Webhook Conflict Strategy" />
+      <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+        Choose how conflicts between real-time webhook data and periodic polling are resolved.
+      </p>
+      <div className="space-y-2">
+        {STRATEGY_OPTIONS.map((opt) => (
+          <label
+            key={opt.value}
+            className={cn(
+              "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+              strategy === opt.value
+                ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)]/5"
+                : "border-[var(--color-border)] hover:bg-[var(--color-bg-overlay)]/40"
+            )}
+          >
+            <input
+              type="radio"
+              name="conflict-strategy"
+              value={opt.value}
+              checked={strategy === opt.value}
+              disabled={isSaving}
+              onChange={() => onStrategyChange(opt.value)}
+              className="mt-0.5 accent-[var(--color-brand-500)]"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">{opt.label}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{opt.description}</p>
+            </div>
+            {isSaving && strategy === opt.value && <SpinnerIcon />}
+          </label>
+        ))}
+      </div>
     </section>
   );
 }
@@ -716,6 +787,10 @@ interface ConnectionDetailPageProps {
 
 export function ConnectionDetailPage({ providerConfigKey, connectionId }: ConnectionDetailPageProps) {
   const { connections, fetchConnections, deleteConnection } = useConnectionsStore();
+  const webhookSettings = useWebhooksStore((s) => s.settings);
+  const webhookIsSaving = useWebhooksStore((s) => s.isSaving);
+  const fetchWebhookSettings = useWebhooksStore((s) => s.fetchSettings);
+  const updateWebhookSettings = useWebhooksStore((s) => s.updateSettings);
   const [detail, setDetail] = useState<NangoConnectionDetail | null>(null);
   const [syncs, setSyncs] = useState<NangoSyncRecord[]>([]);
   const [isDetailLoading, setIsDetailLoading] = useState(true);
@@ -781,7 +856,20 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   useEffect(() => {
     loadDetail();
     loadSyncs();
-  }, [loadDetail, loadSyncs]);
+    fetchWebhookSettings();
+  }, [loadDetail, loadSyncs, fetchWebhookSettings]);
+
+  // Detect whether this connection has both webhook and polling syncs
+  const hasWebhookSync = syncs.some((s) => s.type === "webhook");
+  const hasPollingSync = syncs.some((s) => s.type !== "webhook" && s.frequency !== null);
+  const showConflictStrategy = hasWebhookSync && hasPollingSync;
+
+  const handleStrategyChange = useCallback(
+    (strategy: WebhookConflictStrategy) => {
+      updateWebhookSettings({ conflictResolutionStrategy: strategy });
+    },
+    [updateWebhookSettings]
+  );
 
   // Cleanup Connect UI on unmount
   useEffect(() => {
@@ -962,6 +1050,15 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           providerConfigKey={providerConfigKey}
           connectionId={connectionId}
         />
+
+        {/* Webhook Conflict Strategy — only when both webhook and polling syncs exist */}
+        {showConflictStrategy && webhookSettings && (
+          <WebhookConflictSection
+            strategy={webhookSettings.conflictResolutionStrategy}
+            isSaving={webhookIsSaving}
+            onStrategyChange={handleStrategyChange}
+          />
+        )}
 
         {/* Metadata */}
         <MetadataSection

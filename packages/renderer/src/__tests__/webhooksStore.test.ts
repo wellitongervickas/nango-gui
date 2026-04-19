@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: NangoWebhookSettings = {
   onAuthRefreshError: false,
   onSyncError: false,
   onAsyncActionCompletion: false,
+  conflictResolutionStrategy: "deep_merge",
 };
 
 const FULL_SETTINGS: NangoWebhookSettings = {
@@ -30,6 +31,7 @@ const FULL_SETTINGS: NangoWebhookSettings = {
   onAuthRefreshError: false,
   onSyncError: true,
   onAsyncActionCompletion: false,
+  conflictResolutionStrategy: "most_recent_wins",
 };
 
 // ── window.nango mock ───────────────────────────────────────────────────────
@@ -213,6 +215,40 @@ describe("useWebhooksStore", () => {
       await useWebhooksStore.getState().updateSettings({ primaryUrl: "https://bad.com" });
       // Settings must be unchanged
       expect(useWebhooksStore.getState().settings).toEqual(existing);
+    });
+  });
+
+  describe("conflict resolution strategy", () => {
+    it("fetched settings include conflictResolutionStrategy", async () => {
+      mockGetWebhookSettings.mockResolvedValueOnce({
+        status: "ok",
+        data: FULL_SETTINGS,
+        error: null,
+      });
+      await useWebhooksStore.getState().fetchSettings();
+      expect(useWebhooksStore.getState().settings?.conflictResolutionStrategy).toBe("most_recent_wins");
+    });
+
+    it("defaults conflictResolutionStrategy to deep_merge", async () => {
+      mockGetWebhookSettings.mockResolvedValueOnce({
+        status: "ok",
+        data: DEFAULT_SETTINGS,
+        error: null,
+      });
+      await useWebhooksStore.getState().fetchSettings();
+      expect(useWebhooksStore.getState().settings?.conflictResolutionStrategy).toBe("deep_merge");
+    });
+
+    it("persists strategy change via updateSettings", async () => {
+      const updated = { ...DEFAULT_SETTINGS, conflictResolutionStrategy: "custom_update" as const };
+      mockUpdateWebhookSettings.mockResolvedValueOnce({
+        status: "ok",
+        data: updated,
+        error: null,
+      });
+      await useWebhooksStore.getState().updateSettings({ conflictResolutionStrategy: "custom_update" });
+      expect(mockUpdateWebhookSettings).toHaveBeenCalledWith({ conflictResolutionStrategy: "custom_update" });
+      expect(useWebhooksStore.getState().settings?.conflictResolutionStrategy).toBe("custom_update");
     });
   });
 

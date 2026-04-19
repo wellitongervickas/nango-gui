@@ -733,6 +733,9 @@ export interface McpStatusChangedEvent {
 
 // ── Nango webhook settings ────────────────────────────────────────────────────
 
+/** Strategy for resolving conflicts between webhook and polling data. */
+export type WebhookConflictStrategy = "deep_merge" | "custom_update" | "most_recent_wins";
+
 /** Nango outgoing webhook URL configuration and event filter settings. */
 export interface NangoWebhookSettings {
   primaryUrl: string;
@@ -742,6 +745,7 @@ export interface NangoWebhookSettings {
   onAuthRefreshError: boolean;
   onSyncError: boolean;
   onAsyncActionCompletion: boolean;
+  conflictResolutionStrategy: WebhookConflictStrategy;
 }
 
 /** Partial update payload for webhook settings. */
@@ -753,6 +757,7 @@ export interface NangoUpdateWebhookSettingsRequest {
   onAuthRefreshError?: boolean;
   onSyncError?: boolean;
   onAsyncActionCompletion?: boolean;
+  conflictResolutionStrategy?: WebhookConflictStrategy;
 }
 
 // ── AI Integration Builder v2 (provider-backed tool-calling) ─────────────────

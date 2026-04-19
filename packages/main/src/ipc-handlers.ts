@@ -80,6 +80,9 @@ import {
   type NangoSetMetadataRequest,
   type NangoCreateReconnectSessionRequest,
   type NangoCreateReconnectSessionResult,
+  type NangoWebhookSettings,
+  type NangoUpdateWebhookSettingsRequest,
+  type WebhookConflictStrategy,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -413,6 +416,97 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         await client.setMetadata(args.providerConfigKey, args.connectionId, args.metadata);
+      })
+  );
+
+  // ── Webhook settings handlers ─────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_WEBHOOK_SETTINGS,
+    async (): Promise<IpcResponse<NangoWebhookSettings>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const baseUrl = client.serverUrl;
+        const res = await fetch(`${baseUrl}/environment/webhook`, {
+          headers: { Authorization: `Bearer ${client.secretKey}` },
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`Nango API error ${res.status}: ${body}`);
+        }
+        const data = (await res.json()) as {
+          webhook_url?: string;
+          webhook_url_secondary?: string;
+          on_sync_completion_always?: boolean;
+          on_auth_creation?: boolean;
+          on_auth_refresh_error?: boolean;
+          on_sync_error?: boolean;
+          on_async_action_completion?: boolean;
+        };
+        return {
+          primaryUrl: data.webhook_url ?? "",
+          secondaryUrl: data.webhook_url_secondary ?? "",
+          onSyncCompletionAlways: data.on_sync_completion_always ?? false,
+          onAuthCreation: data.on_auth_creation ?? false,
+          onAuthRefreshError: data.on_auth_refresh_error ?? false,
+          onSyncError: data.on_sync_error ?? false,
+          onAsyncActionCompletion: data.on_async_action_completion ?? false,
+          conflictResolutionStrategy: "deep_merge" as WebhookConflictStrategy,
+        };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_UPDATE_WEBHOOK_SETTINGS,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoUpdateWebhookSettingsRequest
+    ): Promise<IpcResponse<NangoWebhookSettings>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const baseUrl = client.serverUrl;
+
+        // Build the Nango API payload (snake_case)
+        const body: Record<string, unknown> = {};
+        if (args.primaryUrl !== undefined) body.webhook_url = args.primaryUrl;
+        if (args.secondaryUrl !== undefined) body.webhook_url_secondary = args.secondaryUrl;
+        if (args.onSyncCompletionAlways !== undefined) body.on_sync_completion_always = args.onSyncCompletionAlways;
+        if (args.onAuthCreation !== undefined) body.on_auth_creation = args.onAuthCreation;
+        if (args.onAuthRefreshError !== undefined) body.on_auth_refresh_error = args.onAuthRefreshError;
+        if (args.onSyncError !== undefined) body.on_sync_error = args.onSyncError;
+        if (args.onAsyncActionCompletion !== undefined) body.on_async_action_completion = args.onAsyncActionCompletion;
+
+        const res = await fetch(`${baseUrl}/environment/webhook`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${client.secretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Nango API error ${res.status}: ${text}`);
+        }
+        const data = (await res.json()) as {
+          webhook_url?: string;
+          webhook_url_secondary?: string;
+          on_sync_completion_always?: boolean;
+          on_auth_creation?: boolean;
+          on_auth_refresh_error?: boolean;
+          on_sync_error?: boolean;
+          on_async_action_completion?: boolean;
+        };
+        return {
+          primaryUrl: data.webhook_url ?? "",
+          secondaryUrl: data.webhook_url_secondary ?? "",
+          onSyncCompletionAlways: data.on_sync_completion_always ?? false,
+          onAuthCreation: data.on_auth_creation ?? false,
+          onAuthRefreshError: data.on_auth_refresh_error ?? false,
+          onSyncError: data.on_sync_error ?? false,
+          onAsyncActionCompletion: data.on_async_action_completion ?? false,
+          conflictResolutionStrategy: args.conflictResolutionStrategy ?? "deep_merge",
+        };
       })
   );
 
