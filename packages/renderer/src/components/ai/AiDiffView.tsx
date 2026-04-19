@@ -3,7 +3,7 @@ import { DiffEditor } from "@monaco-editor/react";
 import { cn } from "@/lib/utils";
 import type { AiGenerationResult } from "@nango-gui/shared";
 
-type DiffTab = "yaml" | "typescript";
+type DiffTab = "config" | "typescript";
 
 interface AiDiffViewProps {
   /** The definition before the most recent refinement. */
@@ -15,15 +15,15 @@ interface AiDiffViewProps {
 
 /**
  * Side-by-side diff comparing the previous AI-generated definition against
- * the latest refinement. Shows YAML and TypeScript tabs.
+ * the latest refinement. Shows Config and TypeScript tabs.
  */
 export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
-  const [activeTab, setActiveTab] = useState<DiffTab>("yaml");
+  const [activeTab, setActiveTab] = useState<DiffTab>("config");
   const [renderSideBySide, setRenderSideBySide] = useState(true);
 
-  const original = activeTab === "yaml" ? previous.yaml : previous.typescript;
-  const modified = activeTab === "yaml" ? current.yaml : current.typescript;
-  const language = activeTab === "yaml" ? "yaml" : "typescript";
+  const original = activeTab === "config" ? previous.yaml : previous.typescript;
+  const modified = activeTab === "config" ? current.yaml : current.typescript;
+  const language = "typescript";
 
   return (
     <div className="flex flex-col h-full border-t border-[var(--color-border)] bg-[var(--color-bg-surface)]">
@@ -35,7 +35,7 @@ export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
           </span>
           {/* Tabs */}
           <div className="flex items-center gap-0.5 ml-2">
-            {(["yaml", "typescript"] as DiffTab[]).map((tab) => (
+            {(["config", "typescript"] as DiffTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -46,7 +46,7 @@ export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
                     : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 )}
               >
-                {tab === "yaml" ? "YAML" : "TypeScript"}
+                {tab === "config" ? "Config" : "Handlers"}
               </button>
             ))}
           </div>

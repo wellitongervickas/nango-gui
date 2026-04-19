@@ -2,14 +2,14 @@ import { useState, useMemo, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { useFlowStore } from "../../store/flowStore";
 import { useProjectStore } from "../../store/projectStore";
-import { graphToYaml } from "../../codegen/yaml-serializer";
+import { graphToTsConfig } from "../../codegen/ts-config-generator";
 import {
   graphToTypeScript,
   type GeneratedFile,
 } from "../../codegen/typescript-generator";
 import { cn } from "../../lib/utils";
 
-type Tab = "yaml" | "typescript";
+type Tab = "config" | "typescript";
 
 function CloseIcon() {
   return (
@@ -35,7 +35,7 @@ interface CodePreviewPanelProps {
 }
 
 export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("yaml");
+  const [activeTab, setActiveTab] = useState<Tab>("config");
   const [selectedFile, setSelectedFile] = useState(0);
 
   const project = useProjectStore((s) => s.project);
@@ -43,8 +43,8 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
   const edges = useFlowStore((s) => s.edges);
 
   // Regenerate code whenever graph or project changes
-  const yamlCode = useMemo(
-    () => graphToYaml(project, nodes, edges),
+  const configCode = useMemo(
+    () => graphToTsConfig(project, nodes, edges),
     [project, nodes, edges],
   );
 
@@ -56,11 +56,11 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
   const currentTsFile: GeneratedFile | undefined = tsFiles[selectedFile];
 
   const displayCode =
-    activeTab === "yaml"
-      ? yamlCode
+    activeTab === "config"
+      ? configCode
       : (currentTsFile?.content ?? "// No generated files");
 
-  const language = activeTab === "yaml" ? "yaml" : "typescript";
+  const language = "typescript";
 
   const [exporting, setExporting] = useState(false);
 
@@ -72,13 +72,13 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
 
     setExporting(true);
     try {
-      // Write nango.yaml
+      // Write nango.ts (TypeScript config — replaces legacy nango.yaml)
       await window.project.writeFile({
-        filePath: `${dir}/nango.yaml`,
-        data: yamlCode,
+        filePath: `${dir}/nango.ts`,
+        data: configCode,
       });
 
-      // Write TypeScript files
+      // Write TypeScript handler files
       for (const file of tsFiles) {
         await window.project.writeFile({
           filePath: `${dir}/${file.path}`,
@@ -88,7 +88,7 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
     } finally {
       setExporting(false);
     }
-  }, [yamlCode, tsFiles]);
+  }, [configCode, tsFiles]);
 
   return (
     <div className="flex flex-col h-full border-l border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -96,12 +96,12 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
       <div className="flex items-center justify-between px-3 h-9 border-b border-[var(--color-border)] shrink-0">
         <div className="flex items-center gap-1">
           <TabButton
-            label="YAML"
-            active={activeTab === "yaml"}
-            onClick={() => setActiveTab("yaml")}
+            label="Config"
+            active={activeTab === "config"}
+            onClick={() => setActiveTab("config")}
           />
           <TabButton
-            label="TypeScript"
+            label="Handlers"
             active={activeTab === "typescript"}
             onClick={() => setActiveTab("typescript")}
           />
