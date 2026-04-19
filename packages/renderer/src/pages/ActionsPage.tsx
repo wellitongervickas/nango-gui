@@ -3,6 +3,7 @@ import type { NangoProxyMethod, AsyncActionStatus } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import {
   useActionsStore,
+  type ActionHistoryEntry,
   type HistoryEntry,
 } from "@/store/actionsStore";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,27 @@ import {
 } from "@/components/icons";
 import { ErrorBanner } from "../components/common/ErrorBanner";
 
+// ── Inline icons ──────────────────────────────────────────────────────────
+
+function RetryIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatTimestamp(iso: string): string {
@@ -29,6 +51,15 @@ function formatTimestamp(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remainSecs = secs % 60;
+  return `${mins}m ${remainSecs}s`;
 }
 
 function isValidJson(str: string): boolean {
@@ -59,6 +90,40 @@ function statusBadgeColor(status: number): string {
   if (status >= 400 && status < 500) return "bg-[var(--color-warning)]/15 text-[var(--color-warning)]";
   return "bg-[var(--color-error)]/15 text-[var(--color-error)]";
 }
+
+// ── Async status badge config ─────────────────────────────────────────────
+
+const ASYNC_STATUS_CONFIG: Record<AsyncActionStatus, {
+  label: string;
+  badgeClass: string;
+  dotClass: string;
+}> = {
+  pending: {
+    label: "Pending",
+    badgeClass: "bg-[var(--color-text-secondary)]/10 text-[var(--color-text-secondary)]",
+    dotClass: "bg-[var(--color-text-secondary)] animate-pulse",
+  },
+  running: {
+    label: "Running",
+    badgeClass: "bg-[var(--color-brand-500)]/15 text-[var(--color-brand-500)]",
+    dotClass: "bg-[var(--color-brand-500)] animate-pulse",
+  },
+  success: {
+    label: "Success",
+    badgeClass: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+    dotClass: "bg-[var(--color-success)]",
+  },
+  failed: {
+    label: "Failed",
+    badgeClass: "bg-[var(--color-error)]/15 text-[var(--color-error)]",
+    dotClass: "bg-[var(--color-error)]",
+  },
+  timed_out: {
+    label: "Timed Out",
+    badgeClass: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+    dotClass: "bg-[var(--color-warning)]",
+  },
+};
 
 // ── Tab type ───────────────────────────────────────────────────────────────
 
@@ -222,105 +287,249 @@ function KeyValueEditor({
   );
 }
 
+// ── Async Status Badge ────────────────────────────────────────────────────
+
+function AsyncStatusBadge({ status }: { status: AsyncActionStatus }) {
+  const config = ASYNC_STATUS_CONFIG[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full",
+        config.badgeClass
+      )}
+    >
+      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", config.dotClass)} />
+      {config.label}
+    </span>
+  );
+}
+
 // ── Async Status Indicator ─────────────────────────────────────────────────
 
-const ASYNC_STATUS_STEPS: { key: AsyncActionStatus; label: string }[] = [
+const ASYNC_PIPELINE_STEPS: { key: AsyncActionStatus; label: string }[] = [
   { key: "pending", label: "Pending" },
-  { key: "complete", label: "Done" },
+  { key: "running", label: "Running" },
+  { key: "success", label: "Done" },
 ];
 
 function AsyncStatusIndicator({
   status,
   pollCount,
   onCancel,
+  onRetry,
 }: {
   status: AsyncActionStatus;
   pollCount: number;
   onCancel: () => void;
+  onRetry: () => void;
 }) {
-  const isError = status === "error";
+  const isTerminal = status === "success" || status === "failed" || status === "timed_out";
+  const isActive = status === "pending" || status === "running";
+  const maxPolls = Math.ceil((10 * 60) / 5); // 120
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
-      {/* Status pipeline */}
-      <div className="flex items-center gap-2">
-        {ASYNC_STATUS_STEPS.map((step, idx) => {
-          const isActive =
-            step.key === status ||
-            (status === "pending" && step.key === "pending");
-          const isDone =
-            step.key === "pending" && status === "complete";
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3">
+          <AsyncStatusBadge status={status} />
 
-          return (
-            <div key={step.key} className="flex items-center gap-2">
-              {idx > 0 && (
-                <div
-                  className={cn(
-                    "w-6 h-px",
-                    isDone || status === "complete"
-                      ? "bg-[var(--color-success)]"
-                      : "bg-[var(--color-border)]"
-                  )}
-                />
-              )}
-              <div className="flex items-center gap-1.5">
-                <div
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    isDone
-                      ? "bg-[var(--color-success)]"
-                      : isActive && !isError
-                        ? "bg-[var(--color-brand-500)] animate-pulse"
-                        : isError && step.key === status
-                          ? "bg-[var(--color-error)]"
-                          : "bg-[var(--color-border)]"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-xs",
-                    isActive
-                      ? "text-[var(--color-text-primary)] font-medium"
-                      : "text-[var(--color-text-secondary)]"
-                  )}
-                >
-                  {step.label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+          {/* Poll progress */}
+          {isActive && (
+            <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+              Poll {pollCount}/{maxPolls}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Cancel for active jobs */}
+          {isActive && (
+            <button
+              onClick={onCancel}
+              className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors cursor-pointer"
+            >
+              <XIcon /> Cancel
+            </button>
+          )}
+
+          {/* Retry for failed/timed-out */}
+          {(status === "failed" || status === "timed_out") && (
+            <button
+              onClick={onRetry}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+            >
+              <RetryIcon /> Retry
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Poll count */}
-      {status === "pending" && (
-        <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
-          Poll {pollCount}/60
-        </span>
-      )}
+      {/* Pipeline visualization */}
+      <div className="px-4 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg-base)]">
+        <div className="flex items-center gap-2">
+          {ASYNC_PIPELINE_STEPS.map((step, idx) => {
+            const stepIndex = ASYNC_PIPELINE_STEPS.findIndex((s) => s.key === status);
+            const currentIndex = status === "failed" || status === "timed_out"
+              ? 1 // Failed/timed-out means we got past pending but didn't reach success
+              : stepIndex;
 
-      {/* Cancel button */}
-      {status === "pending" && (
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors cursor-pointer ml-auto"
-        >
-          <XIcon /> Cancel
-        </button>
-      )}
+            const isDone = idx < currentIndex || (status === "success" && idx <= currentIndex);
+            const isCurrent = idx === currentIndex && !isTerminal;
+            const isFailed = (status === "failed" || status === "timed_out") && idx === currentIndex;
 
-      {/* Error indicator */}
-      {isError && (
-        <span className="text-xs text-[var(--color-error)] font-medium ml-auto">
-          Failed
-        </span>
-      )}
+            return (
+              <div key={step.key} className="flex items-center gap-2 flex-1">
+                {idx > 0 && (
+                  <div
+                    className={cn(
+                      "flex-1 h-px",
+                      isDone || (status === "success" && idx <= currentIndex)
+                        ? "bg-[var(--color-success)]"
+                        : isFailed
+                          ? "bg-[var(--color-error)]"
+                          : "bg-[var(--color-border)]"
+                    )}
+                  />
+                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-colors",
+                      isDone
+                        ? "bg-[var(--color-success)]"
+                        : isCurrent
+                          ? "bg-[var(--color-brand-500)] animate-pulse"
+                          : isFailed
+                            ? "bg-[var(--color-error)]"
+                            : "bg-[var(--color-border)]"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[10px]",
+                      isDone || isCurrent
+                        ? "text-[var(--color-text-primary)] font-medium"
+                        : "text-[var(--color-text-secondary)]"
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-      {/* Complete indicator */}
-      {status === "complete" && (
-        <span className="text-xs text-[var(--color-success)] font-medium ml-auto">
-          Complete
+// ── Execution History Panel ───────────────────────────────────────────────
+
+function ExecutionHistoryPanel({
+  integrationId,
+}: {
+  integrationId: string;
+}) {
+  const { getHistoryForIntegration } = useActionsStore();
+  const entries = getHistoryForIntegration(integrationId);
+  const [expanded, setExpanded] = useState(true);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2">
+          <HistoryIcon />
+          <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+            Execution History
+          </span>
+          <span className="text-[10px] text-[var(--color-text-secondary)]">
+            ({entries.length})
+          </span>
+        </div>
+        <ChevronIcon direction={expanded ? "down" : "right"} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-[var(--color-border)] max-h-80 overflow-y-auto">
+          {entries.map((entry) => (
+            <ExecutionHistoryRow key={entry.id} entry={entry} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExecutionHistoryRow({ entry }: { entry: ActionHistoryEntry }) {
+  const hasError = entry.error !== null;
+  const asyncStatus = entry.asyncStatus;
+  const [showDetail, setShowDetail] = useState(false);
+
+  return (
+    <div className="border-b border-[var(--color-border)] last:border-b-0">
+      <button
+        onClick={() => setShowDetail((v) => !v)}
+        className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer text-left"
+      >
+        {/* Status indicator */}
+        <div className="shrink-0">
+          {asyncStatus ? (
+            <AsyncStatusBadge status={asyncStatus} />
+          ) : (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded",
+                hasError
+                  ? "bg-[var(--color-error)]/15 text-[var(--color-error)]"
+                  : "bg-[var(--color-success)]/15 text-[var(--color-success)]"
+              )}
+            >
+              {hasError ? "Error" : "OK"}
+            </span>
+          )}
+        </div>
+
+        {/* Action name */}
+        <span className="text-xs font-mono text-[var(--color-text-primary)] truncate flex-1">
+          {entry.actionName}
         </span>
+
+        {/* Duration */}
+        <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums shrink-0">
+          {formatDuration(entry.durationMs)}
+        </span>
+
+        {/* Timestamp */}
+        <span className="text-[10px] text-[var(--color-text-secondary)] shrink-0">
+          {formatTimestamp(entry.timestamp)}
+        </span>
+
+        <ChevronIcon direction={showDetail ? "down" : "right"} />
+      </button>
+
+      {showDetail && (
+        <div className="px-4 pb-3 space-y-2 bg-[var(--color-bg-base)]">
+          {entry.error && (
+            <div className="text-xs text-[var(--color-error)] bg-[var(--color-error)]/5 rounded p-2 font-mono">
+              {entry.error}
+            </div>
+          )}
+          {entry.result !== null && (
+            <JsonViewer data={entry.result} label="Output" maxHeight="30vh" />
+          )}
+          {!entry.error && entry.result === null && (
+            <p className="text-xs text-[var(--color-text-secondary)] italic">
+              No output data
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -346,6 +555,7 @@ function ActionsRunnerTab({
     isPollingAsync,
     triggerAction,
     triggerActionAsync,
+    retryLastAsyncAction,
     cancelAsyncPolling,
     clearActionResult,
   } = useActionsStore();
@@ -353,15 +563,17 @@ function ActionsRunnerTab({
   const jsonValid = isValidJson(inputJson);
   const isBusy = isExecutingAction || isPollingAsync;
 
+  const integrationId = selectedConnection?.split("::")[0] ?? null;
+
   const handleRun = useCallback(() => {
     if (!selectedConnection || !actionName.trim() || !jsonValid || isBusy) return;
-    const [integrationId, connectionId] = selectedConnection.split("::");
-    if (!integrationId || !connectionId) return;
+    const [intId, connectionId] = selectedConnection.split("::");
+    if (!intId || !connectionId) return;
 
     if (asyncMode) {
-      triggerActionAsync(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
+      triggerActionAsync(intId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
     } else {
-      triggerAction(integrationId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
+      triggerAction(intId, connectionId, actionName.trim(), parseJsonSafe(inputJson));
     }
   }, [selectedConnection, actionName, inputJson, jsonValid, isBusy, asyncMode, triggerAction, triggerActionAsync]);
 
@@ -456,6 +668,7 @@ function ActionsRunnerTab({
           status={asyncStatus}
           pollCount={asyncPollCount}
           onCancel={cancelAsyncPolling}
+          onRetry={retryLastAsyncAction}
         />
       )}
 
@@ -465,6 +678,11 @@ function ActionsRunnerTab({
       {/* Result */}
       {actionResult !== null && !actionError && (
         <JsonViewer data={actionResult} label="Result" />
+      )}
+
+      {/* Execution History */}
+      {integrationId && (
+        <ExecutionHistoryPanel integrationId={integrationId} />
       )}
     </div>
   );
@@ -712,25 +930,41 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
   const isError = entry.error !== null;
 
   if (entry.type === "action") {
+    const asyncStatus = entry.asyncStatus;
     return (
       <div className="px-4 py-2.5 border-b border-[var(--color-border)] hover:bg-[var(--color-bg-overlay)] transition-colors">
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
+          {asyncStatus ? (
+            <span className={cn(
               "w-1.5 h-1.5 rounded-full shrink-0",
-              isError ? "bg-[var(--color-error)]" : "bg-[var(--color-success)]"
-            )}
-          />
+              ASYNC_STATUS_CONFIG[asyncStatus].dotClass
+            )} />
+          ) : (
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                isError ? "bg-[var(--color-error)]" : "bg-[var(--color-success)]"
+              )}
+            />
+          )}
           <span className="text-xs font-mono text-[var(--color-text-primary)] truncate">
             {entry.actionName}
           </span>
         </div>
         <div className="flex items-center gap-2 mt-1 ml-3.5">
+          {asyncStatus && (
+            <span className={cn(
+              "text-[10px] font-medium px-1 rounded",
+              ASYNC_STATUS_CONFIG[asyncStatus].badgeClass
+            )}>
+              {ASYNC_STATUS_CONFIG[asyncStatus].label}
+            </span>
+          )}
           <span className="text-[10px] text-[var(--color-text-secondary)]">
             {formatTimestamp(entry.timestamp)}
           </span>
           <span className="text-[10px] text-[var(--color-text-secondary)]">
-            {entry.durationMs}ms
+            {formatDuration(entry.durationMs)}
           </span>
         </div>
       </div>
@@ -768,7 +1002,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           {formatTimestamp(entry.timestamp)}
         </span>
         <span className="text-[10px] text-[var(--color-text-secondary)]">
-          {entry.durationMs}ms
+          {formatDuration(entry.durationMs)}
         </span>
       </div>
     </div>

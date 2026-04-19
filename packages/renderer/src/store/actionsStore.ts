@@ -15,6 +15,7 @@ export interface ActionHistoryEntry {
   result: unknown | null;
   error: string | null;
   durationMs: number;
+  asyncStatus?: AsyncActionStatus;
 }
 
 export interface ProxyHistoryEntry {
@@ -39,7 +40,19 @@ export type HistoryEntry = ActionHistoryEntry | ProxyHistoryEntry;
 
 const MAX_HISTORY = 20;
 
+// ── Async polling constants ──────────────────────────────────────────────
+
+const ASYNC_POLL_INTERVAL_MS = 5_000;
+const ASYNC_POLL_MAX_DURATION_MS = 10 * 60 * 1_000; // 10 minutes
+
 // ── Store interface ────────────────────────────────────────────────────────
+
+interface LastAsyncAction {
+  integrationId: string;
+  connectionId: string;
+  actionName: string;
+  input: Record<string, unknown>;
+}
 
 interface ActionsState {
   // Action runner
@@ -52,6 +65,7 @@ interface ActionsState {
   asyncStatus: AsyncActionStatus | null;
   asyncPollCount: number;
   isPollingAsync: boolean;
+  lastAsyncAction: LastAsyncAction | null;
 
   // Proxy tester
   proxyStatus: number | null;
@@ -76,6 +90,7 @@ interface ActionsState {
     actionName: string,
     input: Record<string, unknown>
   ) => Promise<void>;
+  retryLastAsyncAction: () => Promise<void>;
   cancelAsyncPolling: () => void;
   sendProxyRequest: (
     integrationId: string,
@@ -91,20 +106,19 @@ interface ActionsState {
   clearHistory: () => void;
   clearActionResult: () => void;
   clearProxyResult: () => void;
+  getHistoryForIntegration: (integrationId: string) => ActionHistoryEntry[];
 }
 
 let _nextId = 1;
-
-const ASYNC_POLL_INTERVAL_MS = 2000;
-const ASYNC_MAX_RETRIES = 60;
-
 let _asyncPollTimer: ReturnType<typeof setInterval> | null = null;
+let _asyncStartTime: number | null = null;
 
 function clearAsyncPollTimer() {
   if (_asyncPollTimer !== null) {
     clearInterval(_asyncPollTimer);
     _asyncPollTimer = null;
   }
+  _asyncStartTime = null;
 }
 
 export const useActionsStore = create<ActionsState>((set, get) => ({
@@ -116,6 +130,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
   asyncStatus: null,
   asyncPollCount: 0,
   isPollingAsync: false,
+  lastAsyncAction: null,
 
   proxyStatus: null,
   proxyHeaders: null,
@@ -214,6 +229,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
       asyncStatus: null,
       asyncPollCount: 0,
       isPollingAsync: false,
+      lastAsyncAction: { integrationId, connectionId, actionName, input },
     });
     const start = Date.now();
 
@@ -238,6 +254,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
           result: null,
           error: res.error,
           durationMs: Date.now() - start,
+          asyncStatus: "failed",
         };
         set((s) => ({
           actionError: res.error,
@@ -248,6 +265,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
       }
 
       const jobId = res.data.id;
+      _asyncStartTime = Date.now();
       set({
         asyncJobId: jobId,
         asyncStatus: "pending",
@@ -256,7 +274,6 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
         asyncPollCount: 0,
       });
 
-      // Start polling for the result
       _asyncPollTimer = setInterval(async () => {
         const state = get();
         if (!state.isPollingAsync || !window.nango) {
@@ -264,12 +281,12 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
           return;
         }
 
+        const elapsed = Date.now() - (_asyncStartTime ?? Date.now());
         const pollCount = state.asyncPollCount + 1;
         set({ asyncPollCount: pollCount });
 
-        if (pollCount > ASYNC_MAX_RETRIES) {
+        if (elapsed >= ASYNC_POLL_MAX_DURATION_MS) {
           clearAsyncPollTimer();
-          const errorMsg = "Async action timed out after max retries";
           const entry: ActionHistoryEntry = {
             id: String(_nextId++),
             type: "action",
@@ -279,13 +296,14 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
             actionName,
             input,
             result: null,
-            error: errorMsg,
-            durationMs: Date.now() - start,
+            error: "Async action timed out after 10 minutes",
+            durationMs: elapsed,
+            asyncStatus: "timed_out",
           };
           set((s) => ({
             isPollingAsync: false,
-            asyncStatus: "error",
-            actionError: errorMsg,
+            asyncStatus: "timed_out",
+            actionError: "Async action timed out after 10 minutes",
             history: [entry, ...s.history].slice(0, MAX_HISTORY),
           }));
           return;
@@ -308,10 +326,11 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
               result: null,
               error: pollRes.error,
               durationMs: Date.now() - start,
+              asyncStatus: "failed",
             };
             set((s) => ({
               isPollingAsync: false,
-              asyncStatus: "error",
+              asyncStatus: "failed",
               actionError: pollRes.error,
               history: [entry, ...s.history].slice(0, MAX_HISTORY),
             }));
@@ -320,7 +339,9 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
 
           const { status: asyncStatus, output, error } = pollRes.data;
 
-          if (asyncStatus === "complete") {
+          if (asyncStatus === "running") {
+            set({ asyncStatus: "running" });
+          } else if (asyncStatus === "success") {
             clearAsyncPollTimer();
             const entry: ActionHistoryEntry = {
               id: String(_nextId++),
@@ -333,14 +354,15 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
               result: output ?? null,
               error: null,
               durationMs: Date.now() - start,
+              asyncStatus: "success",
             };
             set((s) => ({
               isPollingAsync: false,
-              asyncStatus: "complete",
+              asyncStatus: "success",
               actionResult: output,
               history: [entry, ...s.history].slice(0, MAX_HISTORY),
             }));
-          } else if (asyncStatus === "error") {
+          } else if (asyncStatus === "failed") {
             clearAsyncPollTimer();
             const errorMsg = error ?? "Async action failed";
             const entry: ActionHistoryEntry = {
@@ -354,10 +376,11 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
               result: null,
               error: errorMsg,
               durationMs: Date.now() - start,
+              asyncStatus: "failed",
             };
             set((s) => ({
               isPollingAsync: false,
-              asyncStatus: "error",
+              asyncStatus: "failed",
               actionError: errorMsg,
               history: [entry, ...s.history].slice(0, MAX_HISTORY),
             }));
@@ -381,6 +404,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
         result: null,
         error: errorMsg,
         durationMs: Date.now() - start,
+        asyncStatus: "failed",
       };
       set((s) => ({
         actionError: errorMsg,
@@ -388,6 +412,13 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
         history: [entry, ...s.history].slice(0, MAX_HISTORY),
       }));
     }
+  },
+
+  retryLastAsyncAction: async () => {
+    const { lastAsyncAction, triggerActionAsync } = get();
+    if (!lastAsyncAction) return;
+    const { integrationId, connectionId, actionName, input } = lastAsyncAction;
+    await triggerActionAsync(integrationId, connectionId, actionName, input);
   },
 
   cancelAsyncPolling: () => {
@@ -524,4 +555,14 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
       proxyData: null,
       proxyError: null,
     }),
+
+  getHistoryForIntegration: (integrationId: string): ActionHistoryEntry[] => {
+    return get()
+      .history
+      .filter(
+        (e): e is ActionHistoryEntry =>
+          e.type === "action" && e.integrationId === integrationId
+      )
+      .slice(0, MAX_HISTORY);
+  },
 }));

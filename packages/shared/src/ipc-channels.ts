@@ -421,7 +421,7 @@ export interface NangoGetAsyncActionResultRequest {
   id: string;
 }
 
-export type AsyncActionStatus = "pending" | "complete" | "error";
+export type AsyncActionStatus = "pending" | "running" | "success" | "failed" | "timed_out";
 
 export interface NangoGetAsyncActionResultResult {
   status: AsyncActionStatus;

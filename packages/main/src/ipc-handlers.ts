@@ -996,15 +996,17 @@ export function registerIpcHandlers(): void {
         const client = getNangoClient();
         try {
           const output = await client.getAsyncActionResult({ id: args.id });
-          return { status: "complete" as const, output };
+          return { status: "success" as const, output };
         } catch (err: unknown) {
-          // Nango returns 404/202 while the action is still running
-          const status = (err as { status?: number })?.status;
-          if (status === 404 || status === 202) {
+          const httpStatus = (err as { status?: number })?.status;
+          if (httpStatus === 404) {
             return { status: "pending" as const };
           }
+          if (httpStatus === 202) {
+            return { status: "running" as const };
+          }
           return {
-            status: "error" as const,
+            status: "failed" as const,
             error: err instanceof Error ? err.message : "Unknown async action error",
           };
         }
