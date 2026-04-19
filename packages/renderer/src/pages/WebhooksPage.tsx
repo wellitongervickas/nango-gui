@@ -4,6 +4,163 @@ import { useWebhookStore } from "../store/webhookStore";
 import { cn } from "../lib/utils";
 import { WebhookIcon, CopyIcon, XIcon, TrashIcon } from "@/components/icons";
 
+// ── HMAC-SHA256 signature constants ──────────────────────────────────────────
+
+/** New Nango HMAC-SHA256 signature header (current standard). */
+const HMAC_HEADER_NEW = "x-nango-signature";
+/** Legacy Nango webhook signature header (deprecated, backward-compat only). */
+const HMAC_HEADER_LEGACY = "x-nango-webhook-signature";
+
+/**
+ * Verify an HMAC-SHA256 signature using the Web Crypto API.
+ * The signature may be prefixed with "sha256=" (stripped before comparison).
+ */
+async function verifyHmacSha256(
+  secret: string,
+  body: string,
+  signature: string,
+): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const buf = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
+  const computed = Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const received = signature.replace(/^sha256=/, "");
+  return computed === received;
+}
+
+// ── Signature section (inside EventDetail) ───────────────────────────────────
+
+function SignatureSection({
+  headers,
+  bodyText,
+}: {
+  headers: Record<string, string>;
+  bodyText: string;
+}) {
+  const newSig = headers[HMAC_HEADER_NEW];
+  const legacySig = headers[HMAC_HEADER_LEGACY];
+
+  const [secret, setSecret] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<"valid" | "invalid" | null>(null);
+  const [showValidator, setShowValidator] = useState(false);
+
+  if (!newSig && !legacySig) return null;
+
+  const isLegacyOnly = !newSig && !!legacySig;
+
+  async function handleVerify() {
+    const sig = newSig ?? legacySig;
+    if (!sig || !secret || bodyText === "(empty)") return;
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const ok = await verifyHmacSha256(secret, bodyText === "(empty)" ? "" : bodyText, sig);
+      setVerifyResult(ok ? "valid" : "invalid");
+    } catch {
+      setVerifyResult("invalid");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[var(--color-text-muted)] font-medium uppercase tracking-wide text-[10px]">
+        Webhook Signature
+      </p>
+
+      {/* Migration warning for legacy-only events */}
+      {isLegacyOnly && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-[var(--color-warning,_#f59e0b)]/10 border border-[var(--color-warning,_#f59e0b)]/30 text-[10px] text-[var(--color-text)]">
+          <span className="shrink-0 mt-0.5 text-[var(--color-warning,_#f59e0b)]">⚠</span>
+          <div>
+            <span className="font-medium">Legacy header detected — </span>
+            <span className="text-[var(--color-text-muted)]">
+              This request uses <span className="font-mono">X-Nango-Webhook-Signature</span> (deprecated).
+              Migrate to <span className="font-mono">X-Nango-Signature</span> (HMAC-SHA256) for continued security support.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Header name + value */}
+      <div className="rounded-md border border-[var(--color-border)] overflow-hidden">
+        {newSig && (
+          <div className="flex px-3 py-1.5 gap-3 bg-[var(--color-primary)]/5">
+            <span className="font-mono text-[var(--color-primary)] shrink-0 text-[10px]">
+              {HMAC_HEADER_NEW}
+            </span>
+            <span className="font-mono text-[var(--color-text)] break-all text-[10px]">{newSig}</span>
+          </div>
+        )}
+        {legacySig && (
+          <div className="flex px-3 py-1.5 gap-3 border-t border-[var(--color-border)]">
+            <span className="font-mono text-[var(--color-text-muted)] shrink-0 text-[10px]">
+              {HMAC_HEADER_LEGACY}
+              <span className="ml-1 text-[9px] text-[var(--color-warning,_#f59e0b)]">(deprecated)</span>
+            </span>
+            <span className="font-mono text-[var(--color-text-muted)] break-all text-[10px]">{legacySig}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Validator toggle */}
+      <button
+        onClick={() => {
+          setShowValidator((v) => !v);
+          setVerifyResult(null);
+        }}
+        className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] underline cursor-pointer transition-colors"
+      >
+        {showValidator ? "Hide validator" : "Verify signature…"}
+      </button>
+
+      {/* Inline validator */}
+      {showValidator && (
+        <div className="space-y-2 p-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)]">
+          <p className="text-[10px] text-[var(--color-text-muted)]">
+            Enter your HMAC signing secret to verify this request's signature.
+          </p>
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => {
+              setSecret(e.target.value);
+              setVerifyResult(null);
+            }}
+            placeholder="Webhook signing secret…"
+            className="w-full px-2 py-1 text-xs font-mono bg-[var(--color-surface)] border border-[var(--color-border)] rounded text-[var(--color-text)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)]"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleVerify()}
+              disabled={verifying || !secret}
+              className="px-2.5 py-1 text-[10px] font-medium rounded bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50 cursor-pointer transition-opacity"
+            >
+              {verifying ? "Verifying…" : "Verify"}
+            </button>
+            {verifyResult === "valid" && (
+              <span className="text-[10px] font-medium text-[var(--color-sync)]">✓ Signature valid</span>
+            )}
+            {verifyResult === "invalid" && (
+              <span className="text-[10px] font-medium text-[var(--color-error)]">✗ Signature mismatch</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Method badge ─────────────────────────────────────────────────────────────
 
 const METHOD_COLORS: Record<string, string> = {
@@ -176,6 +333,9 @@ function EventDetail({ event, onClose }: { event: WebhookEvent; onClose: () => v
             {bodyText}
           </pre>
         </div>
+
+        {/* HMAC-SHA256 signature info and validator */}
+        <SignatureSection headers={event.headers} bodyText={bodyText} />
       </div>
     </div>
   );
@@ -414,6 +574,13 @@ export function WebhooksPage() {
               {allEvents.length} event{allEvents.length !== 1 ? "s" : ""} received
             </span>
           )}
+          {/* Signature header info badge */}
+          <span
+            title="Nango signs webhook requests with HMAC-SHA256. Verify using the X-Nango-Signature header. The legacy X-Nango-Webhook-Signature header is deprecated."
+            className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] font-mono cursor-help select-none"
+          >
+            X-Nango-Signature (HMAC-SHA256)
+          </span>
         </div>
         <ServerControls />
       </div>
