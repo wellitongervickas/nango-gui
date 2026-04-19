@@ -2,14 +2,11 @@ import { useState, useMemo, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { useFlowStore } from "../../store/flowStore";
 import { useProjectStore } from "../../store/projectStore";
-import { graphToYaml } from "../../codegen/yaml-serializer";
 import {
   graphToTypeScript,
   type GeneratedFile,
 } from "../../codegen/typescript-generator";
 import { cn } from "../../lib/utils";
-
-type Tab = "yaml" | "typescript";
 
 function CloseIcon() {
   return (
@@ -35,18 +32,11 @@ interface CodePreviewPanelProps {
 }
 
 export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("yaml");
   const [selectedFile, setSelectedFile] = useState(0);
 
   const project = useProjectStore((s) => s.project);
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
-
-  // Regenerate code whenever graph or project changes
-  const yamlCode = useMemo(
-    () => graphToYaml(project, nodes, edges),
-    [project, nodes, edges],
-  );
 
   const tsFiles = useMemo(
     () => graphToTypeScript(project, nodes, edges),
@@ -54,13 +44,7 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
   );
 
   const currentTsFile: GeneratedFile | undefined = tsFiles[selectedFile];
-
-  const displayCode =
-    activeTab === "yaml"
-      ? yamlCode
-      : (currentTsFile?.content ?? "// No generated files");
-
-  const language = activeTab === "yaml" ? "yaml" : "typescript";
+  const displayCode = currentTsFile?.content ?? "// No generated files";
 
   const [exporting, setExporting] = useState(false);
 
@@ -72,13 +56,6 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
 
     setExporting(true);
     try {
-      // Write nango.yaml
-      await window.project.writeFile({
-        filePath: `${dir}/nango.yaml`,
-        data: yamlCode,
-      });
-
-      // Write TypeScript files
       for (const file of tsFiles) {
         await window.project.writeFile({
           filePath: `${dir}/${file.path}`,
@@ -88,24 +65,15 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
     } finally {
       setExporting(false);
     }
-  }, [yamlCode, tsFiles]);
+  }, [tsFiles]);
 
   return (
     <div className="flex flex-col h-full border-l border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Header */}
       <div className="flex items-center justify-between px-3 h-9 border-b border-[var(--color-border)] shrink-0">
-        <div className="flex items-center gap-1">
-          <TabButton
-            label="YAML"
-            active={activeTab === "yaml"}
-            onClick={() => setActiveTab("yaml")}
-          />
-          <TabButton
-            label="TypeScript"
-            active={activeTab === "typescript"}
-            onClick={() => setActiveTab("typescript")}
-          />
-        </div>
+        <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
+          TypeScript
+        </span>
         <div className="flex items-center gap-1">
           <button
             onClick={exportFiles}
@@ -125,7 +93,7 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
       </div>
 
       {/* TypeScript file selector */}
-      {activeTab === "typescript" && tsFiles.length > 1 && (
+      {tsFiles.length > 1 && (
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[var(--color-border)] overflow-x-auto shrink-0">
           {tsFiles.map((file, i) => (
             <button
@@ -147,7 +115,7 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
       {/* Editor */}
       <div className="flex-1 min-h-0">
         <Editor
-          language={language}
+          language="typescript"
           value={displayCode}
           theme="vs-dark"
           options={{
@@ -163,29 +131,5 @@ export function CodePreviewPanel({ onClose }: CodePreviewPanelProps) {
         />
       </div>
     </div>
-  );
-}
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "px-2.5 py-1 text-xs rounded-md transition-colors cursor-pointer",
-        active
-          ? "bg-[var(--color-bg)] text-[var(--color-text)] font-medium"
-          : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]",
-      )}
-    >
-      {label}
-    </button>
   );
 }
