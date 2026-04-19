@@ -57,7 +57,7 @@ describe("nango:createConnectSession IPC handler", () => {
 
     expect(result).toEqual({
       status: "ok",
-      data: { token: "sess_abc123", expiresAt: "2026-01-01T00:00:00Z" },
+      data: { token: "sess_abc123", expiresAt: "2026-01-01T00:00:00Z", connectLink: "https://connect.nango.dev" },
       error: null,
     });
 

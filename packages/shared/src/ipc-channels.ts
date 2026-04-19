@@ -254,6 +254,8 @@ export interface NangoCreateConnectSessionResult {
   /** Short-lived token to pass to @nangohq/frontend's openConnectUI. */
   token: string;
   expiresAt: string;
+  /** Shareable Connect UI URL for team-based auth delegation. Expires at `expiresAt`. */
+  connectLink?: string;
 }
 
 export interface NangoDeleteConnectionRequest {

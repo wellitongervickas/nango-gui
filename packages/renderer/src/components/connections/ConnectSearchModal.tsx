@@ -5,7 +5,7 @@ import type { ConnectUIEvent, AuthErrorType } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectFlowStore } from "@/store/connectFlowStore";
 import { useConnectionsStore } from "@/store/connectionsStore";
-import { SearchIcon, SpinnerIcon, XIcon, PlugIcon, ChevronIcon } from "@/components/icons";
+import { SearchIcon, SpinnerIcon, XIcon, PlugIcon, ChevronIcon, CopyIcon, LinkIcon } from "@/components/icons";
 import { AdvancedConnectionForm, validateAdvancedConfig } from "./AdvancedConnectionForm";
 
 const ADVANCED_CONFIG_KEY = "nango-gui:advanced-connection-config";
@@ -46,6 +46,8 @@ type FlowState =
   | { kind: "configure"; provider: NangoProvider }
   | { kind: "connecting"; provider: NangoProvider }
   | { kind: "open"; provider: NangoProvider }
+  | { kind: "shareable-link"; provider: NangoProvider; link: string; expiresAt: string }
+  | { kind: "generating-link"; provider: NangoProvider }
   | { kind: "error"; message: string };
 
 type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "authParams";
@@ -360,6 +362,80 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
     [handleEvent]
   );
 
+  // Generate a shareable Connect UI link for team-based auth delegation.
+  const generateShareableLink = useCallback(
+    async (provider: NangoProvider, cfg: AdvancedConnectionConfig) => {
+      if (!window.nango) {
+        setFlowState({ kind: "error", message: "Nango API not available" });
+        return;
+      }
+
+      const errs = validateAdvancedConfig(cfg);
+      if (Object.keys(errs).length > 0) {
+        setAdvancedErrors(errs);
+        return;
+      }
+
+      saveAdvancedConfig(provider.name, cfg);
+      setFlowState({ kind: "generating-link", provider });
+
+      try {
+        const hasAdvanced =
+          cfg.oauthClientId ||
+          cfg.oauthClientSecret ||
+          (cfg.userScopes ?? []).length > 0 ||
+          Object.keys(cfg.authParams ?? {}).some(Boolean);
+
+        const res = await Promise.race([
+          window.nango.createConnectSession({
+            endUserId: "local-user",
+            endUserDisplayName: "Local User",
+            allowedIntegrations: [provider.name],
+            ...(hasAdvanced
+              ? { integrationsConfigDefaults: { [provider.name]: cfg } }
+              : {}),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Connection timed out. Check that your Nango server is reachable.")),
+              15_000
+            )
+          ),
+        ]);
+
+        if (res.status === "error") {
+          setFlowState({ kind: "configure", provider });
+          setConnectError({ errorType: "unknown_error", message: res.error });
+          return;
+        }
+
+        const link = res.data.connectLink || "";
+        if (!link) {
+          setFlowState({ kind: "configure", provider });
+          setConnectError({
+            errorType: "unknown_error",
+            message: "Shareable links are not supported by your Nango server version.",
+          });
+          return;
+        }
+
+        setFlowState({
+          kind: "shareable-link",
+          provider,
+          link,
+          expiresAt: res.data.expiresAt,
+        });
+      } catch (err) {
+        setFlowState({ kind: "configure", provider });
+        setConnectError({
+          errorType: "unknown_error",
+          message: err instanceof Error ? err.message : "Failed to generate shareable link",
+        });
+      }
+    },
+    []
+  );
+
   // Keyboard navigation (search state only)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -387,6 +463,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
           setFlowState({ kind: "search" });
         } else if (flowState.kind === "configure") {
           setFlowState({ kind: "search" });
+        } else if (flowState.kind === "shareable-link" || flowState.kind === "generating-link") {
+          setFlowState({ kind: "configure", provider: flowState.provider });
         } else if (flowState.kind === "open" || flowState.kind === "connecting") {
           connectUIRef.current?.close();
           connectUIRef.current = null;
@@ -449,6 +527,89 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
           {flowState.kind === "connecting" ? "Cancel" : "Close"}
         </button>
       </div>
+    );
+  }
+
+  // Generating link spinner overlay
+  if (flowState.kind === "generating-link") {
+    return (
+      <>
+        <div className="fixed inset-0 z-50 bg-black/50" />
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+          <div className="w-full max-w-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl shadow-2xl flex flex-col items-center gap-3 px-8 py-10">
+            <SpinnerIcon />
+            <p className="text-sm text-[var(--color-text-secondary)]">Generating shareable link…</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Shareable link view — display link, countdown timer, and copy button
+  if (flowState.kind === "shareable-link") {
+    const { provider, link, expiresAt } = flowState;
+    return (
+      <>
+        <div
+          className="fixed inset-0 z-50 bg-black/50"
+          onClick={() => setFlowState({ kind: "configure", provider })}
+        />
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+          <div
+            className="w-full max-w-lg bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
+              <button
+                onClick={() => setFlowState({ kind: "configure", provider })}
+                className="shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+                aria-label="Back to configure"
+              >
+                <ChevronIcon direction="left" />
+              </button>
+              <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
+                Shareable Connect Link
+              </span>
+              <button
+                onClick={onClose}
+                className="shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <XIcon />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="px-4 py-5 flex flex-col gap-4">
+              {/* Provider context */}
+              <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                <LinkIcon />
+                <span>
+                  Share this link so a teammate can authorize{" "}
+                  <span className="font-medium text-[var(--color-text-primary)]">
+                    {provider.display_name}
+                  </span>{" "}
+                  on your behalf.
+                </span>
+              </div>
+
+              {/* Link display + copy */}
+              <ShareableLinkBox link={link} />
+
+              {/* Expiry warning */}
+              <ExpiryCountdown expiresAt={expiresAt} onExpired={() => setFlowState({ kind: "configure", provider })} />
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-[var(--color-border)] flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
+              <span>
+                <kbd className="font-mono bg-[var(--color-bg-base)] border border-[var(--color-border)] px-1 rounded">esc</kbd> back
+              </span>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -549,14 +710,22 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Connect button (changes label to "Retry" after an error) */}
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-2 flex flex-col gap-2">
               <button
                 onClick={() => launchConnect(provider, advancedConfig)}
                 className="w-full py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-400)] text-white hover:bg-[var(--color-brand-400)]/90 transition-colors cursor-pointer"
               >
                 {connectError ? `Retry — ${provider.display_name}` : `Connect to ${provider.display_name}`}
               </button>
+              <button
+                onClick={() => generateShareableLink(provider, advancedConfig)}
+                className="w-full py-2 text-sm font-medium rounded-lg border border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-base)] transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <LinkIcon />
+                Generate Shareable Link
+              </button>
             </div>
+            <div className="px-4 pb-4" />
 
             {/* Footer hint */}
             <div className="px-4 py-2 border-t border-[var(--color-border)] flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
@@ -713,5 +882,127 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </>
+  );
+}
+
+// ── Shareable link helpers ────────────────────────────────────────────────────
+
+/** Displays the link in a read-only input with a copy button. */
+function ShareableLinkBox({ link }: { link: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback: select the text
+    }
+  }, [link]);
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-base)] px-3 py-2">
+      <input
+        readOnly
+        value={link}
+        className="flex-1 min-w-0 bg-transparent text-xs text-[var(--color-text-primary)] font-mono truncate focus:outline-none"
+        onFocus={(e) => e.target.select()}
+        aria-label="Shareable Connect UI link"
+      />
+      <button
+        onClick={handleCopy}
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+        aria-label="Copy link to clipboard"
+      >
+        <CopyIcon />
+        {copied ? "Copied!" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+const LINK_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+/** Countdown timer showing time remaining until the link expires. */
+function ExpiryCountdown({
+  expiresAt,
+  onExpired,
+}: {
+  expiresAt: string;
+  onExpired: () => void;
+}) {
+  const expiryMs = useMemo(() => new Date(expiresAt).getTime(), [expiresAt]);
+
+  const getRemainingMs = useCallback(
+    () => Math.max(0, expiryMs - Date.now()),
+    [expiryMs]
+  );
+
+  const [remainingMs, setRemainingMs] = useState(getRemainingMs);
+
+  // Keep onExpired stable via ref so the interval isn't torn down on each render
+  const onExpiredRef = useRef(onExpired);
+  useEffect(() => { onExpiredRef.current = onExpired; }, [onExpired]);
+
+  useEffect(() => {
+    const tick = () => {
+      const ms = getRemainingMs();
+      setRemainingMs(ms);
+      if (ms === 0) onExpiredRef.current();
+    };
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [getRemainingMs]);
+
+  const totalSecs = Math.floor(remainingMs / 1000);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  const formatted = `${mins}:${String(secs).padStart(2, "0")}`;
+
+  // Progress 1→0 over 30 minutes
+  const progress = Math.min(1, remainingMs / LINK_TTL_MS);
+  const isWarning = remainingMs < 5 * 60 * 1000; // last 5 minutes
+
+  return (
+    <div
+      className={`rounded-lg border px-3 py-2.5 flex flex-col gap-1.5 ${
+        isWarning
+          ? "border-[var(--color-warning)]/40 bg-[var(--color-warning)]/8"
+          : "border-[var(--color-border)] bg-[var(--color-bg-base)]"
+      }`}
+    >
+      <div className="flex items-center justify-between text-xs">
+        <span
+          className={
+            isWarning
+              ? "text-[var(--color-warning)] font-medium"
+              : "text-[var(--color-text-secondary)]"
+          }
+        >
+          {remainingMs === 0 ? "Link expired" : "Expires in"}
+        </span>
+        <span
+          className={`tabular-nums font-mono font-semibold ${
+            isWarning ? "text-[var(--color-warning)]" : "text-[var(--color-text-primary)]"
+          }`}
+        >
+          {remainingMs === 0 ? "—" : formatted}
+        </span>
+      </div>
+      {/* Progress bar */}
+      <div className="h-1 rounded-full bg-[var(--color-bg-overlay)] overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            isWarning ? "bg-[var(--color-warning)]" : "bg-[var(--color-brand-400)]"
+          }`}
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+      <p className="text-[10px] text-[var(--color-text-secondary)] leading-relaxed">
+        This link grants anyone with it access to complete the{" "}
+        authorization flow. Share it only with trusted teammates.
+      </p>
+    </div>
   );
 }
