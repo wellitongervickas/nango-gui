@@ -25,6 +25,7 @@ const mockSettings: AppSettings = {
   appVersion: "0.1.0",
   electronVersion: "35.0.0",
   nangoSdkVersion: "0.69.49",
+  hasRbac: false,
 };
 
 const mockGetSettings = vi.fn((): Promise<IpcResponse<AppSettings>> =>
@@ -53,6 +54,7 @@ beforeEach(() => {
     appVersion: "",
     electronVersion: "",
     nangoSdkVersion: "",
+    hasRbac: false,
     isLoading: false,
     error: null,
   });
@@ -101,6 +103,7 @@ describe("fetchSettings", () => {
     expect(state.appVersion).toBe("0.1.0");
     expect(state.electronVersion).toBe("35.0.0");
     expect(state.nangoSdkVersion).toBe("0.69.49");
+    expect(state.hasRbac).toBe(false);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
   });

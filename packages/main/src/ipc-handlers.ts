@@ -93,6 +93,7 @@ import { mcpManager } from "./mcp-manager.js";
 import {
   getNangoClient,
   initNangoClient,
+  isNangoClientReady,
   resetNangoClient,
   validateNangoKey,
 } from "./nango-client.js";
@@ -1128,14 +1129,34 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.APP_GET_SETTINGS,
     async (): Promise<IpcResponse<AppSettings>> =>
-      wrap(async () => ({
-        environment: credentialStore.loadEnvironment(),
-        theme: credentialStore.loadTheme(),
-        maskedKey: credentialStore.loadMaskedKey(),
-        appVersion: app.getVersion(),
-        electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.69.49",
-      }))
+      wrap(async () => {
+        // Attempt to read has_rbac from the Nango environment endpoint.
+        // Defaults to false if the client is not ready or the API call fails.
+        let hasRbac = false;
+        try {
+          if (isNangoClientReady()) {
+            const client = getNangoClient();
+            const res = await fetch(`${client.serverUrl}/environment`, {
+              headers: { Authorization: `Bearer ${client.secretKey}` },
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { has_rbac?: boolean };
+              hasRbac = data.has_rbac ?? false;
+            }
+          }
+        } catch {
+          // Non-fatal — RBAC defaults to false when unavailable
+        }
+        return {
+          environment: credentialStore.loadEnvironment(),
+          theme: credentialStore.loadTheme(),
+          maskedKey: credentialStore.loadMaskedKey(),
+          appVersion: app.getVersion(),
+          electronVersion: process.versions.electron ?? "unknown",
+          nangoSdkVersion: "0.69.49",
+          hasRbac,
+        };
+      })
   );
 
   ipcMain.handle(

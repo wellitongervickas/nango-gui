@@ -289,6 +289,8 @@ export interface AppSettings {
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;
+  /** Whether RBAC is enabled on the connected Nango server. */
+  hasRbac: boolean;
 }
 
 export interface AppUpdateSettingsRequest {

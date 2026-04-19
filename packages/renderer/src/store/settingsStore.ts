@@ -8,6 +8,8 @@ interface SettingsState {
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;
+  /** Whether RBAC is enabled on the connected Nango server. */
+  hasRbac: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -23,6 +25,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   appVersion: "",
   electronVersion: "",
   nangoSdkVersion: "",
+  hasRbac: false,
   isLoading: false,
   error: null,
 
@@ -35,8 +38,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({ error: res.error, isLoading: false });
         return;
       }
-      const { theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion } = res.data;
-      set({ theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion, isLoading: false });
+      const { theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion, hasRbac } = res.data;
+      set({ theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion, hasRbac, isLoading: false });
       applyTheme(theme);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load settings";
