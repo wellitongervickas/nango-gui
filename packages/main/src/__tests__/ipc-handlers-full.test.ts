@@ -481,7 +481,7 @@ describe("IPC handlers", () => {
         status: "ok",
         data: {
           appVersion: "1.0.0",
-          nangoSdkVersion: "0.69.49",
+          nangoSdkVersion: "0.70.1",
         },
       });
     });

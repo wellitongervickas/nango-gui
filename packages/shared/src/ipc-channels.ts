@@ -289,11 +289,15 @@ export interface AppSettings {
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;
+  connectUiTheme: AppTheme;
+  connectUiPrimaryColor: string | null;
 }
 
 export interface AppUpdateSettingsRequest {
   environment?: NangoEnvironment;
   theme?: AppTheme;
+  connectUiTheme?: AppTheme;
+  connectUiPrimaryColor?: string | null;
 }
 
 // ── Sync types ────────────────────────────────────────────────────────────

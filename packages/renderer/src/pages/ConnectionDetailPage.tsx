@@ -3,6 +3,7 @@ import Nango from "@nangohq/frontend";
 import type { ConnectUI, ConnectUIEvent } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
 import { navigate } from "@/lib/router";
+import { getFriendlyErrorMessage, getErrorTitle } from "@/lib/auth-errors";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { StatusBadge } from "@/components/syncs/StatusBadge";
@@ -123,6 +124,7 @@ interface OverviewSectionProps {
   isRefreshing: boolean;
   onReAuthorize: () => void;
   isReAuthorizing: boolean;
+  reAuthError: { title: string; message: string } | null;
 }
 
 function OverviewSection({
@@ -133,6 +135,7 @@ function OverviewSection({
   isRefreshing,
   onReAuthorize,
   isReAuthorizing,
+  reAuthError,
 }: OverviewSectionProps) {
   const expiresAt = detail ? getTokenExpiresAt(detail) : null;
   const expiredSoon = isTokenExpiredOrSoon(expiresAt);
@@ -199,6 +202,21 @@ function OverviewSection({
           Re-authorize
         </button>
       </div>
+
+      {/* Re-auth error with retry */}
+      {reAuthError && (
+        <div className="mt-3 px-3 py-2.5 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm space-y-1">
+          <p className="font-medium text-[var(--color-error)]">{reAuthError.title}</p>
+          <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">{reAuthError.message}</p>
+          <button
+            onClick={onReAuthorize}
+            disabled={isReAuthorizing}
+            className="mt-1 text-xs font-medium text-[var(--color-brand-400)] hover:underline cursor-pointer disabled:opacity-50"
+          >
+            Retry authorization
+          </button>
+        </div>
+      )}
     </section>
   );
 }
@@ -726,6 +744,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   const [isReAuthorizing, setIsReAuthorizing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reAuthError, setReAuthError] = useState<{ title: string; message: string } | null>(null);
   const connectUIRef = useRef<ConnectUI | null>(null);
 
   // Find connection summary from store (or wait for it)
@@ -804,6 +823,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   async function handleReAuthorize() {
     if (!window.nango) return;
     setIsReAuthorizing(true);
+    setReAuthError(null);
 
     // Load any advanced config that was saved when this provider was first connected
     const savedCfg = loadSavedAdvancedConfig(providerConfigKey);
@@ -872,12 +892,26 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   }
 
   function handleConnectUIEvent(event: ConnectUIEvent) {
-    if (event.type === "close" || event.type === "connect") {
-      connectUIRef.current?.close();
-      connectUIRef.current = null;
-      if (event.type === "connect") {
-        // Refresh detail after re-auth
+    switch (event.type) {
+      case "close":
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        break;
+      case "connect":
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        setReAuthError(null);
         loadDetail(true);
+        break;
+      case "error": {
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        const { errorType, errorMessage } = event.payload;
+        setReAuthError({
+          title: getErrorTitle(errorType),
+          message: getFriendlyErrorMessage(errorType, errorMessage),
+        });
+        break;
       }
     }
   }
@@ -951,6 +985,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
             isRefreshing={isRefreshing}
             onReAuthorize={handleReAuthorize}
             isReAuthorizing={isReAuthorizing}
+            reAuthError={reAuthError}
           />
         )}
 

@@ -1040,7 +1040,9 @@ export function registerIpcHandlers(): void {
         maskedKey: credentialStore.loadMaskedKey(),
         appVersion: app.getVersion(),
         electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.69.49",
+        nangoSdkVersion: "0.70.1",
+        connectUiTheme: credentialStore.loadConnectUiTheme(),
+        connectUiPrimaryColor: credentialStore.loadConnectUiPrimaryColor(),
       }))
   );
 
@@ -1061,6 +1063,12 @@ export function registerIpcHandlers(): void {
         }
         if (args.theme !== undefined) {
           credentialStore.saveTheme(args.theme);
+        }
+        if (args.connectUiTheme !== undefined) {
+          credentialStore.saveConnectUiTheme(args.connectUiTheme);
+        }
+        if (args.connectUiPrimaryColor !== undefined) {
+          credentialStore.saveConnectUiPrimaryColor(args.connectUiPrimaryColor);
         }
       })
   );

@@ -3,12 +3,16 @@ import Nango from "@nangohq/frontend";
 import type { ConnectUI } from "@nangohq/frontend";
 import type { ConnectUIEvent } from "@nangohq/frontend";
 import { useConnectionsStore } from "@/store/connectionsStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { buildConnectUIOptions } from "@/lib/connectUiOptions";
+import { getFriendlyErrorMessage, getErrorTitle } from "@/lib/auth-errors";
+import type { AuthErrorType } from "@nangohq/frontend";
 
 type ConnectState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "open" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; title: string; errorType?: AuthErrorType };
 
 interface ConnectModalProps {
   /** Called after a successful connection is made. */
@@ -28,6 +32,8 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
   const closedRef = useRef(false);
   const fetchConnections = useConnectionsStore((s) => s.fetchConnections);
   const addConnection = useConnectionsStore((s) => s.addConnection);
+  const connectUiTheme = useSettingsStore((s) => s.connectUiTheme);
+  const connectUiPrimaryColor = useSettingsStore((s) => s.connectUiPrimaryColor);
 
   const forceClose = useCallback(() => {
     connectUIRef.current?.close();
@@ -85,12 +91,19 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
           break;
         }
 
-        case "error":
+        case "error": {
           closedRef.current = true;
-          setState({ kind: "error", message: event.payload.errorMessage });
+          const { errorType, errorMessage } = event.payload;
+          setState({
+            kind: "error",
+            title: getErrorTitle(errorType),
+            message: getFriendlyErrorMessage(errorType, errorMessage),
+            errorType,
+          });
           connectUIRef.current?.close();
           connectUIRef.current = null;
           break;
+        }
 
         default:
           break;
@@ -101,7 +114,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
 
   const open = useCallback(async () => {
     if (!window.nango) {
-      setState({ kind: "error", message: "Nango API not available" });
+      setState({ kind: "error", title: "Configuration error", message: "Nango API not available" });
       return;
     }
     closedRef.current = false;
@@ -122,7 +135,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
       ]);
 
       if (res.status === "error") {
-        setState({ kind: "error", message: res.error });
+        setState({ kind: "error", title: "Connection failed", message: res.error });
         return;
       }
 
@@ -131,7 +144,10 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
       if (closedRef.current) return;
 
       const nango = new Nango({ connectSessionToken: res.data.token });
-      const connectUI = nango.openConnectUI({ onEvent: handleEvent });
+      const connectUI = nango.openConnectUI({
+        onEvent: handleEvent,
+        ...buildConnectUIOptions(connectUiTheme, connectUiPrimaryColor),
+      });
       connectUIRef.current = connectUI;
       connectUI.open();
 
@@ -142,9 +158,9 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to open Connect UI";
-      setState({ kind: "error", message });
+      setState({ kind: "error", title: "Connection failed", message });
     }
-  }, [handleEvent]);
+  }, [handleEvent, connectUiTheme, connectUiPrimaryColor]);
 
   return (
     <>
@@ -168,13 +184,22 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
       {state.kind === "error" && (
         <div
           role="alert"
-          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)] shadow-lg"
+          className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-bg-surface)] px-4 py-3 text-sm shadow-lg"
         >
           <div className="flex items-start gap-2">
-            <span className="flex-1">{state.message}</span>
+            <div className="flex-1 space-y-1">
+              <p className="font-medium text-[var(--color-error)]">{state.title}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">{state.message}</p>
+              <button
+                onClick={() => { setState({ kind: "idle" }); open(); }}
+                className="mt-1.5 text-xs font-medium text-[var(--color-brand-400)] hover:underline cursor-pointer"
+              >
+                Retry connection
+              </button>
+            </div>
             <button
               onClick={() => setState({ kind: "idle" })}
-              className="shrink-0 text-[var(--color-error)]/70 hover:text-[var(--color-error)] cursor-pointer"
+              className="shrink-0 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
               aria-label="Dismiss error"
             >
               ✕

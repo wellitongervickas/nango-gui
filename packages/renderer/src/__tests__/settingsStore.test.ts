@@ -24,7 +24,9 @@ const mockSettings: AppSettings = {
   maskedKey: "••••••••abcd",
   appVersion: "0.1.0",
   electronVersion: "35.0.0",
-  nangoSdkVersion: "0.69.49",
+  nangoSdkVersion: "0.70.1",
+  connectUiTheme: "system",
+  connectUiPrimaryColor: null,
 };
 
 const mockGetSettings = vi.fn((): Promise<IpcResponse<AppSettings>> =>
@@ -100,7 +102,7 @@ describe("fetchSettings", () => {
     expect(state.maskedKey).toBe("••••••••abcd");
     expect(state.appVersion).toBe("0.1.0");
     expect(state.electronVersion).toBe("35.0.0");
-    expect(state.nangoSdkVersion).toBe("0.69.49");
+    expect(state.nangoSdkVersion).toBe("0.70.1");
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
   });

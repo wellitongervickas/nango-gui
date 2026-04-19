@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
 import { useSettingsStore } from "@/store/settingsStore";
 import { cn } from "@/lib/utils";
@@ -13,11 +13,15 @@ export function SettingsPage() {
     appVersion,
     electronVersion,
     nangoSdkVersion,
+    connectUiTheme,
+    connectUiPrimaryColor,
     isLoading,
     error,
     fetchSettings,
     updateTheme,
     updateEnvironment,
+    updateConnectUiTheme,
+    updateConnectUiPrimaryColor,
   } = useSettingsStore();
 
   useEffect(() => {
@@ -42,6 +46,12 @@ export function SettingsPage() {
         <ApiKeySection maskedKey={maskedKey} />
         <EnvironmentSection environment={environment} onUpdate={updateEnvironment} />
         <AppearanceSection theme={theme} onUpdate={updateTheme} />
+        <ConnectUiSection
+          theme={connectUiTheme}
+          primaryColor={connectUiPrimaryColor}
+          onUpdateTheme={updateConnectUiTheme}
+          onUpdatePrimaryColor={updateConnectUiPrimaryColor}
+        />
         <AboutSection
           appVersion={appVersion}
           electronVersion={electronVersion}
@@ -288,6 +298,160 @@ function AppearanceSection({
       {themeError && (
         <p className="mt-2 text-xs text-[var(--color-error)]">{themeError}</p>
       )}
+    </Section>
+  );
+}
+
+// ── Connect UI ─────────────────────────────────────────────────────────────
+
+const CONNECT_UI_THEME_OPTIONS: { value: AppTheme; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+];
+
+function isValidHexColor(value: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(value);
+}
+
+function ConnectUiSection({
+  theme,
+  primaryColor,
+  onUpdateTheme,
+  onUpdatePrimaryColor,
+}: {
+  theme: AppTheme;
+  primaryColor: string | null;
+  onUpdateTheme: (theme: AppTheme) => Promise<void>;
+  onUpdatePrimaryColor: (color: string | null) => Promise<void>;
+}) {
+  const [themeError, setThemeError] = useState<string | null>(null);
+  const [colorDraft, setColorDraft] = useState(primaryColor ?? "");
+  const [colorError, setColorError] = useState<string | null>(null);
+  const [colorSaving, setColorSaving] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function handleTheme(t: AppTheme) {
+    if (t === theme) return;
+    setThemeError(null);
+    try {
+      await onUpdateTheme(t);
+    } catch (err) {
+      setThemeError(err instanceof Error ? err.message : "Failed to save theme");
+    }
+  }
+
+  function scheduleColorSave(resolved: string | null) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setColorSaving(true);
+      try {
+        await onUpdatePrimaryColor(resolved);
+      } catch {
+        setColorError("Failed to save color");
+      } finally {
+        setColorSaving(false);
+      }
+    }, 500);
+  }
+
+  function handleColorInput(value: string) {
+    setColorDraft(value);
+    setColorError(null);
+    if (value === "" || value === "#") {
+      scheduleColorSave(null);
+      return;
+    }
+    const normalized = value.startsWith("#") ? value : `#${value}`;
+    if (isValidHexColor(normalized)) scheduleColorSave(normalized);
+  }
+
+  function handleColorPickerChange(value: string) {
+    setColorDraft(value);
+    setColorError(null);
+    scheduleColorSave(value);
+  }
+
+  async function handleColorReset() {
+    setColorDraft("");
+    setColorError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    try {
+      await onUpdatePrimaryColor(null);
+    } catch {
+      setColorError("Failed to reset color");
+    }
+  }
+
+  const swatchColor = isValidHexColor(colorDraft)
+    ? colorDraft
+    : (primaryColor ?? "#7C3AED");
+
+  return (
+    <Section title="Connect UI">
+      <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+        Configure the appearance of the embedded Nango Connect UI used for provider authentication.
+      </p>
+
+      {/* Theme */}
+      <div className="mb-5">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">Theme</p>
+        <div className="flex gap-2">
+          {CONNECT_UI_THEME_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => handleTheme(value)}
+              className={cn(
+                "rounded-md border px-4 py-2 text-sm font-medium transition-colors",
+                theme === value
+                  ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10 text-[var(--color-brand-400)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:border-[var(--color-border-focus)] hover:text-[var(--color-text)]"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {themeError && <p className="mt-2 text-xs text-[var(--color-error)]">{themeError}</p>}
+      </div>
+
+      {/* Primary color */}
+      <div>
+        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+          Primary Color
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-[var(--color-border)]">
+            <input
+              type="color"
+              value={swatchColor}
+              onChange={(e) => handleColorPickerChange(e.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              title="Pick a color"
+            />
+            <span
+              className="h-5 w-5 rounded-sm border border-white/20"
+              style={{ backgroundColor: swatchColor }}
+            />
+          </label>
+          <input
+            type="text"
+            value={colorDraft}
+            onChange={(e) => handleColorInput(e.target.value)}
+            placeholder="#7C3AED"
+            maxLength={7}
+            className="w-28 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-mono text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-500)]"
+          />
+          {colorSaving && <span className="text-xs text-[var(--color-text-muted)]">Saving…</span>}
+          {primaryColor && !colorSaving && (
+            <ActionButton onClick={handleColorReset}>Reset</ActionButton>
+          )}
+        </div>
+        <p className="mt-1.5 text-xs text-[var(--color-text-muted)]">
+          Sets the accent color in the Connect UI. Leave empty to use the Nango default.
+        </p>
+        {colorError && <p className="mt-1 text-xs text-[var(--color-error)]">{colorError}</p>}
+      </div>
     </Section>
   );
 }

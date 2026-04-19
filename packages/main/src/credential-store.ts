@@ -134,6 +134,66 @@ export const credentialStore = {
   },
 
   /**
+   * Persist the Connect UI theme preference.
+   */
+  saveConnectUiTheme(theme: AppTheme): void {
+    const path = settingsPath();
+    let existing: Record<string, unknown> = {};
+    if (existsSync(path)) {
+      try {
+        existing = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    writeFileSync(path, JSON.stringify({ ...existing, connectUiTheme: theme }));
+  },
+
+  /**
+   * Load the persisted Connect UI theme, defaulting to "system".
+   */
+  loadConnectUiTheme(): AppTheme {
+    const path = settingsPath();
+    if (!existsSync(path)) return "system";
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf-8")) as { connectUiTheme?: AppTheme };
+      return raw.connectUiTheme ?? "system";
+    } catch {
+      return "system";
+    }
+  },
+
+  /**
+   * Persist the Connect UI primary color (hex, e.g. "#7C3AED"), or null to clear.
+   */
+  saveConnectUiPrimaryColor(color: string | null): void {
+    const path = settingsPath();
+    let existing: Record<string, unknown> = {};
+    if (existsSync(path)) {
+      try {
+        existing = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+      } catch {
+        // ignore parse errors
+      }
+    }
+    writeFileSync(path, JSON.stringify({ ...existing, connectUiPrimaryColor: color }));
+  },
+
+  /**
+   * Load the persisted Connect UI primary color, or null if not set.
+   */
+  loadConnectUiPrimaryColor(): string | null {
+    const path = settingsPath();
+    if (!existsSync(path)) return null;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf-8")) as { connectUiPrimaryColor?: string | null };
+      return raw.connectUiPrimaryColor ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Return the last 4 characters of the stored key masked for display,
    * e.g. "••••••••abcd". Returns null if no key is stored.
    */
