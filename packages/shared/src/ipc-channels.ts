@@ -115,6 +115,10 @@ export const IPC_CHANNELS = {
   // Nango webhook settings (outgoing webhook URL configuration)
   NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
   NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
+
+  // MCP tool configuration (Nango Actions as MCP tools)
+  NANGO_GET_MCP_TOOLS: "nango:getMcpTools",
+  NANGO_SET_MCP_TOOL_ENABLED: "nango:setMcpToolEnabled",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -857,4 +861,47 @@ export interface AiProviderLoadKeyResult {
 /** Request to clear an AI provider API key. */
 export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
+}
+
+// ── MCP tool configuration (Nango Actions exposed as MCP tools) ──────────────
+
+/** A single action that can be exposed as an MCP tool. */
+export interface McpToolEntry {
+  /** Numeric flow ID from Nango (used for enable/disable). */
+  id: number;
+  /** Action script name. */
+  name: string;
+  /** Human-readable description. */
+  description: string;
+  /** Whether the action is currently enabled (exposed as an MCP tool). */
+  enabled: boolean;
+  /** Whether this is a pre-built (public) action. */
+  preBuilt: boolean;
+}
+
+export interface NangoGetMcpToolsRequest {
+  /** Provider key (e.g. "github", "slack"). */
+  provider: string;
+}
+
+export interface NangoGetMcpToolsResult {
+  /** Actions available as MCP tools for this provider. */
+  tools: McpToolEntry[];
+  /** The MCP server endpoint URL. */
+  mcpEndpoint: string;
+  /** The providerConfigKey (integration ID) these tools belong to. */
+  providerConfigKey: string;
+}
+
+export interface NangoSetMcpToolEnabledRequest {
+  /** Numeric flow ID of the action. */
+  flowId: number;
+  /** Provider key. */
+  provider: string;
+  /** The integration ID (providerConfigKey). */
+  providerConfigKey: string;
+  /** Action script name. */
+  scriptName: string;
+  /** Whether to enable or disable the action. */
+  enabled: boolean;
 }

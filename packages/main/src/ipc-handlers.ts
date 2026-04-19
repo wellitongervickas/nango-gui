@@ -82,6 +82,9 @@ import {
   type McpRemoveConfigRequest,
   type McpStartRequest,
   type McpStopRequest,
+  type NangoGetMcpToolsRequest,
+  type NangoGetMcpToolsResult,
+  type NangoSetMcpToolEnabledRequest,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -1582,4 +1585,76 @@ export function registerIpcHandlers(): void {
       }
     }
   });
+
+  // ── MCP tool configuration (Nango Actions as MCP tools) ─────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_MCP_TOOLS,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetMcpToolsRequest
+    ): Promise<IpcResponse<NangoGetMcpToolsResult>> =>
+      wrap(async () => {
+        if (!args?.provider) throw new Error("provider is required");
+        const client = getNangoClient();
+        const configs = (await client.getScriptsConfig()) as Array<{
+          providerConfigKey: string;
+          provider?: string;
+          actions: Array<{
+            id?: number;
+            name: string;
+            description?: string;
+            enabled?: boolean;
+            is_public?: boolean | null;
+            pre_built?: boolean | null;
+          }>;
+        }>;
+
+        // Find the integration matching this provider
+        const match = configs.find(
+          (c) => c.provider === args.provider || c.providerConfigKey === args.provider
+        );
+
+        const tools = (match?.actions ?? []).map((a) => ({
+          id: a.id ?? 0,
+          name: a.name,
+          description: a.description ?? "",
+          enabled: a.enabled ?? false,
+          preBuilt: !!(a.is_public || a.pre_built),
+        }));
+
+        const mcpEndpoint = `${client.serverUrl}/mcp`;
+
+        return {
+          tools,
+          mcpEndpoint,
+          providerConfigKey: match?.providerConfigKey ?? args.provider,
+        };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_SET_MCP_TOOL_ENABLED,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoSetMcpToolEnabledRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.flowId || !args?.provider || !args?.providerConfigKey || !args?.scriptName) {
+          throw new Error("flowId, provider, providerConfigKey, and scriptName are required");
+        }
+        const client = getNangoClient();
+        const action = args.enabled ? "enable" : "disable";
+        await client.http.patch(
+          `${client.serverUrl}/api/v1/flows/${args.flowId}/${action}`,
+          {
+            provider: args.provider,
+            providerConfigKey: args.providerConfigKey,
+            scriptName: args.scriptName,
+            type: "action",
+          },
+          { headers: { Authorization: `Bearer ${client.secretKey}` } }
+        );
+      })
+  );
 }

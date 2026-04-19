@@ -40,6 +40,8 @@ import type {
   AiRefineRequest,
   AiStreamTokenEvent,
   NangoUpdateWebhookSettingsRequest,
+  NangoGetMcpToolsRequest,
+  NangoSetMcpToolEnabledRequest,
   McpAddConfigRequest,
   McpRemoveConfigRequest,
   McpStartRequest,
@@ -113,6 +115,10 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_WEBHOOK_SETTINGS),
   updateWebhookSettings: (args: NangoUpdateWebhookSettingsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_UPDATE_WEBHOOK_SETTINGS, args),
+  getMcpTools: (args: NangoGetMcpToolsRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_MCP_TOOLS, args),
+  setMcpToolEnabled: (args: NangoSetMcpToolEnabledRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_MCP_TOOL_ENABLED, args),
 });
 
 // Expose window.credentials — secure credential storage

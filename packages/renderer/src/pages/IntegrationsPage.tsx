@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import Markdown from "react-markdown";
-import type { NangoProvider, ModelDownloadFormat } from "@nango-gui/shared";
+import type { NangoProvider, ModelDownloadFormat, McpToolEntry } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
 import { useIntegrationReadme } from "@/hooks/useIntegrationReadme";
 import { useProviderModels } from "@/hooks/useProviderModels";
+import { useIntegrationMcpTools } from "@/hooks/useIntegrationMcpTools";
 import { ConnectModal } from "@/components/connections/ConnectModal";
-import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon, ChevronDownIcon } from "@/components/icons";
+import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon, ChevronDownIcon, CopyIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
 
@@ -157,7 +158,7 @@ function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
 
 // ── Detail panel ───────────────────────────────────────────────────────────
 
-type DetailTab = "details" | "documentation" | "models";
+type DetailTab = "details" | "documentation" | "models" | "mcp-tools";
 
 interface DetailPanelProps {
   provider: NangoProvider;
@@ -168,6 +169,7 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const { markdown, isLoading: readmeLoading } = useIntegrationReadme(provider.name);
   const { hasModels, isChecking: modelsChecking, isDownloading, download } = useProviderModels(provider.name);
+  const { tools: mcpTools, mcpEndpoint, isLoading: mcpLoading, error: mcpError, toggleTool } = useIntegrationMcpTools(provider.name);
 
   return (
     <>
@@ -205,6 +207,9 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
           </DetailTabButton>
           <DetailTabButton active={activeTab === "models"} onClick={() => setActiveTab("models")}>
             Models
+          </DetailTabButton>
+          <DetailTabButton active={activeTab === "mcp-tools"} onClick={() => setActiveTab("mcp-tools")}>
+            MCP Tools
           </DetailTabButton>
         </div>
 
@@ -267,6 +272,16 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
               isChecking={modelsChecking}
               isDownloading={isDownloading}
               onDownload={download}
+            />
+          )}
+
+          {activeTab === "mcp-tools" && (
+            <McpToolsContent
+              tools={mcpTools}
+              mcpEndpoint={mcpEndpoint}
+              isLoading={mcpLoading}
+              error={mcpError}
+              onToggle={toggleTool}
             />
           )}
         </div>
@@ -488,6 +503,166 @@ function ModelsContent({ hasModels, isChecking, isDownloading, onDownload }: Mod
         </div>
       </section>
     </div>
+  );
+}
+
+// ── MCP Tools content ─────────────────────────────────────────────────
+
+interface McpToolsContentProps {
+  tools: McpToolEntry[];
+  mcpEndpoint: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onToggle: (tool: McpToolEntry) => Promise<void>;
+}
+
+function McpToolsContent({ tools, mcpEndpoint, isLoading, error, onToggle }: McpToolsContentProps) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    if (!mcpEndpoint) return;
+    navigator.clipboard.writeText(mcpEndpoint);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-5 w-48 rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-10 w-full rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-8 w-full rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-8 w-full rounded bg-[var(--color-bg-overlay)]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          Unable to load MCP tools
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">{error}</p>
+      </div>
+    );
+  }
+
+  if (tools.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          No actions available
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Deploy actions for this integration to expose them as MCP tools.
+        </p>
+      </div>
+    );
+  }
+
+  const enabledCount = tools.filter((t) => t.enabled).length;
+
+  return (
+    <div className="space-y-5">
+      {/* MCP endpoint */}
+      {mcpEndpoint && (
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+            MCP Server Endpoint
+          </h3>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs font-mono bg-[var(--color-bg-overlay)] rounded-md px-3 py-2 text-[var(--color-text-primary)] truncate">
+              {mcpEndpoint}
+            </code>
+            <button
+              onClick={handleCopy}
+              title="Copy endpoint URL"
+              className="shrink-0 p-2 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+          </div>
+          {copied && (
+            <p className="text-[10px] text-[var(--color-brand-400)] mt-1">Copied!</p>
+          )}
+        </section>
+      )}
+
+      {/* Tool list */}
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">
+          Available Actions
+        </h3>
+        <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+          {enabledCount} of {tools.length} action{tools.length !== 1 ? "s" : ""} enabled as MCP tool{enabledCount !== 1 ? "s" : ""}
+        </p>
+        <div className="space-y-1.5">
+          {tools.map((tool) => (
+            <McpToolRow key={tool.id} tool={tool} onToggle={onToggle} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function McpToolRow({ tool, onToggle }: { tool: McpToolEntry; onToggle: (t: McpToolEntry) => Promise<void> }) {
+  const [toggling, setToggling] = useState(false);
+
+  async function handleToggle() {
+    setToggling(true);
+    try {
+      await onToggle(tool);
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+          {tool.name}
+        </p>
+        {tool.description && (
+          <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">
+            {tool.description}
+          </p>
+        )}
+      </div>
+      {tool.preBuilt && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)] shrink-0">
+          pre-built
+        </span>
+      )}
+      <button
+        onClick={handleToggle}
+        disabled={toggling || tool.id === 0}
+        title={tool.enabled ? "Disable MCP tool" : "Enable MCP tool"}
+        className={cn(
+          "relative shrink-0 w-8 h-[18px] rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+          tool.enabled
+            ? "bg-[var(--color-brand-500)]"
+            : "bg-[var(--color-bg-overlay)] border border-[var(--color-border)]"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 w-3.5 h-3.5 rounded-full transition-transform bg-white shadow-sm",
+            tool.enabled ? "translate-x-[17px]" : "translate-x-0.5"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   );
 }
 

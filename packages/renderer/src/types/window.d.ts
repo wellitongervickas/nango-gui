@@ -75,6 +75,9 @@ import type {
   McpStatusChangedEvent,
   NangoWebhookSettings,
   NangoUpdateWebhookSettingsRequest,
+  NangoGetMcpToolsRequest,
+  NangoGetMcpToolsResult,
+  NangoSetMcpToolEnabledRequest,
   AiBuilderRunRequest,
   AiBuilderRunResult,
   AiBuilderToolCallEvent,
@@ -163,6 +166,8 @@ declare global {
       getDashboard(): Promise<IpcResponse<NangoDashboardData>>;
       getWebhookSettings(): Promise<IpcResponse<NangoWebhookSettings>>;
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
+      getMcpTools(args: NangoGetMcpToolsRequest): Promise<IpcResponse<NangoGetMcpToolsResult>>;
+      setMcpToolEnabled(args: NangoSetMcpToolEnabledRequest): Promise<IpcResponse<void>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;
