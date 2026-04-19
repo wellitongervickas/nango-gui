@@ -494,6 +494,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             <div className="px-4 pt-3 pb-4">
               <AdvancedConnectionForm
                 providerName={provider.display_name}
+                providerKey={provider.name}
+                authMode={provider.auth_mode}
                 value={advancedConfig}
                 onChange={(cfg) => {
                   setAdvancedConfig(cfg);

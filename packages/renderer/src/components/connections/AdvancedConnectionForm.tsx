@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AdvancedConnectionConfig } from "@nango-gui/shared";
 import { ChevronIcon, XIcon } from "@/components/icons";
+import { ScopesField } from "./ScopesField";
 
 interface KVPair {
   key: string;
@@ -16,6 +17,16 @@ type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "au
 
 interface AdvancedConnectionFormProps {
   providerName: string;
+  /**
+   * Nango provider key (e.g. "github") — forwarded to ScopesField for scope
+   * discovery. Optional; discovery button is disabled when absent.
+   */
+  providerKey?: string;
+  /**
+   * Provider auth mode (e.g. "OAUTH2") — forwarded to ScopesField to control
+   * visibility of the "Suggest scopes" button.
+   */
+  authMode?: string;
   value: AdvancedConnectionConfig;
   onChange: (cfg: AdvancedConnectionConfig) => void;
   /** Client-side validation errors to surface inline. */
@@ -72,6 +83,8 @@ export function validateAdvancedConfig(cfg: AdvancedConnectionConfig): Validatio
  */
 export function AdvancedConnectionForm({
   providerName,
+  providerKey,
+  authMode,
   value,
   onChange,
   errors = {},
@@ -118,8 +131,9 @@ export function AdvancedConnectionForm({
 
   const handleScopesChange = (raw: string) => {
     setScopesInput(raw);
+    // Split on commas or whitespace so both "a, b" and "a b" are valid.
     const scopes = raw
-      .split(",")
+      .split(/[\s,]+/)
       .map((s) => s.trim())
       .filter(Boolean);
     onChange({ ...value, userScopes: scopes });
@@ -217,24 +231,15 @@ export function AdvancedConnectionForm({
           </div>
 
           {/* ── Custom OAuth Scopes ──────────────────────────────────────── */}
-          <div className={`space-y-1.5 rounded-md transition-colors ${serverHighlightField === "userScopes" ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
-            <div className="flex items-center gap-1.5">
-              <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-                Custom OAuth Scopes
-              </label>
-              <Tooltip text={`Override the default OAuth scopes requested from ${providerName}. Enter scopes as a comma-separated list (e.g. read:user, repo). See Nango docs for your provider's scope reference.`} />
-            </div>
-            <input
-              type="text"
-              value={scopesInput}
-              onChange={(e) => handleScopesChange(e.target.value)}
-              placeholder="e.g. read:user, repo, gist"
-              className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)]"
-            />
-            {errors.userScopes && (
-              <p className="text-xs text-[var(--color-error)]">{errors.userScopes}</p>
-            )}
-          </div>
+          <ScopesField
+            providerName={providerName}
+            providerKey={providerKey ?? ""}
+            authMode={authMode}
+            value={scopesInput}
+            onChange={handleScopesChange}
+            error={errors.userScopes}
+            hasServerError={serverHighlightField === "userScopes"}
+          />
 
           {/* ── Developer App Credentials ────────────────────────────────── */}
           <div className={`space-y-1.5 rounded-md transition-colors ${(serverHighlightField === "oauthClientId" || serverHighlightField === "oauthClientSecret") ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
