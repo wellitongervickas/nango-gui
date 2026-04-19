@@ -55,6 +55,8 @@ beforeEach(() => {
     appVersion: "",
     electronVersion: "",
     nangoSdkVersion: "",
+    connectUiTheme: "system",
+    connectUiPrimaryColor: null,
     isLoading: false,
     error: null,
   });
@@ -103,6 +105,8 @@ describe("fetchSettings", () => {
     expect(state.appVersion).toBe("0.1.0");
     expect(state.electronVersion).toBe("35.0.0");
     expect(state.nangoSdkVersion).toBe("0.70.1");
+    expect(state.connectUiTheme).toBe("system");
+    expect(state.connectUiPrimaryColor).toBeNull();
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
   });
@@ -168,5 +172,62 @@ describe("updateEnvironment", () => {
       useSettingsStore.getState().updateEnvironment("production")
     ).rejects.toThrow("Save failed");
     expect(useSettingsStore.getState().environment).toBe("development");
+  });
+});
+
+// ── updateConnectUiTheme ────────────────────────────────────────────────────
+
+describe("updateConnectUiTheme", () => {
+  it("optimistically sets connectUiTheme and calls IPC", async () => {
+    useSettingsStore.setState({ connectUiTheme: "system" });
+    await useSettingsStore.getState().updateConnectUiTheme("dark");
+    expect(mockUpdateSettings).toHaveBeenCalledWith({ connectUiTheme: "dark" });
+    expect(useSettingsStore.getState().connectUiTheme).toBe("dark");
+  });
+
+  it("rolls back connectUiTheme on IPC error", async () => {
+    useSettingsStore.setState({ connectUiTheme: "light" });
+    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed", errorCode: "UNKNOWN" } as IpcResponse<void>);
+    await expect(useSettingsStore.getState().updateConnectUiTheme("dark")).rejects.toThrow("Save failed");
+    expect(useSettingsStore.getState().connectUiTheme).toBe("light");
+  });
+
+  it("rolls back connectUiTheme on thrown exception", async () => {
+    useSettingsStore.setState({ connectUiTheme: "system" });
+    mockUpdateSettings.mockRejectedValueOnce(new Error("Crash"));
+    await expect(useSettingsStore.getState().updateConnectUiTheme("light")).rejects.toThrow("Crash");
+    expect(useSettingsStore.getState().connectUiTheme).toBe("system");
+  });
+});
+
+// ── updateConnectUiPrimaryColor ─────────────────────────────────────────────
+
+describe("updateConnectUiPrimaryColor", () => {
+  it("optimistically sets connectUiPrimaryColor and calls IPC", async () => {
+    useSettingsStore.setState({ connectUiPrimaryColor: null });
+    await useSettingsStore.getState().updateConnectUiPrimaryColor("#7C3AED");
+    expect(mockUpdateSettings).toHaveBeenCalledWith({ connectUiPrimaryColor: "#7C3AED" });
+    expect(useSettingsStore.getState().connectUiPrimaryColor).toBe("#7C3AED");
+  });
+
+  it("clears connectUiPrimaryColor when set to null", async () => {
+    useSettingsStore.setState({ connectUiPrimaryColor: "#7C3AED" });
+    await useSettingsStore.getState().updateConnectUiPrimaryColor(null);
+    expect(mockUpdateSettings).toHaveBeenCalledWith({ connectUiPrimaryColor: null });
+    expect(useSettingsStore.getState().connectUiPrimaryColor).toBeNull();
+  });
+
+  it("rolls back connectUiPrimaryColor on IPC error", async () => {
+    useSettingsStore.setState({ connectUiPrimaryColor: "#FF0000" });
+    mockUpdateSettings.mockResolvedValueOnce({ status: "error", data: null, error: "Save failed", errorCode: "UNKNOWN" } as IpcResponse<void>);
+    await expect(useSettingsStore.getState().updateConnectUiPrimaryColor("#7C3AED")).rejects.toThrow("Save failed");
+    expect(useSettingsStore.getState().connectUiPrimaryColor).toBe("#FF0000");
+  });
+
+  it("rolls back connectUiPrimaryColor on thrown exception", async () => {
+    useSettingsStore.setState({ connectUiPrimaryColor: null });
+    mockUpdateSettings.mockRejectedValueOnce(new Error("Crash"));
+    await expect(useSettingsStore.getState().updateConnectUiPrimaryColor("#7C3AED")).rejects.toThrow("Crash");
+    expect(useSettingsStore.getState().connectUiPrimaryColor).toBeNull();
   });
 });

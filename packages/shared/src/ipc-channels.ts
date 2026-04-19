@@ -309,6 +309,9 @@ export type NangoSyncStatus =
   | "ERROR"
   | "SUCCESS";
 
+/** Flat key-value checkpoint state saved by a sync for resumable progress. */
+export type NangoCheckpoint = Record<string, string | number | boolean>;
+
 export interface NangoSyncRecord {
   id: string;
   name: string;
@@ -322,6 +325,10 @@ export interface NangoSyncRecord {
     updated: number;
     deleted: number;
   } | null;
+  /** Per-model record counts (e.g. { "Contact": 1200, "Deal": 340 }). */
+  recordCount: Record<string, number> | null;
+  /** Last saved checkpoint state for resumable syncs. Null if no checkpoint exists. */
+  checkpoint: NangoCheckpoint | null;
 }
 
 export interface NangoListSyncsRequest {

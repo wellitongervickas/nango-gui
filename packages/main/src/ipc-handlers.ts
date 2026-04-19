@@ -90,6 +90,7 @@ import { mcpManager } from "./mcp-manager.js";
 import {
   getNangoClient,
   initNangoClient,
+  isNangoClientReady,
   resetNangoClient,
   validateNangoKey,
 } from "./nango-client.js";
@@ -172,6 +173,30 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
       ? (s.latestResult as Record<string, unknown>)
       : null;
 
+  // Extract per-model record counts
+  let recordCount: Record<string, number> | null = null;
+  if (s.recordCount != null && typeof s.recordCount === "object") {
+    const rc = s.recordCount as Record<string, unknown>;
+    recordCount = {};
+    for (const [key, val] of Object.entries(rc)) {
+      if (typeof val === "number") recordCount[key] = val;
+    }
+    if (Object.keys(recordCount).length === 0) recordCount = null;
+  }
+
+  // Extract checkpoint state (flat key-value of string | number | boolean)
+  let checkpoint: NangoSyncRecord["checkpoint"] = null;
+  if (s.checkpoint != null && typeof s.checkpoint === "object") {
+    const cp = s.checkpoint as Record<string, unknown>;
+    checkpoint = {};
+    for (const [key, val] of Object.entries(cp)) {
+      if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+        checkpoint[key] = val;
+      }
+    }
+    if (Object.keys(checkpoint).length === 0) checkpoint = null;
+  }
+
   return {
     id: String(s.id ?? ""),
     name: String(s.name ?? ""),
@@ -197,6 +222,8 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
           deleted: typeof result.deleted === "number" ? result.deleted : 0,
         }
       : null,
+    recordCount,
+    checkpoint,
   };
 }
 
@@ -350,6 +377,60 @@ function rankTopConnections(
       return b.lastActivity.localeCompare(a.lastActivity);
     })
     .slice(0, limit);
+}
+
+/**
+ * Best-effort sync of the Connect UI primary color to the Nango server.
+ * The Connect UI hosted iframe reads this setting from the Nango API so it
+ * must be persisted server-side for the color to take effect.
+ *
+ * Errors are intentionally swallowed by the caller — a failed sync should
+ * never block the local settings save.
+ */
+async function syncConnectUiPrimaryColorToNango(
+  serverUrl: string,
+  secretKey: string,
+  environment: string,
+  primaryColor: string | null,
+): Promise<void> {
+  // Map our local environment name to the Nango API env slug convention.
+  const envSlug =
+    environment === "development" ? "dev"
+    : environment === "production" ? "prod"
+    : environment; // staging → staging, or any custom name passed through
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${secretKey}`,
+    "Content-Type": "application/json",
+  };
+
+  // Fetch current settings so we only change the primary color field.
+  const getRes = await fetch(`${serverUrl}/api/v1/connect-ui-settings?env=${envSlug}`, { headers });
+  if (!getRes.ok) return;
+
+  const body = await getRes.json() as {
+    data: {
+      theme: { light: { primary: string }; dark: { primary: string } };
+      defaultTheme: string;
+      showWatermark: boolean;
+    };
+  };
+  const current = body.data;
+
+  // When primaryColor is null the user cleared the override; fall back to Nango's default purple.
+  const newPrimary = primaryColor ?? "#7C3AED";
+
+  await fetch(`${serverUrl}/api/v1/connect-ui-settings?env=${envSlug}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({
+      ...current,
+      theme: {
+        light: { ...current.theme.light, primary: newPrimary },
+        dark: { ...current.theme.dark, primary: newPrimary },
+      },
+    }),
+  });
 }
 
 /**
@@ -1069,6 +1150,22 @@ export function registerIpcHandlers(): void {
         }
         if (args.connectUiPrimaryColor !== undefined) {
           credentialStore.saveConnectUiPrimaryColor(args.connectUiPrimaryColor);
+          // Best-effort: sync the primary color to the Nango server so the
+          // Connect UI hosted iframe picks it up automatically on next open.
+          const secretKey = credentialStore.load();
+          if (secretKey && isNangoClientReady()) {
+            const client = getNangoClient();
+            const serverUrl = (client as unknown as { serverUrl: string }).serverUrl;
+            const environment = credentialStore.loadEnvironment();
+            syncConnectUiPrimaryColorToNango(
+              serverUrl,
+              secretKey,
+              environment,
+              args.connectUiPrimaryColor,
+            ).catch((err: unknown) => {
+              log.debug("[ConnectUI] primary color sync failed (non-fatal):", err instanceof Error ? err.message : String(err));
+            });
+          }
         }
       })
   );
