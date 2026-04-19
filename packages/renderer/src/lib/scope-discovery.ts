@@ -1,9 +1,9 @@
 /**
- * Scope discovery helpers for the "Suggest scopes" OAuth2 UX (NANA-221).
+ * Scope discovery helpers for the "Suggest scopes" OAuth2 UX (NANA-202).
  *
- * The IPC backend (`window.nango.suggestScopes`) is implemented in NANA-202.
- * Until that lands, `discoverScopes` returns `{ supported: false }` as a safe
- * fallback so the UI degrades gracefully without throwing.
+ * Calls `window.nango.suggestScopes(providerKey)` which proxies through the
+ * Electron IPC to the main process, fetches provider scope data from the
+ * Nango API, and returns it in the renderer-friendly format below.
  */
 
 /** A single scope entry returned by the scope discovery API. */
@@ -43,14 +43,7 @@ export async function discoverScopes(
     throw new Error("Nango API not available");
   }
 
-  // Guard until NANA-202 ships the IPC implementation.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const suggestFn = (window.nango as any).suggestScopes;
-  if (typeof suggestFn !== "function") {
-    return { supported: false };
-  }
-
-  const res = await suggestFn(providerKey);
+  const res = await window.nango.suggestScopes(providerKey);
   if (res.status === "error") {
     throw new Error(res.error ?? "Scope discovery failed");
   }

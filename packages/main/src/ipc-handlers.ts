@@ -80,6 +80,9 @@ import {
   type NangoSetMetadataRequest,
   type NangoCreateReconnectSessionRequest,
   type NangoCreateReconnectSessionResult,
+  type NangoSuggestScopesRequest,
+  type NangoSuggestScopesResult,
+  type NangoSuggestedScope,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -1635,4 +1638,52 @@ export function registerIpcHandlers(): void {
       }
     }
   });
+
+  // ── OAuth2 scope discovery ─────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_SUGGEST_SCOPES,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoSuggestScopesRequest
+    ): Promise<IpcResponse<NangoSuggestScopesResult>> =>
+      wrap(async () => {
+        if (!args?.providerKey) {
+          throw new Error("providerKey is required");
+        }
+
+        const client = getNangoClient();
+        const result = await client.getProvider({ provider: args.providerKey });
+        const provider = result.data as {
+          auth_mode?: string;
+          default_scopes?: string[];
+          available_scopes?: string[];
+          docs?: string;
+        };
+
+        // Only OAuth2 providers support scope discovery.
+        const authMode = provider.auth_mode?.toUpperCase() ?? "";
+        if (!authMode.includes("OAUTH2")) {
+          return { supported: false, docsUrl: provider.docs };
+        }
+
+        const defaultScopes = provider.default_scopes ?? [];
+        const availableScopes = provider.available_scopes ?? [];
+
+        if (defaultScopes.length === 0 && availableScopes.length === 0) {
+          return { supported: false, docsUrl: provider.docs };
+        }
+
+        // default_scopes → recommended; available_scopes (minus defaults) → optional.
+        const defaultSet = new Set(defaultScopes);
+        const scopes: NangoSuggestedScope[] = [
+          ...defaultScopes.map((scope) => ({ scope, recommended: true })),
+          ...availableScopes
+            .filter((scope) => !defaultSet.has(scope))
+            .map((scope) => ({ scope, recommended: false })),
+        ];
+
+        return { supported: true, scopes };
+      })
+  );
 }

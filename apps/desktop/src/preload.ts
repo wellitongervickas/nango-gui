@@ -110,6 +110,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_METADATA, args),
   createReconnectSession: (args: NangoCreateReconnectSessionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_RECONNECT_SESSION, args),
+  suggestScopes: (providerKey: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_SUGGEST_SCOPES, { providerKey }),
 });
 
 // Expose window.credentials — secure credential storage

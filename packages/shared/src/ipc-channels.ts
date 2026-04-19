@@ -120,6 +120,9 @@ export const IPC_CHANNELS = {
 
   // Re-authorization (reconnect session)
   NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
+
+  // AI-powered OAuth2 scope discovery
+  NANGO_SUGGEST_SCOPES: "nango:suggestScopes",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -860,6 +863,26 @@ export interface AiProviderLoadKeyResult {
 export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
 }
+
+// ── Scope discovery ───────────────────────────────────────────────────────────
+
+export interface NangoSuggestScopesRequest {
+  /** Nango provider key (e.g. "github", "slack"). */
+  providerKey: string;
+}
+
+export interface NangoSuggestedScope {
+  /** The scope string (e.g. "read:user", "repo", "openid"). */
+  scope: string;
+  /** Human-readable description of what this scope grants. */
+  description?: string;
+  /** Pre-checked in the suggestion panel when true (default scopes). */
+  recommended: boolean;
+}
+
+export type NangoSuggestScopesResult =
+  | { supported: true; scopes: NangoSuggestedScope[] }
+  | { supported: false; docsUrl?: string };
 
 // ── Connection Health ─────────────────────────────────────────────────────
 

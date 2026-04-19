@@ -70,6 +70,7 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderLoadKeyResult,
   AiProviderClearKeyRequest,
+  NangoSuggestScopesResult,
 } from "./ipc-channels.js";
 
 declare global {
@@ -133,6 +134,8 @@ declare global {
       getConnectionHealth(
         args: NangoGetConnectionHealthRequest
       ): Promise<IpcResponse<NangoConnectionHealthData>>;
+      /** Discover OAuth2 scopes for a provider using Nango's scope catalog. */
+      suggestScopes(providerKey: string): Promise<IpcResponse<NangoSuggestScopesResult>>;
     };
     credentials: {
       save(
