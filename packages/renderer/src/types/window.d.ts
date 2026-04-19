@@ -86,6 +86,10 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderLoadKeyResult,
   AiProviderClearKeyRequest,
+  NangoCreateJwtConnectionRequest,
+  NangoCreateJwtConnectionResult,
+  NangoValidateConnectionRequest,
+  NangoValidateConnectionResult,
 } from "@nango-gui/shared";
 
 declare global {
@@ -168,6 +172,8 @@ declare global {
       updateWebhookSettings(args: NangoUpdateWebhookSettingsRequest): Promise<IpcResponse<NangoWebhookSettings>>;
       getMcpTools(args: NangoGetMcpToolsRequest): Promise<IpcResponse<NangoGetMcpToolsResult>>;
       setMcpToolEnabled(args: NangoSetMcpToolEnabledRequest): Promise<IpcResponse<void>>;
+      createJwtConnection(args: NangoCreateJwtConnectionRequest): Promise<IpcResponse<NangoCreateJwtConnectionResult>>;
+      validateConnection(args: NangoValidateConnectionRequest): Promise<IpcResponse<NangoValidateConnectionResult>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

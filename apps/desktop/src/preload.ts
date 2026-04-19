@@ -53,6 +53,8 @@ import type {
   AiProviderSaveKeyRequest,
   AiProviderLoadKeyRequest,
   AiProviderClearKeyRequest,
+  NangoCreateJwtConnectionRequest,
+  NangoValidateConnectionRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -119,6 +121,10 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_MCP_TOOLS, args),
   setMcpToolEnabled: (args: NangoSetMcpToolEnabledRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_MCP_TOOL_ENABLED, args),
+  createJwtConnection: (args: NangoCreateJwtConnectionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_JWT_CONNECTION, args),
+  validateConnection: (args: NangoValidateConnectionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_VALIDATE_CONNECTION, args),
 });
 
 // Expose window.credentials — secure credential storage

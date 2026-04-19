@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NangoConnectionDetail, NangoConnectionSummary } from "@nango-gui/shared";
+import type { NangoConnectionDetail, NangoConnectionSummary, ConnectionHealthStatus } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
+import { useCredentialHealthStore } from "@/store/credentialHealthStore";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn, searchInputClass } from "@/lib/utils";
-import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
+import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon, ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -70,6 +71,90 @@ function DeleteDialog({ connection, onConfirm, onCancel, isDeleting }: DeleteDia
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Credential Health Badge ────────────────────────────────────────────────
+
+const HEALTH_CONFIG: Record<ConnectionHealthStatus, { label: string; colorClass: string; Icon: () => React.JSX.Element }> = {
+  valid: { label: "Valid", colorClass: "bg-[var(--color-success)]/15 text-[var(--color-success)]", Icon: ShieldCheckIcon },
+  invalid: { label: "Invalid", colorClass: "bg-[var(--color-error)]/15 text-[var(--color-error)]", Icon: ShieldAlertIcon },
+  unchecked: { label: "Unchecked", colorClass: "bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)]", Icon: ShieldQuestionIcon },
+};
+
+function CredentialHealthBadge({ status }: { status: ConnectionHealthStatus }) {
+  const { label, colorClass, Icon } = HEALTH_CONFIG[status];
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium", colorClass)}>
+      <Icon />
+      {label}
+    </span>
+  );
+}
+
+// ── Credential Health Section (detail panel) ──────────────────────────────
+
+function CredentialHealthSection({
+  providerConfigKey,
+  connectionId,
+}: {
+  providerConfigKey: string;
+  connectionId: string;
+}) {
+  const { validate, getEntry, validating } = useCredentialHealthStore();
+  const entry = getEntry(providerConfigKey, connectionId);
+  const isValidating = validating.has(`${providerConfigKey}:${connectionId}`);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!entry) {
+      validate(providerConfigKey, connectionId);
+    }
+  }, [providerConfigKey, connectionId, entry, validate]);
+
+  const status = entry?.status ?? "unchecked";
+
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+        Credential Health
+      </h3>
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => entry?.output && setExpanded((e) => !e)}
+            className={cn(
+              "flex items-center gap-1.5",
+              entry?.output ? "cursor-pointer" : "cursor-default"
+            )}
+          >
+            <CredentialHealthBadge status={status} />
+            {entry?.output && (
+              <ChevronIcon direction={expanded ? "up" : "down"} />
+            )}
+          </button>
+          <button
+            onClick={() => validate(providerConfigKey, connectionId)}
+            disabled={isValidating}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {isValidating ? <SpinnerIcon /> : <RefreshIcon />}
+            Re-validate
+          </button>
+        </div>
+        {entry?.lastChecked && (
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Last checked: {formatDate(entry.lastChecked)}
+          </p>
+        )}
+        {expanded && entry?.output && (
+          <pre className="text-xs bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-lg p-3 overflow-auto max-h-32 text-[var(--color-text-secondary)] font-mono whitespace-pre-wrap break-words">
+            {entry.output.slice(0, 500)}
+          </pre>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -149,6 +234,12 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
               )}
             </dl>
           </section>
+
+          {/* Credential Health */}
+          <CredentialHealthSection
+            providerConfigKey={connection.provider_config_key}
+            connectionId={connection.connection_id}
+          />
 
           {/* Raw metadata */}
           {isLoading ? (
@@ -482,6 +573,11 @@ function ConnectionRow({
   onClick: () => void;
   onDelete: () => void;
 }) {
+  const healthEntry = useCredentialHealthStore(
+    (s) => s.entries[`${connection.provider_config_key}:${connection.connection_id}`]
+  );
+  const isInvalid = healthEntry?.status === "invalid";
+
   return (
     <div
       role="button"
@@ -489,55 +585,65 @@ function ConnectionRow({
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
       className={cn(
-        "flex items-center gap-4 px-4 py-3 border-b border-[var(--color-border)] cursor-pointer transition-colors group",
+        "flex flex-col border-b border-[var(--color-border)] cursor-pointer transition-colors group",
         isSelected
           ? "bg-[var(--color-brand-500)]/10"
           : "hover:bg-[var(--color-bg-surface)]"
       )}
     >
-      {/* Provider avatar */}
-      <div className="w-8 h-8 rounded-md bg-[var(--color-bg-overlay)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] uppercase shrink-0">
-        {(connection.provider_config_key[0] ?? "?").toUpperCase()}
-      </div>
+      {/* Warning banner for invalid credentials */}
+      {isInvalid && (
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-[var(--color-error)]/10 text-[var(--color-error)] text-xs border-b border-[var(--color-error)]/20">
+          <ShieldAlertIcon />
+          <span>Credential validation failed</span>
+        </div>
+      )}
 
-      {/* Provider name */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-          {connection.provider_config_key}
-        </p>
-        <p className="text-xs text-[var(--color-text-secondary)] truncate">
-          {connection.provider || "—"}
-        </p>
-      </div>
+      <div className="flex items-center gap-4 px-4 py-3">
+        {/* Provider avatar */}
+        <div className="w-8 h-8 rounded-md bg-[var(--color-bg-overlay)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] uppercase shrink-0">
+          {(connection.provider_config_key[0] ?? "?").toUpperCase()}
+        </div>
 
-      {/* Connection ID */}
-      <div className="w-48 min-w-0">
-        <p className="text-sm font-mono text-[var(--color-text-secondary)] truncate">
-          {connection.connection_id}
-        </p>
-      </div>
+        {/* Provider name */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+            {connection.provider_config_key}
+          </p>
+          <p className="text-xs text-[var(--color-text-secondary)] truncate">
+            {connection.provider || "—"}
+          </p>
+        </div>
 
-      {/* Status */}
-      <div className="w-16">
-        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
-          active
-        </span>
-      </div>
+        {/* Connection ID */}
+        <div className="w-48 min-w-0">
+          <p className="text-sm font-mono text-[var(--color-text-secondary)] truncate">
+            {connection.connection_id}
+          </p>
+        </div>
 
-      {/* Created */}
-      <div className="w-36 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">
-        {formatDate(connection.created)}
-      </div>
+        {/* Status */}
+        <div className="w-16">
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-success)]/15 text-[var(--color-success)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
+            active
+          </span>
+        </div>
 
-      {/* Row actions */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-all cursor-pointer"
-        aria-label="Delete connection"
-      >
-        <TrashIcon />
-      </button>
+        {/* Created */}
+        <div className="w-36 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">
+          {formatDate(connection.created)}
+        </div>
+
+        {/* Row actions */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-all cursor-pointer"
+          aria-label="Delete connection"
+        >
+          <TrashIcon />
+        </button>
+      </div>
     </div>
   );
 }

@@ -85,6 +85,11 @@ import {
   type NangoGetMcpToolsRequest,
   type NangoGetMcpToolsResult,
   type NangoSetMcpToolEnabledRequest,
+  type NangoCreateJwtConnectionRequest,
+  type NangoCreateJwtConnectionResult,
+  type NangoValidateConnectionRequest,
+  type NangoValidateConnectionResult,
+  type ConnectionHealthStatus,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -407,6 +412,60 @@ export function registerIpcHandlers(): void {
       })
   );
 
+  // ── Connection credential health validation ────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_VALIDATE_CONNECTION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoValidateConnectionRequest
+    ): Promise<IpcResponse<NangoValidateConnectionResult>> =>
+      wrap(async () => {
+        if (!args?.providerConfigKey || !args?.connectionId) {
+          throw new Error("providerConfigKey and connectionId are required");
+        }
+        const client = getNangoClient();
+        let status: ConnectionHealthStatus = "unchecked";
+        let output: string | null = null;
+
+        try {
+          const conn = await client.getConnection(
+            args.providerConfigKey,
+            args.connectionId
+          );
+          const creds = conn?.credentials as Record<string, unknown> | undefined;
+          if (creds && Object.keys(creds).length > 0) {
+            status = "valid";
+            output = "Credentials retrieved successfully.";
+          } else {
+            status = "invalid";
+            output = "No credentials found on this connection.";
+          }
+        } catch (err: unknown) {
+          status = "invalid";
+          const errStatus = (err as { status?: number })?.status;
+          if (errStatus === 401 || errStatus === 403) {
+            output = "Authentication failed: credentials are expired or revoked.";
+          } else if (errStatus === 404) {
+            output = "Connection not found on the Nango server.";
+          } else {
+            output = err instanceof Error ? err.message : "Validation failed with an unknown error.";
+          }
+        }
+
+        // Truncate output to 500 chars as per spec
+        if (output && output.length > 500) {
+          output = output.slice(0, 497) + "...";
+        }
+
+        return {
+          status,
+          lastChecked: new Date().toISOString(),
+          output,
+        };
+      })
+  );
+
   ipcMain.handle(
     IPC_CHANNELS.NANGO_VALIDATE_KEY,
     async (
@@ -441,6 +500,38 @@ export function registerIpcHandlers(): void {
         return {
           token: result.data.token,
           expiresAt: result.data.expires_at,
+        };
+      })
+  );
+
+  // ── JWT Bearer connection creation ────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_CREATE_JWT_CONNECTION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoCreateJwtConnectionRequest
+    ): Promise<IpcResponse<NangoCreateJwtConnectionResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        // The Nango Node SDK deprecated createConnection; use the REST API
+        // directly via the SDK's internal axios instance.
+        const res = await (client as unknown as { http: import("axios").AxiosInstance }).http.post(
+          "/connection",
+          {
+            connection_id: args.connectionId,
+            provider_config_key: args.providerConfigKey,
+            credentials: {
+              privateKey: args.privateKey,
+              username: args.username,
+            },
+          },
+          { headers: { Authorization: `Bearer ${client.secretKey}` } }
+        );
+        const data = res.data as { connectionId?: string; connection_id?: string; providerConfigKey?: string; provider_config_key?: string };
+        return {
+          connectionId: data.connection_id ?? data.connectionId ?? args.connectionId,
+          providerConfigKey: data.provider_config_key ?? data.providerConfigKey ?? args.providerConfigKey,
         };
       })
   );

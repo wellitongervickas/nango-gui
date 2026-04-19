@@ -112,6 +112,12 @@ export const IPC_CHANNELS = {
   /** Main → renderer push event: an MCP server status changed. */
   MCP_STATUS_CHANGED: "mcp:statusChanged",
 
+  // Connection credential health validation
+  NANGO_VALIDATE_CONNECTION: "nango:validateConnection",
+
+  // JWT Bearer connection creation (Salesforce server-to-server)
+  NANGO_CREATE_JWT_CONNECTION: "nango:createJwtConnection",
+
   // Nango webhook settings (outgoing webhook URL configuration)
   NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
   NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
@@ -904,4 +910,39 @@ export interface NangoSetMcpToolEnabledRequest {
   scriptName: string;
   /** Whether to enable or disable the action. */
   enabled: boolean;
+}
+
+// ── Connection credential health validation ──────────────────────────────────
+
+export type ConnectionHealthStatus = "valid" | "invalid" | "unchecked";
+
+export interface NangoValidateConnectionRequest {
+  providerConfigKey: string;
+  connectionId: string;
+}
+
+export interface NangoValidateConnectionResult {
+  status: ConnectionHealthStatus;
+  lastChecked: string;
+  output: string | null;
+}
+
+// ── JWT Bearer connection creation ──────────────────────────────────────────
+
+export interface NangoCreateJwtConnectionRequest {
+  /** Unique connection identifier (user-chosen). */
+  connectionId: string;
+  /** The integration ID (providerConfigKey) configured in Nango for JWT Bearer auth. */
+  providerConfigKey: string;
+  /** PEM-encoded RSA private key for signing the JWT assertion. */
+  privateKey: string;
+  /** Salesforce username to impersonate. */
+  username: string;
+}
+
+export interface NangoCreateJwtConnectionResult {
+  /** The connection ID of the newly created connection. */
+  connectionId: string;
+  /** The provider config key the connection belongs to. */
+  providerConfigKey: string;
 }
