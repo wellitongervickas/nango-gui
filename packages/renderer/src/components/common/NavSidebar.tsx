@@ -45,6 +45,12 @@ function isRouteActive(route: string, currentRoute: string): boolean {
   if (route === "dashboard") {
     return currentRoute === "/" || currentRoute === "dashboard";
   }
+  if (route === "integrations") {
+    return currentRoute === "integrations" || currentRoute.startsWith("integrations/");
+  }
+  if (route === "connections") {
+    return currentRoute === "connections" || currentRoute.startsWith("connections/");
+  }
   return currentRoute === route;
 }
 

@@ -32,6 +32,7 @@ import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
+import { IntegrationDetailPage } from "./pages/IntegrationDetailPage";
 import { applyTheme } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
 import { useHashRoute } from "./lib/router";
@@ -128,6 +129,15 @@ function App() {
 
   if (route === "integrations") {
     return <AppShell pageName="Integrations"><IntegrationsPage /></AppShell>;
+  }
+
+  if (route.startsWith("integrations/detail/")) {
+    const providerKey = decodeURIComponent(route.split("/")[2] ?? "");
+    return (
+      <AppShell pageName="Integration Detail">
+        <IntegrationDetailPage providerKey={providerKey} />
+      </AppShell>
+    );
   }
 
   if (route === "syncs") {
