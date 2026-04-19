@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
   NANGO_LIST_PROVIDERS: "nango:listProviders",
   NANGO_GET_PROVIDER: "nango:getProvider",
   NANGO_GET_INTEGRATION_README: "nango:getIntegrationReadme",
+  NANGO_GET_PROVIDER_MODELS: "nango:getProviderModels",
 
   // Sync operations
   NANGO_LIST_SYNCS: "nango:listSyncs",
@@ -241,6 +242,26 @@ export interface NangoGetIntegrationReadmeRequest {
 export interface NangoGetIntegrationReadmeResult {
   /** Markdown content of the readme, or null if none exists. */
   markdown: string | null;
+}
+
+// ── Typed model download ──────────────────────────────────────────────────
+
+export type ModelDownloadFormat = "json-schema" | "typescript" | "zod";
+
+export interface NangoGetProviderModelsRequest {
+  /** Provider key (e.g. "github", "slack"). */
+  provider: string;
+  /** Desired output format. */
+  format: ModelDownloadFormat;
+}
+
+export interface NangoGetProviderModelsResult {
+  /** Generated file content as a string. */
+  content: string;
+  /** Suggested filename for the download. */
+  filename: string;
+  /** Whether models were found for this provider. */
+  hasModels: boolean;
 }
 
 export type AppTheme = "light" | "dark" | "system";

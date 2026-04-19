@@ -7,6 +7,8 @@ import type {
   NangoGetProviderRequest,
   NangoGetIntegrationReadmeRequest,
   NangoGetIntegrationReadmeResult,
+  NangoGetProviderModelsRequest,
+  NangoGetProviderModelsResult,
   NangoListConnectionsRequest,
   NangoListProvidersRequest,
   NangoProvider,
@@ -110,6 +112,9 @@ declare global {
       getIntegrationReadme(
         args: NangoGetIntegrationReadmeRequest
       ): Promise<IpcResponse<NangoGetIntegrationReadmeResult>>;
+      getProviderModels(
+        args: NangoGetProviderModelsRequest
+      ): Promise<IpcResponse<NangoGetProviderModelsResult>>;
       listSyncs(
         args: NangoListSyncsRequest
       ): Promise<IpcResponse<NangoSyncRecord[]>>;

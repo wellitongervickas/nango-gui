@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import Markdown from "react-markdown";
-import type { NangoProvider } from "@nango-gui/shared";
+import type { NangoProvider, ModelDownloadFormat } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
 import { useIntegrationReadme } from "@/hooks/useIntegrationReadme";
+import { useProviderModels } from "@/hooks/useProviderModels";
 import { ConnectModal } from "@/components/connections/ConnectModal";
-import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon } from "@/components/icons";
+import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon, ChevronDownIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
 
@@ -156,7 +157,7 @@ function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
 
 // ── Detail panel ───────────────────────────────────────────────────────────
 
-type DetailTab = "details" | "documentation";
+type DetailTab = "details" | "documentation" | "models";
 
 interface DetailPanelProps {
   provider: NangoProvider;
@@ -166,6 +167,7 @@ interface DetailPanelProps {
 function DetailPanel({ provider, onClose }: DetailPanelProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const { markdown, isLoading: readmeLoading } = useIntegrationReadme(provider.name);
+  const { hasModels, isChecking: modelsChecking, isDownloading, download } = useProviderModels(provider.name);
 
   return (
     <>
@@ -200,6 +202,9 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
           </DetailTabButton>
           <DetailTabButton active={activeTab === "documentation"} onClick={() => setActiveTab("documentation")}>
             Documentation
+          </DetailTabButton>
+          <DetailTabButton active={activeTab === "models"} onClick={() => setActiveTab("models")}>
+            Models
           </DetailTabButton>
         </div>
 
@@ -254,6 +259,15 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
 
           {activeTab === "documentation" && (
             <ReadmeContent markdown={markdown} isLoading={readmeLoading} />
+          )}
+
+          {activeTab === "models" && (
+            <ModelsContent
+              hasModels={hasModels}
+              isChecking={modelsChecking}
+              isDownloading={isDownloading}
+              onDownload={download}
+            />
           )}
         </div>
 
@@ -377,6 +391,103 @@ function ReadmeContent({ markdown, isLoading }: { markdown: string | null; isLoa
     >
       {markdown}
     </Markdown>
+  );
+}
+
+// ── Models download content ───────────────────────────────────────────────
+
+const MODEL_FORMATS: { format: ModelDownloadFormat; label: string; ext: string }[] = [
+  { format: "json-schema", label: "JSON Schema", ext: ".json" },
+  { format: "typescript", label: "TypeScript Types", ext: ".d.ts" },
+  { format: "zod", label: "Zod Schema", ext: ".ts" },
+];
+
+interface ModelsContentProps {
+  hasModels: boolean | null;
+  isChecking: boolean;
+  isDownloading: boolean;
+  onDownload: (format: ModelDownloadFormat) => Promise<void>;
+}
+
+function ModelsContent({ hasModels, isChecking, isDownloading, onDownload }: ModelsContentProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
+
+  if (isChecking) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-5 w-48 rounded bg-[var(--color-bg-overlay)]" />
+        <div className="h-10 w-full rounded bg-[var(--color-bg-overlay)]" />
+      </div>
+    );
+  }
+
+  if (!hasModels) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+          No models defined
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          This integration does not have typed models yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
+          Typed Models
+        </h3>
+        <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          Download auto-generated type definitions from this integration's model schema.
+        </p>
+
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen((v) => !v)}
+            disabled={isDownloading}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+          >
+            {isDownloading ? <SpinnerIcon /> : <DownloadIcon />}
+            Download Models
+            <ChevronDownIcon />
+          </button>
+
+          {dropdownOpen && (
+            <div className="absolute left-0 top-full mt-1 z-50 min-w-[200px] bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-lg shadow-xl overflow-hidden">
+              {MODEL_FORMATS.map(({ format, label, ext }) => (
+                <button
+                  key={format}
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    onDownload(format);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer flex items-center justify-between gap-4"
+                >
+                  <span>{label}</span>
+                  <span className="text-xs text-[var(--color-text-secondary)] font-mono">{ext}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 

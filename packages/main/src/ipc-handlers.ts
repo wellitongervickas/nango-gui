@@ -21,6 +21,8 @@ import {
   type NangoGetProviderRequest,
   type NangoGetIntegrationReadmeRequest,
   type NangoGetIntegrationReadmeResult,
+  type NangoGetProviderModelsRequest,
+  type NangoGetProviderModelsResult,
   type NangoListSyncsRequest,
   type NangoGetSyncStatusRequest,
   type NangoTriggerSyncRequest,
@@ -536,6 +538,199 @@ export function registerIpcHandlers(): void {
 
         _readmeCache.set(provider, { markdown, fetchedAt: now });
         return { markdown };
+      })
+  );
+
+  // ── Typed model download handler ─────────────────────────────────────────
+
+  const _modelsYamlCache = new Map<string, { yaml: string | null; fetchedAt: number }>();
+  const MODELS_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  /**
+   * Parse the `models` block from a nango.yaml string.
+   * Returns a map of model name → record of field name → field type.
+   */
+  function parseModelsFromYaml(yamlContent: string): Record<string, Record<string, string>> {
+    const models: Record<string, Record<string, string>> = {};
+    const lines = yamlContent.split("\n");
+    let inModels = false;
+    let currentModel: string | null = null;
+
+    for (const line of lines) {
+      // Detect top-level `models:` key
+      if (/^models:\s*$/.test(line)) {
+        inModels = true;
+        continue;
+      }
+      if (!inModels) continue;
+
+      // A non-indented line (other than blank) exits the models block
+      if (line.length > 0 && !line.startsWith(" ") && !line.startsWith("\t")) {
+        break;
+      }
+
+      // Model name line: exactly 2-space or 4-space indent, ends with ':'
+      const modelMatch = line.match(/^  (\w[\w-]*):\s*$/);
+      if (modelMatch) {
+        currentModel = modelMatch[1];
+        models[currentModel] = {};
+        continue;
+      }
+
+      // Field line: deeper indent under a model
+      if (currentModel) {
+        const fieldMatch = line.match(/^\s{4,}(\w[\w-]*):\s*(.+)$/);
+        if (fieldMatch) {
+          models[currentModel][fieldMatch[1]] = fieldMatch[2].trim();
+        }
+      }
+    }
+
+    return models;
+  }
+
+  /** Map a nango.yaml type string to a JSON Schema type. */
+  function nangoTypeToJsonSchema(t: string): Record<string, unknown> {
+    const trimmed = t.replace(/\s/g, "");
+    if (trimmed === "string") return { type: "string" };
+    if (trimmed === "boolean") return { type: "boolean" };
+    if (trimmed === "number" || trimmed === "integer") return { type: "number" };
+    if (trimmed === "date") return { type: "string", format: "date-time" };
+    if (trimmed.endsWith("[]")) {
+      return { type: "array", items: nangoTypeToJsonSchema(trimmed.slice(0, -2)) };
+    }
+    // fallback: treat as string
+    return { type: "string" };
+  }
+
+  /** Map a nango.yaml type string to a TypeScript type. */
+  function nangoTypeToTs(t: string): string {
+    const trimmed = t.replace(/\s/g, "");
+    if (trimmed === "string" || trimmed === "boolean" || trimmed === "number") return trimmed;
+    if (trimmed === "integer") return "number";
+    if (trimmed === "date") return "string";
+    if (trimmed.endsWith("[]")) return `${nangoTypeToTs(trimmed.slice(0, -2))}[]`;
+    return "string";
+  }
+
+  function generateJsonSchema(models: Record<string, Record<string, string>>, provider: string): string {
+    const definitions: Record<string, unknown> = {};
+    for (const [name, fields] of Object.entries(models)) {
+      const properties: Record<string, unknown> = {};
+      for (const [field, type] of Object.entries(fields)) {
+        properties[field] = nangoTypeToJsonSchema(type);
+      }
+      definitions[name] = {
+        type: "object",
+        properties,
+        required: Object.keys(fields),
+      };
+    }
+    return JSON.stringify(
+      { $schema: "http://json-schema.org/draft-07/schema#", title: `${provider} models`, definitions },
+      null,
+      2
+    );
+  }
+
+  function generateTypescript(models: Record<string, Record<string, string>>): string {
+    const lines: string[] = ["// Auto-generated TypeScript types from Nango integration models", ""];
+    for (const [name, fields] of Object.entries(models)) {
+      lines.push(`export interface ${name} {`);
+      for (const [field, type] of Object.entries(fields)) {
+        lines.push(`  ${field}: ${nangoTypeToTs(type)};`);
+      }
+      lines.push("}", "");
+    }
+    return lines.join("\n");
+  }
+
+  function generateZod(models: Record<string, Record<string, string>>): string {
+    const zodType = (t: string): string => {
+      const trimmed = t.replace(/\s/g, "");
+      if (trimmed === "string") return "z.string()";
+      if (trimmed === "boolean") return "z.boolean()";
+      if (trimmed === "number" || trimmed === "integer") return "z.number()";
+      if (trimmed === "date") return "z.string().datetime()";
+      if (trimmed.endsWith("[]")) return `z.array(${zodType(trimmed.slice(0, -2))})`;
+      return "z.string()";
+    };
+
+    const lines: string[] = [
+      '// Auto-generated Zod schemas from Nango integration models',
+      'import { z } from "zod";',
+      "",
+    ];
+    for (const [name, fields] of Object.entries(models)) {
+      lines.push(`export const ${name}Schema = z.object({`);
+      for (const [field, type] of Object.entries(fields)) {
+        lines.push(`  ${field}: ${zodType(type)},`);
+      }
+      lines.push("});", "");
+      lines.push(`export type ${name} = z.infer<typeof ${name}Schema>;`, "");
+    }
+    return lines.join("\n");
+  }
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_PROVIDER_MODELS,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetProviderModelsRequest
+    ): Promise<IpcResponse<NangoGetProviderModelsResult>> =>
+      wrap(async () => {
+        const { provider, format } = args;
+        const now = Date.now();
+
+        // Fetch and cache nango.yaml for this provider
+        let yamlContent: string | null = null;
+        const cached = _modelsYamlCache.get(provider);
+        if (cached && now - cached.fetchedAt < MODELS_TTL_MS) {
+          yamlContent = cached.yaml;
+        } else {
+          try {
+            const url = `https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/${encodeURIComponent(provider)}/nango.yaml`;
+            const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+            if (res.ok) {
+              yamlContent = await res.text();
+            }
+          } catch {
+            // Network error — leave null
+          }
+          _modelsYamlCache.set(provider, { yaml: yamlContent, fetchedAt: now });
+        }
+
+        if (!yamlContent) {
+          return { content: "", filename: "", hasModels: false };
+        }
+
+        const models = parseModelsFromYaml(yamlContent);
+        if (Object.keys(models).length === 0) {
+          return { content: "", filename: "", hasModels: false };
+        }
+
+        const base = `${provider}-models`;
+        let content: string;
+        let filename: string;
+
+        switch (format) {
+          case "json-schema":
+            content = generateJsonSchema(models, provider);
+            filename = `${base}.json`;
+            break;
+          case "typescript":
+            content = generateTypescript(models);
+            filename = `${base}.d.ts`;
+            break;
+          case "zod":
+            content = generateZod(models);
+            filename = `${base}.ts`;
+            break;
+          default:
+            throw new Error(`Unsupported format: ${format}`);
+        }
+
+        return { content, filename, hasModels: true };
       })
   );
 
