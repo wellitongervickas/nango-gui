@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { NangoSyncRecord } from "@nango-gui/shared";
 import { useSyncsStore } from "@/store/syncsStore";
-import { PlayIcon, PauseIcon, SpinnerIcon, ChevronIcon } from "@/components/icons";
+import { PlayIcon, PauseIcon, SpinnerIcon, ChevronIcon, AlertTriangleIcon } from "@/components/icons";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
+import { getInactivityInfo, type InactivityLevel } from "@/lib/sync-inactivity";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "\u2014";
@@ -113,6 +114,8 @@ export function SyncRow({
 
   const hasCheckpoint = sync.checkpoint != null && Object.keys(sync.checkpoint).length > 0;
 
+  const inactivity = useMemo(() => getInactivityInfo(sync), [sync.finishedAt]);
+
   return (
     <div className="border-b border-[var(--color-border)]">
       <div className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--color-bg-surface)] transition-colors group">
@@ -137,7 +140,18 @@ export function SyncRow({
                 checkpoint
               </span>
             )}
+            {inactivity.level !== "none" && (
+              <InactivityBadge level={inactivity.level} inactiveDays={inactivity.inactiveDays} daysUntilDeletion={inactivity.daysUntilDeletion} />
+            )}
           </div>
+          {inactivity.level !== "none" && (
+            <p className={cn("text-xs mt-0.5 truncate flex items-center gap-1", inactivity.level === "danger" ? "text-[var(--color-error)]" : "text-[#f59e0b]")}>
+              <AlertTriangleIcon />
+              {inactivity.level === "danger"
+                ? `Data at risk — inactive for ${inactivity.inactiveDays} days (60-day deletion policy)`
+                : `${inactivity.daysUntilDeletion} days until data deletion — inactive for ${inactivity.inactiveDays} days`}
+            </p>
+          )}
           {actionError && (
             <p className="text-xs text-[var(--color-error)] mt-0.5 truncate">{actionError}</p>
           )}
@@ -172,7 +186,7 @@ export function SyncRow({
           )}
         </div>
 
-        <div className="w-40 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">
+        <div className={cn("w-40 text-xs whitespace-nowrap", inactivity.level === "danger" ? "text-[var(--color-error)] font-medium" : inactivity.level === "warning" ? "text-[#f59e0b] font-medium" : "text-[var(--color-text-secondary)]")}>
           {formatDate(sync.finishedAt)}
         </div>
 
@@ -254,5 +268,25 @@ export function SyncRow({
         </div>
       )}
     </div>
+  );
+}
+
+function InactivityBadge({ level, inactiveDays, daysUntilDeletion }: { level: InactivityLevel; inactiveDays: number; daysUntilDeletion: number }) {
+  const isDanger = level === "danger";
+  return (
+    <span
+      className={cn(
+        "shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1",
+        isDanger
+          ? "bg-[var(--color-error)]/10 text-[var(--color-error)]"
+          : "bg-[#f59e0b]/10 text-[#f59e0b]"
+      )}
+      title={isDanger
+        ? `Inactive for ${inactiveDays} days — sync data may already be deleted`
+        : `Inactive for ${inactiveDays} days — ${daysUntilDeletion} days until data is deleted`}
+    >
+      <AlertTriangleIcon />
+      {isDanger ? "data at risk" : `${daysUntilDeletion}d left`}
+    </span>
   );
 }

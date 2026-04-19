@@ -4,11 +4,13 @@ import { useConnectionsStore } from "@/store/connectionsStore";
 import { useSyncsStore } from "@/store/syncsStore";
 import { SearchIcon, RefreshIcon, SyncIcon } from "@/components/icons";
 import { ErrorBanner } from "../components/common/ErrorBanner";
+import { WarningBanner } from "../components/common/WarningBanner";
 import { searchInputClass } from "@/lib/utils";
 import { ConnectionSelector } from "@/components/syncs/ConnectionSelector";
 import { SortHeader, type SyncSortKey, type SortDir } from "@/components/syncs/SortHeader";
 import { SyncRow } from "@/components/syncs/SyncRow";
 import { SyncRowSkeleton } from "@/components/syncs/SyncRowSkeleton";
+import { countInactiveSyncs } from "@/lib/sync-inactivity";
 
 const BASE_REFRESH_MS = 30_000;
 const MAX_BACKOFF_MULTIPLIER = 4;
@@ -80,6 +82,8 @@ export function SyncsPage() {
       });
   }, [syncs, search, sortKey, sortDir]);
 
+  const inactiveCounts = useMemo(() => countInactiveSyncs(syncs), [syncs]);
+
   function toggleSort(key: SyncSortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -136,6 +140,22 @@ export function SyncsPage() {
 
       {/* Error banner */}
       {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
+
+      {/* Inactive sync data deletion warning */}
+      {selectedConnection && !isLoading && inactiveCounts.danger > 0 && (
+        <WarningBanner
+          message={`${inactiveCounts.danger} sync${inactiveCounts.danger > 1 ? "s" : ""} exceeded the 60-day inactivity limit \u2014 data may already be deleted.`}
+          detail="Nango hard-deletes sync records after 60 days of inactivity. Trigger or resume affected syncs to re-populate data."
+          className="mx-6 mt-4 shrink-0"
+        />
+      )}
+      {selectedConnection && !isLoading && inactiveCounts.danger === 0 && inactiveCounts.warning > 0 && (
+        <WarningBanner
+          message={`${inactiveCounts.warning} sync${inactiveCounts.warning > 1 ? "s are" : " is"} approaching the 60-day inactivity deletion threshold.`}
+          detail="Nango hard-deletes sync records after 60 days of inactivity. Trigger or resume affected syncs to prevent data loss."
+          className="mx-6 mt-4 shrink-0"
+        />
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
