@@ -88,6 +88,8 @@ import type {
   NangoProxyResult,
   NangoCreateJwtConnectionRequest,
   NangoCreateJwtConnectionResult,
+  NangoCreateMcpConnectionRequest,
+  NangoCreateMcpConnectionResult,
   NangoValidateConnectionRequest,
   NangoValidateConnectionResult,
 } from "./ipc-channels.js";
@@ -174,6 +176,8 @@ declare global {
       listMcpIntegrations(): Promise<IpcResponse<NangoListMcpIntegrationsResult>>;
       /** Create a JWT Bearer connection. */
       createJwtConnection(args: NangoCreateJwtConnectionRequest): Promise<IpcResponse<NangoCreateJwtConnectionResult>>;
+      /** Create an MCP Auth connection. */
+      createMcpConnection(args: NangoCreateMcpConnectionRequest): Promise<IpcResponse<NangoCreateMcpConnectionResult>>;
       /** Validate a connection's credentials. */
       validateConnection(args: NangoValidateConnectionRequest): Promise<IpcResponse<NangoValidateConnectionResult>>;
     };

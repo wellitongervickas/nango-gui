@@ -118,6 +118,9 @@ export const IPC_CHANNELS = {
   // JWT Bearer connection creation (Salesforce server-to-server)
   NANGO_CREATE_JWT_CONNECTION: "nango:createJwtConnection",
 
+  // MCP Auth connection creation (AI agent authentication)
+  NANGO_CREATE_MCP_CONNECTION: "nango:createMcpConnection",
+
   // Nango webhook settings (outgoing webhook URL configuration)
   NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
   NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
@@ -966,6 +969,24 @@ export interface NangoCreateJwtConnectionRequest {
 }
 
 export interface NangoCreateJwtConnectionResult {
+  /** The connection ID of the newly created connection. */
+  connectionId: string;
+  /** The provider config key the connection belongs to. */
+  providerConfigKey: string;
+}
+
+// ── MCP Auth connection creation ──────────────────────────────────────────
+
+export interface NangoCreateMcpConnectionRequest {
+  /** Unique connection identifier (user-chosen). */
+  connectionId: string;
+  /** The integration ID (providerConfigKey) configured for MCP Auth. */
+  providerConfigKey: string;
+  /** Bearer token or API key for authenticating the MCP connection. */
+  token: string;
+}
+
+export interface NangoCreateMcpConnectionResult {
   /** The connection ID of the newly created connection. */
   connectionId: string;
   /** The provider config key the connection belongs to. */

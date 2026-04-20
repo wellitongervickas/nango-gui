@@ -88,6 +88,8 @@ import {
   type NangoSetMcpToolEnabledRequest,
   type NangoCreateJwtConnectionRequest,
   type NangoCreateJwtConnectionResult,
+  type NangoCreateMcpConnectionRequest,
+  type NangoCreateMcpConnectionResult,
   type NangoValidateConnectionRequest,
   type NangoValidateConnectionResult,
   type ConnectionHealthStatus,
@@ -555,7 +557,8 @@ export function registerIpcHandlers(): void {
         const client = getNangoClient();
         // The Nango Node SDK deprecated createConnection; use the REST API
         // directly via the SDK's internal axios instance.
-        const res = await (client as unknown as { http: import("axios").AxiosInstance }).http.post(
+        const httpClient = (client as unknown as { http: { post: (url: string, body: unknown, config: unknown) => Promise<{ data: unknown }> } }).http;
+        const res = await httpClient.post(
           "/connection",
           {
             connection_id: args.connectionId,
@@ -563,6 +566,36 @@ export function registerIpcHandlers(): void {
             credentials: {
               privateKey: args.privateKey,
               username: args.username,
+            },
+          },
+          { headers: { Authorization: `Bearer ${client.secretKey}` } }
+        );
+        const data = res.data as { connectionId?: string; connection_id?: string; providerConfigKey?: string; provider_config_key?: string };
+        return {
+          connectionId: data.connection_id ?? data.connectionId ?? args.connectionId,
+          providerConfigKey: data.provider_config_key ?? data.providerConfigKey ?? args.providerConfigKey,
+        };
+      })
+  );
+
+  // ── MCP Auth connection creation ─────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_CREATE_MCP_CONNECTION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoCreateMcpConnectionRequest
+    ): Promise<IpcResponse<NangoCreateMcpConnectionResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const mcpHttpClient = (client as unknown as { http: { post: (url: string, body: unknown, config: unknown) => Promise<{ data: unknown }> } }).http;
+        const res = await mcpHttpClient.post(
+          "/connection",
+          {
+            connection_id: args.connectionId,
+            provider_config_key: args.providerConfigKey,
+            credentials: {
+              token: args.token,
             },
           },
           { headers: { Authorization: `Bearer ${client.secretKey}` } }

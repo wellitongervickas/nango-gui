@@ -54,6 +54,7 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderClearKeyRequest,
   NangoCreateJwtConnectionRequest,
+  NangoCreateMcpConnectionRequest,
   NangoValidateConnectionRequest,
 } from "@nango-gui/shared";
 
@@ -125,6 +126,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_MCP_INTEGRATIONS),
   createJwtConnection: (args: NangoCreateJwtConnectionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_JWT_CONNECTION, args),
+  createMcpConnection: (args: NangoCreateMcpConnectionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_MCP_CONNECTION, args),
   validateConnection: (args: NangoValidateConnectionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_VALIDATE_CONNECTION, args),
 });

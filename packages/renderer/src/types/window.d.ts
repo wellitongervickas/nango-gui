@@ -89,6 +89,8 @@ import type {
   AiProviderClearKeyRequest,
   NangoCreateJwtConnectionRequest,
   NangoCreateJwtConnectionResult,
+  NangoCreateMcpConnectionRequest,
+  NangoCreateMcpConnectionResult,
   NangoValidateConnectionRequest,
   NangoValidateConnectionResult,
 } from "@nango-gui/shared";
@@ -175,6 +177,7 @@ declare global {
       setMcpToolEnabled(args: NangoSetMcpToolEnabledRequest): Promise<IpcResponse<void>>;
       listMcpIntegrations(): Promise<IpcResponse<NangoListMcpIntegrationsResult>>;
       createJwtConnection(args: NangoCreateJwtConnectionRequest): Promise<IpcResponse<NangoCreateJwtConnectionResult>>;
+      createMcpConnection(args: NangoCreateMcpConnectionRequest): Promise<IpcResponse<NangoCreateMcpConnectionResult>>;
       validateConnection(args: NangoValidateConnectionRequest): Promise<IpcResponse<NangoValidateConnectionResult>>;
     };
     credentials: {
