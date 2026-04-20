@@ -7,6 +7,13 @@ const CREDENTIALS_FILE = "credentials.enc";
 const ENVIRONMENT_FILE = "environment.json";
 const SETTINGS_FILE = "settings.json";
 
+/** Per-environment credential file names. */
+const ENV_CREDENTIALS_FILES: Record<NangoEnvironment, string> = {
+  development: "credentials-development.enc",
+  staging: "credentials-staging.enc",
+  production: "credentials-production.enc",
+};
+
 /** Per-provider credential file names. */
 const AI_PROVIDER_FILES: Record<AiProviderType, string> = {
   openai: "ai-key-openai.enc",
@@ -15,6 +22,10 @@ const AI_PROVIDER_FILES: Record<AiProviderType, string> = {
 
 function aiProviderKeyPath(provider: AiProviderType): string {
   return join(app.getPath("userData"), AI_PROVIDER_FILES[provider]);
+}
+
+function envCredentialsPath(env: NangoEnvironment): string {
+  return join(app.getPath("userData"), ENV_CREDENTIALS_FILES[env]);
 }
 
 function credentialsPath(): string {
@@ -31,45 +42,66 @@ function settingsPath(): string {
 
 export const credentialStore = {
   /**
-   * Encrypt and persist the Nango secret key to disk.
+   * Encrypt and persist the Nango secret key for a specific environment.
+   * Also writes the legacy global file for backward compatibility.
    * Throws if safeStorage is not available on this platform.
    */
-  save(secretKey: string): void {
+  save(secretKey: string, environment?: NangoEnvironment): void {
     if (!safeStorage.isEncryptionAvailable()) {
       throw new Error(
         "Secure storage is not available on this system. Cannot save credentials."
       );
     }
     const encrypted = safeStorage.encryptString(secretKey);
+    const env = environment ?? this.loadEnvironment();
+    writeFileSync(envCredentialsPath(env), encrypted);
+    // Keep legacy global file in sync with the active environment
     writeFileSync(credentialsPath(), encrypted);
   },
 
   /**
-   * Decrypt and return the stored key, or null if no key is stored.
+   * Decrypt and return the stored key for a specific environment.
+   * Falls back to the legacy global file if no per-env file exists.
    */
-  load(): string | null {
-    const path = credentialsPath();
-    if (!existsSync(path)) return null;
+  load(environment?: NangoEnvironment): string | null {
+    const env = environment ?? this.loadEnvironment();
+    const perEnvPath = envCredentialsPath(env);
+    if (existsSync(perEnvPath)) {
+      try {
+        return safeStorage.decryptString(readFileSync(perEnvPath));
+      } catch {
+        return null;
+      }
+    }
+    // Fallback: legacy global credentials file
+    const globalPath = credentialsPath();
+    if (!existsSync(globalPath)) return null;
     try {
-      const encrypted = readFileSync(path);
-      return safeStorage.decryptString(encrypted);
+      return safeStorage.decryptString(readFileSync(globalPath));
     } catch {
       return null;
     }
   },
 
   /**
-   * Remove the stored credential file.
+   * Remove credential files. If environment is specified, remove only that
+   * environment's key. Otherwise remove all credential files.
    */
-  clear(): void {
-    const path = credentialsPath();
-    if (existsSync(path)) {
-      unlinkSync(path);
+  clear(environment?: NangoEnvironment): void {
+    if (environment) {
+      const path = envCredentialsPath(environment);
+      if (existsSync(path)) unlinkSync(path);
+      return;
+    }
+    // Clear all
+    const globalPath = credentialsPath();
+    if (existsSync(globalPath)) unlinkSync(globalPath);
+    for (const env of Object.keys(ENV_CREDENTIALS_FILES) as NangoEnvironment[]) {
+      const path = envCredentialsPath(env);
+      if (existsSync(path)) unlinkSync(path);
     }
     const envPath = environmentPath();
-    if (existsSync(envPath)) {
-      unlinkSync(envPath);
-    }
+    if (existsSync(envPath)) unlinkSync(envPath);
   },
 
   /**
@@ -137,11 +169,22 @@ export const credentialStore = {
    * Return the last 4 characters of the stored key masked for display,
    * e.g. "••••••••abcd". Returns null if no key is stored.
    */
-  loadMaskedKey(): string | null {
-    const key = this.load();
+  loadMaskedKey(environment?: NangoEnvironment): string | null {
+    const key = this.load(environment);
     if (!key) return null;
     const suffix = key.slice(-4);
     return `••••••••${suffix}`;
+  },
+
+  /**
+   * Return a map of which environments have a configured secret key.
+   */
+  getEnvironmentKeyStatus(): Record<NangoEnvironment, boolean> {
+    return {
+      development: this.load("development") !== null,
+      staging: this.load("staging") !== null,
+      production: this.load("production") !== null,
+    };
   },
 
   // ── AI Provider API keys ───────────────────────────────────────────────

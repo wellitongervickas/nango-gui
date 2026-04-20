@@ -126,6 +126,7 @@ export function EnvironmentSwitcher() {
   const isSwitching = useEnvironmentStore((s) => s.isSwitching);
   const switchEnvironment = useEnvironmentStore((s) => s.switchEnvironment);
   const getCurrentEntry = useEnvironmentStore((s) => s.getCurrentEntry);
+  const hasKeyForEnvironment = useEnvironmentStore((s) => s.hasKeyForEnvironment);
 
   const [open, setOpen] = useState(false);
   const [confirmingProd, setConfirmingProd] = useState(false);
@@ -299,6 +300,7 @@ export function EnvironmentSwitcher() {
                 entry={env}
                 isActive={env.name === current}
                 isFocused={idx === focusedIndex}
+                hasKey={hasKeyForEnvironment(env.name)}
                 onSelect={() => handleSelect(env.name)}
                 onHover={() => setFocusedIndex(idx)}
               />
@@ -337,12 +339,14 @@ function EnvironmentOption({
   entry,
   isActive,
   isFocused,
+  hasKey,
   onSelect,
   onHover,
 }: {
   entry: EnvironmentEntry;
   isActive: boolean;
   isFocused: boolean;
+  hasKey: boolean;
   onSelect: () => void;
   onHover: () => void;
 }) {
@@ -363,6 +367,11 @@ function EnvironmentOption({
     >
       <EnvironmentDot color={entry.color} />
       <span className="flex-1">{entry.label}</span>
+      {!hasKey && (
+        <span className="text-[10px] text-[var(--color-text-muted)] opacity-60">
+          no key
+        </span>
+      )}
       {isActive && (
         <span className="text-[var(--color-env-production)]">
           <CheckIcon />

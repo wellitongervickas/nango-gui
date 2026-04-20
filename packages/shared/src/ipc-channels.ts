@@ -280,11 +280,16 @@ export interface NangoGetProviderModelsResult {
 
 export type AppTheme = "light" | "dark" | "system";
 
+/** Per-environment key configuration status. */
+export type EnvironmentKeyStatus = Record<NangoEnvironment, boolean>;
+
 export interface AppSettings {
   environment: NangoEnvironment;
   theme: AppTheme;
-  /** Last 4 chars of the stored key, prefixed with bullets. Null if no key stored. */
+  /** Last 4 chars of the stored key for the active environment. Null if no key stored. */
   maskedKey: string | null;
+  /** Which environments have a secret key configured. */
+  environmentKeys: EnvironmentKeyStatus;
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;

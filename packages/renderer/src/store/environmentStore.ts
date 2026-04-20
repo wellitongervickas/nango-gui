@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { NangoEnvironment } from "@nango-gui/shared";
+import type { NangoEnvironment, EnvironmentKeyStatus } from "@nango-gui/shared";
+import { useConnectionsStore } from "./connectionsStore";
+import { useIntegrationsStore } from "./integrationsStore";
+import { useSyncsStore } from "./syncsStore";
+import { useDashboardStore } from "./dashboardStore";
+import { useRecordsStore } from "./recordsStore";
 
 const ENV_STORAGE_KEY = "nango-gui-environment";
 const ENV_URL_PARAM = "env";
@@ -20,12 +25,15 @@ const ENVIRONMENTS: EnvironmentEntry[] = [
 interface EnvironmentState {
   current: NangoEnvironment;
   environments: EnvironmentEntry[];
+  environmentKeys: EnvironmentKeyStatus;
   isSwitching: boolean;
   error: string | null;
 
   initialize: () => void;
   switchEnvironment: (env: NangoEnvironment) => Promise<void>;
   getCurrentEntry: () => EnvironmentEntry;
+  refreshEnvironmentKeys: () => Promise<void>;
+  hasKeyForEnvironment: (env: NangoEnvironment) => boolean;
 }
 
 function readFromUrl(): NangoEnvironment | null {
@@ -63,9 +71,26 @@ function syncUrlParam(env: NangoEnvironment): void {
   window.history.replaceState(null, "", url.toString());
 }
 
+/**
+ * Reset all data stores and re-fetch data for the new environment.
+ * Called after a successful environment switch so views reflect
+ * the correct environment's data.
+ */
+function resetAndRefreshDataStores(): void {
+  useConnectionsStore.getState().reset();
+  useSyncsStore.getState().reset();
+  useRecordsStore.getState().reset();
+
+  // Re-fetch core data for the new environment
+  useConnectionsStore.getState().fetchConnections();
+  useIntegrationsStore.getState().fetchProviders();
+  useDashboardStore.getState().fetchDashboard();
+}
+
 export const useEnvironmentStore = create<EnvironmentState>((set, get) => ({
   current: "development",
   environments: ENVIRONMENTS,
+  environmentKeys: { development: false, staging: false, production: false },
   isSwitching: false,
   error: null,
 
@@ -78,6 +103,9 @@ export const useEnvironmentStore = create<EnvironmentState>((set, get) => ({
     set({ current: resolved });
     persistToStorage(resolved);
     syncUrlParam(resolved);
+
+    // Load per-environment key status from main process
+    get().refreshEnvironmentKeys();
   },
 
   switchEnvironment: async (env) => {
@@ -97,6 +125,8 @@ export const useEnvironmentStore = create<EnvironmentState>((set, get) => ({
         syncUrlParam(prev);
         return;
       }
+      // Refresh all data stores for the new environment
+      resetAndRefreshDataStores();
       set({ isSwitching: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to switch environment";
@@ -109,5 +139,21 @@ export const useEnvironmentStore = create<EnvironmentState>((set, get) => ({
   getCurrentEntry: () => {
     const { current, environments } = get();
     return environments.find((e) => e.name === current) ?? environments[0];
+  },
+
+  refreshEnvironmentKeys: async () => {
+    if (!window.electronApp) return;
+    try {
+      const res = await window.electronApp.getSettings();
+      if (res.status === "ok") {
+        set({ environmentKeys: res.data.environmentKeys });
+      }
+    } catch {
+      // Non-critical — UI will just show all envs as unconfigured
+    }
+  },
+
+  hasKeyForEnvironment: (env) => {
+    return get().environmentKeys[env] ?? false;
   },
 }));

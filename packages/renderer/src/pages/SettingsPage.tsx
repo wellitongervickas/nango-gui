@@ -39,7 +39,7 @@ export function SettingsPage() {
 
         {error && <ErrorBanner message={error} />}
 
-        <ApiKeySection maskedKey={maskedKey} />
+        <ApiKeySection maskedKey={maskedKey} environment={environment} />
         <EnvironmentSection environment={environment} onUpdate={updateEnvironment} />
         <AppearanceSection theme={theme} onUpdate={updateTheme} />
         <AboutSection
@@ -52,14 +52,41 @@ export function SettingsPage() {
   );
 }
 
-// ── API Key ────────────────────────────────────────────────────────────────
+// ── API Key (per-environment) ──────────────────────────────────────────────
 
-function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
+const ENV_LABELS: Record<NangoEnvironment, string> = {
+  development: "Development",
+  staging: "Staging",
+  production: "Production",
+};
+
+const ENV_COLORS: Record<NangoEnvironment, string> = {
+  development: "var(--color-env-development)",
+  staging: "var(--color-env-staging)",
+  production: "var(--color-env-production)",
+};
+
+function ApiKeySection({
+  maskedKey,
+  environment,
+}: {
+  maskedKey: string | null;
+  environment: NangoEnvironment;
+}) {
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const environmentKeys = useSettingsStore((s) => s.environmentKeys);
   const [changeState, setChangeState] = useState<"idle" | "entering" | "validating">("idle");
   const [removeConfirm, setRemoveConfirm] = useState(false);
   const [newKey, setNewKey] = useState("");
   const [keyError, setKeyError] = useState<string | null>(null);
+
+  // Reset UI state when environment changes
+  useEffect(() => {
+    setChangeState("idle");
+    setNewKey("");
+    setKeyError(null);
+    setRemoveConfirm(false);
+  }, [environment]);
 
   async function handleValidateAndSave() {
     if (!newKey.trim()) return;
@@ -78,7 +105,7 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
       }
       const saveRes = await window.credentials.save({
         secretKey: newKey.trim(),
-        environment: "development",
+        environment,
       });
       if (saveRes.status === "error") {
         setKeyError(saveRes.error);
@@ -98,13 +125,44 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
     if (!window.credentials) return;
     const res = await window.credentials.clear();
     if (res.status === "error") return;
-    // Redirect to setup wizard
     navigate("setup");
     window.location.reload();
   }
 
+  const configuredEnvs = (Object.keys(environmentKeys) as NangoEnvironment[]).filter(
+    (e) => environmentKeys[e]
+  );
+
   return (
-    <Section title="API Key">
+    <Section title="API Keys">
+      <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+        Each environment uses its own Nango secret key.
+        The key below is for the active <strong className="text-[var(--color-text)]">{ENV_LABELS[environment]}</strong> environment.
+      </p>
+
+      {/* Per-env key status indicators */}
+      <div className="mb-4 flex gap-3">
+        {(["development", "staging", "production"] as NangoEnvironment[]).map((env) => (
+          <div key={env} className="flex items-center gap-1.5 text-xs">
+            <span
+              className="inline-block w-2 h-2 rounded-full"
+              style={{ backgroundColor: ENV_COLORS[env] }}
+            />
+            <span className={cn(
+              environmentKeys[env] ? "text-[var(--color-text)]" : "text-[var(--color-text-muted)]"
+            )}>
+              {ENV_LABELS[env]}
+            </span>
+            <span className={cn(
+              "text-xs",
+              environmentKeys[env] ? "text-green-500" : "text-[var(--color-text-muted)]"
+            )}>
+              {environmentKeys[env] ? "configured" : "not set"}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {maskedKey ? (
         <div className="space-y-3">
           {changeState === "idle" ? (
@@ -112,18 +170,34 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
               <span className="font-mono text-sm text-[var(--color-text)]">{maskedKey}</span>
               <div className="flex gap-2">
                 <ActionButton onClick={() => setChangeState("entering")}>Change Key</ActionButton>
-                {removeConfirm ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-[var(--color-text-muted)]">Remove key?</span>
-                    <ActionButton variant="destructive" onClick={handleRemove}>
-                      Yes, remove
+                {configuredEnvs.length <= 1 ? (
+                  removeConfirm ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--color-text-muted)]">Remove key?</span>
+                      <ActionButton variant="destructive" onClick={handleRemove}>
+                        Yes, remove
+                      </ActionButton>
+                      <ActionButton onClick={() => setRemoveConfirm(false)}>Cancel</ActionButton>
+                    </div>
+                  ) : (
+                    <ActionButton variant="destructive" onClick={() => setRemoveConfirm(true)}>
+                      Remove Key
                     </ActionButton>
-                    <ActionButton onClick={() => setRemoveConfirm(false)}>Cancel</ActionButton>
-                  </div>
+                  )
                 ) : (
-                  <ActionButton variant="destructive" onClick={() => setRemoveConfirm(true)}>
-                    Remove Key
-                  </ActionButton>
+                  removeConfirm ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--color-text-muted)]">Remove all keys?</span>
+                      <ActionButton variant="destructive" onClick={handleRemove}>
+                        Yes, remove all
+                      </ActionButton>
+                      <ActionButton onClick={() => setRemoveConfirm(false)}>Cancel</ActionButton>
+                    </div>
+                  ) : (
+                    <ActionButton variant="destructive" onClick={() => setRemoveConfirm(true)}>
+                      Remove All Keys
+                    </ActionButton>
+                  )
                 )}
               </div>
             </div>
@@ -133,7 +207,8 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
                 type="password"
                 value={newKey}
                 onChange={(e) => setNewKey(e.target.value)}
-                placeholder="Enter new secret key"
+                onKeyDown={(e) => { if (e.key === "Enter") handleValidateAndSave(); }}
+                placeholder={`Enter secret key for ${ENV_LABELS[environment]}`}
                 className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-500)]"
                 autoFocus
               />
@@ -161,18 +236,42 @@ function ApiKeySection({ maskedKey }: { maskedKey: string | null }) {
           )}
         </div>
       ) : (
-        <p className="text-sm text-[var(--color-text-muted)]">
-          No API key configured.{" "}
-          <button
-            onClick={() => {
-              navigate("setup");
-              window.location.reload();
-            }}
-            className="text-[var(--color-brand-500)] hover:underline"
-          >
-            Run setup wizard
-          </button>
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            No API key configured for <strong>{ENV_LABELS[environment]}</strong>.
+          </p>
+          {changeState === "entering" || changeState === "validating" ? (
+            <div className="space-y-2">
+              <input
+                type="password"
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleValidateAndSave(); }}
+                placeholder={`Enter secret key for ${ENV_LABELS[environment]}`}
+                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-500)]"
+                autoFocus
+              />
+              {keyError && (
+                <p className="text-xs text-[var(--color-error)]">{keyError}</p>
+              )}
+              <div className="flex gap-2">
+                <ActionButton
+                  onClick={handleValidateAndSave}
+                  disabled={!newKey.trim() || changeState === "validating"}
+                >
+                  {changeState === "validating" ? "Validating…" : "Save Key"}
+                </ActionButton>
+                <ActionButton onClick={() => { setChangeState("idle"); setNewKey(""); setKeyError(null); }}>
+                  Cancel
+                </ActionButton>
+              </div>
+            </div>
+          ) : (
+            <ActionButton onClick={() => setChangeState("entering")}>
+              Configure Key
+            </ActionButton>
+          )}
+        </div>
       )}
     </Section>
   );

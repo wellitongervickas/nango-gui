@@ -1157,7 +1157,7 @@ export function registerIpcHandlers(): void {
       args: CredentialsSaveRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
-        credentialStore.save(args.secretKey);
+        credentialStore.save(args.secretKey, args.environment);
         credentialStore.saveEnvironment(args.environment);
         await initNangoClient(args.secretKey);
       })
@@ -1216,14 +1216,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.APP_GET_SETTINGS,
     async (): Promise<IpcResponse<AppSettings>> =>
-      wrap(async () => ({
-        environment: credentialStore.loadEnvironment(),
-        theme: credentialStore.loadTheme(),
-        maskedKey: credentialStore.loadMaskedKey(),
-        appVersion: app.getVersion(),
-        electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.70.1",
-      }))
+      wrap(async () => {
+        const environment = credentialStore.loadEnvironment();
+        return {
+          environment,
+          theme: credentialStore.loadTheme(),
+          maskedKey: credentialStore.loadMaskedKey(environment),
+          environmentKeys: credentialStore.getEnvironmentKeyStatus(),
+          appVersion: app.getVersion(),
+          electronVersion: process.versions.electron ?? "unknown",
+          nangoSdkVersion: "0.70.1",
+        };
+      })
   );
 
   ipcMain.handle(
@@ -1235,10 +1239,12 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         if (args.environment !== undefined) {
           credentialStore.saveEnvironment(args.environment);
-          // Re-initialize the Nango client so subsequent API calls use the new environment
-          const secretKey = credentialStore.load();
+          // Re-initialize the Nango client with the target environment's key
+          const secretKey = credentialStore.load(args.environment);
           if (secretKey) {
             await initNangoClient(secretKey);
+          } else {
+            resetNangoClient();
           }
         }
         if (args.theme !== undefined) {
