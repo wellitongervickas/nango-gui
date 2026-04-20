@@ -540,6 +540,7 @@ export function registerIpcHandlers(): void {
         return {
           token: result.data.token,
           expiresAt: result.data.expires_at,
+          ...(result.data.connect_link ? { connectLink: result.data.connect_link } : {}),
         };
       })
   );

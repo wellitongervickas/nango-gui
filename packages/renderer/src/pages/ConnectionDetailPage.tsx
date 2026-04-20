@@ -357,7 +357,7 @@ function SyncsSection({ syncs, isLoading, error, providerConfigKey, connectionId
   );
 }
 
-// ── Metadata section ──────────────────────────────────────────────────────
+// ── Metadata section (raw JSON) ───────────────────────────────────────────
 
 interface MetadataSectionProps {
   metadata: Record<string, unknown> | null;
