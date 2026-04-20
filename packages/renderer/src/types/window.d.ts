@@ -85,6 +85,10 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderLoadKeyResult,
   AiProviderClearKeyRequest,
+  NangoLogsSearchRequest,
+  NangoLogsSearchResult,
+  NangoLogsMessagesRequest,
+  NangoLogsMessagesResult,
 } from "@nango-gui/shared";
 
 declare global {
@@ -165,6 +169,8 @@ declare global {
       ): Promise<IpcResponse<NangoConnectionHealthData>>;
       setMetadata(args: NangoSetMetadataRequest): Promise<IpcResponse<void>>;
       createReconnectSession(args: NangoCreateReconnectSessionRequest): Promise<IpcResponse<NangoCreateReconnectSessionResult>>;
+      searchLogs(args: NangoLogsSearchRequest): Promise<IpcResponse<NangoLogsSearchResult>>;
+      getLogMessages(args: NangoLogsMessagesRequest): Promise<IpcResponse<NangoLogsMessagesResult>>;
     };
     credentials: {
       save(args: CredentialsSaveRequest): Promise<IpcResponse<void>>;

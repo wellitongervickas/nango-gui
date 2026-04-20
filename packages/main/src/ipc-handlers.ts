@@ -87,6 +87,10 @@ import {
   type NangoSuggestScopesRequest,
   type NangoSuggestScopesResult,
   type NangoSuggestedScope,
+  type NangoLogsSearchRequest,
+  type NangoLogsSearchResult,
+  type NangoLogsMessagesRequest,
+  type NangoLogsMessagesResult,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -94,6 +98,7 @@ import { rateLimitTracker } from "./rate-limit-tracker.js";
 import { aiService } from "./ai-service.js";
 import { runAiBuilder } from "./ai-builder-service.js";
 import { mcpManager } from "./mcp-manager.js";
+import { logsService } from "./logs-service.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -1723,6 +1728,31 @@ export function registerIpcHandlers(): void {
         ];
 
         return { supported: true, scopes };
+      })
+  );
+
+  // ── Nango Logs handlers ─────────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LOGS_SEARCH,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoLogsSearchRequest
+    ): Promise<IpcResponse<NangoLogsSearchResult>> =>
+      wrap(async () => logsService.searchOperations(args ?? {}))
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LOGS_MESSAGES,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoLogsMessagesRequest
+    ): Promise<IpcResponse<NangoLogsMessagesResult>> =>
+      wrap(async () => {
+        if (!args?.operationId) {
+          throw new Error("operationId is required");
+        }
+        return logsService.getMessages(args);
       })
   );
 }

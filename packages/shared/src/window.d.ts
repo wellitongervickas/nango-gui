@@ -71,6 +71,10 @@ import type {
   AiProviderLoadKeyResult,
   AiProviderClearKeyRequest,
   NangoSuggestScopesResult,
+  NangoLogsSearchRequest,
+  NangoLogsSearchResult,
+  NangoLogsMessagesRequest,
+  NangoLogsMessagesResult,
 } from "./ipc-channels.js";
 
 declare global {
@@ -136,6 +140,10 @@ declare global {
       ): Promise<IpcResponse<NangoConnectionHealthData>>;
       /** Discover OAuth2 scopes for a provider using Nango's scope catalog. */
       suggestScopes(providerKey: string): Promise<IpcResponse<NangoSuggestScopesResult>>;
+      /** Search Nango operation logs (syncs, actions, webhooks, etc.). */
+      searchLogs(args: NangoLogsSearchRequest): Promise<IpcResponse<NangoLogsSearchResult>>;
+      /** Get detailed messages for a specific log operation. */
+      getLogMessages(args: NangoLogsMessagesRequest): Promise<IpcResponse<NangoLogsMessagesResult>>;
     };
     credentials: {
       save(

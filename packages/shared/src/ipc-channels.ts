@@ -123,6 +123,10 @@ export const IPC_CHANNELS = {
   // Re-authorization (reconnect session)
   NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
 
+  // Nango Logs (operations search & messages)
+  NANGO_LOGS_SEARCH: "nango:logsSearch",
+  NANGO_LOGS_MESSAGES: "nango:logsMessages",
+
   // AI-powered OAuth2 scope discovery
   NANGO_SUGGEST_SCOPES: "nango:suggestScopes",
 } as const;
@@ -934,4 +938,96 @@ export interface NangoConnectionHealthData {
   syncCount: number;
   /** Number of syncs currently in error state. */
   errorCount: number;
+}
+
+// ── Nango Logs (Operations & Messages) ──────────────────────────────────
+
+export type NangoLogType = "sync" | "action" | "proxy" | "webhook" | "auth" | "deploy";
+export type NangoLogStatus = "success" | "failed" | "running" | "timeout" | "cancelled";
+export type NangoLogLevel = "info" | "debug" | "warn" | "error" | "http";
+
+export interface NangoLogOperation {
+  id: string;
+  type: NangoLogType;
+  configId: number | null;
+  configName: string | null;
+  connectionId: string | null;
+  connectionName: string | null;
+  syncId: string | null;
+  syncName: string | null;
+  jobId: string | null;
+  level: NangoLogLevel;
+  environmentId: number;
+  providerName: string | null;
+  status: NangoLogStatus;
+  title: string | null;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+}
+
+export interface NangoLogMessage {
+  id: string;
+  parentId: string | null;
+  level: NangoLogLevel;
+  type: "log" | "http";
+  source: "internal" | "user";
+  operationId: string;
+  message: string;
+  createdAt: string;
+  request?: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body?: string;
+  };
+  response?: {
+    code: number;
+    headers: Record<string, string>;
+    body?: string;
+  };
+  meta: Record<string, unknown> | null;
+}
+
+export interface NangoLogsSearchRequest {
+  /** Filter by operation type(s). */
+  types?: NangoLogType[];
+  /** Filter by status. */
+  status?: NangoLogStatus;
+  /** Filter by connection ID. */
+  connectionId?: string;
+  /** Filter by integration ID. */
+  integrationId?: string;
+  /** Time range filter. */
+  period?: {
+    from: string;
+    to: string;
+  };
+  /** Pagination cursor. */
+  cursor?: string;
+  /** Number of results to return (default 50). */
+  limit?: number;
+}
+
+export interface NangoLogsSearchResult {
+  operations: NangoLogOperation[];
+  pagination: {
+    cursor: string | null;
+    total: number;
+  };
+}
+
+export interface NangoLogsMessagesRequest {
+  operationId: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface NangoLogsMessagesResult {
+  messages: NangoLogMessage[];
+  pagination: {
+    cursor: string | null;
+  };
 }
