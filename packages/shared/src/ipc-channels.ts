@@ -981,10 +981,12 @@ export interface NangoLogMessage {
     url: string;
     method: string;
     headers: Record<string, string>;
+    body?: string;
   };
   response?: {
     code: number;
     headers: Record<string, string>;
+    body?: string;
   };
   meta: Record<string, unknown> | null;
 }

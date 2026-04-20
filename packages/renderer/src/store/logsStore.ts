@@ -17,6 +17,7 @@ interface LogsState {
   selectedOperationId: string | null;
   messages: NangoLogMessage[];
   messagesLoading: boolean;
+  messagesError: string | null;
 
   /** Filters */
   filterType: NangoLogType | null;
@@ -42,6 +43,7 @@ export const useLogsStore = create<LogsState>((set, get) => ({
   selectedOperationId: null,
   messages: [],
   messagesLoading: false,
+  messagesError: null,
   filterType: null,
   filterStatus: null,
   filterPeriodFrom: null,
@@ -86,22 +88,28 @@ export const useLogsStore = create<LogsState>((set, get) => ({
 
   fetchMessages: async (operationId: string) => {
     if (!window.nango) return;
-    set({ messagesLoading: true, messages: [] });
+    set({ messagesLoading: true, messages: [], messagesError: null });
 
     try {
       const res = await window.nango.getLogMessages({ operationId, limit: 100 });
+      // Guard against stale fetch overwriting current selection
+      if (get().selectedOperationId !== operationId) return;
       if (res.status === "error") {
-        set({ messagesLoading: false });
+        set({ messagesLoading: false, messagesError: res.error });
         return;
       }
       set({ messages: res.data.messages, messagesLoading: false });
-    } catch {
-      set({ messagesLoading: false });
+    } catch (err) {
+      if (get().selectedOperationId !== operationId) return;
+      set({
+        messagesLoading: false,
+        messagesError: err instanceof Error ? err.message : "Failed to fetch messages",
+      });
     }
   },
 
   setSelectedOperationId: (id: string | null) => {
-    set({ selectedOperationId: id, messages: [] });
+    set({ selectedOperationId: id, messages: [], messagesError: null });
     if (id) get().fetchMessages(id);
   },
 

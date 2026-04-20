@@ -105,10 +105,12 @@ interface RawMessagesResponse {
       url?: string;
       method?: string;
       headers?: Record<string, string>;
+      body?: string;
     };
     response?: {
       code?: number;
       headers?: Record<string, string>;
+      body?: string;
     };
     meta?: Record<string, unknown>;
   }>;
@@ -156,12 +158,14 @@ function mapMessage(raw: RawMessagesResponse["data"][number]): NangoLogMessage {
           url: raw.request.url ?? "",
           method: raw.request.method ?? "",
           headers: raw.request.headers ?? {},
+          body: raw.request.body,
         }
       : undefined,
     response: raw.response
       ? {
           code: raw.response.code ?? 0,
           headers: raw.response.headers ?? {},
+          body: raw.response.body,
         }
       : undefined,
     meta: raw.meta ?? null,

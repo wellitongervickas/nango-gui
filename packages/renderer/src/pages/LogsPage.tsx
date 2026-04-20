@@ -31,6 +31,28 @@ const PERIOD_OPTIONS = [
   { value: "30d", label: "Last 30 days" },
 ];
 
+const SENSITIVE_HEADERS = new Set([
+  "authorization",
+  "proxy-authorization",
+  "x-api-key",
+  "x-secret-key",
+]);
+
+function maskSensitiveHeader(name: string, value: string): string {
+  if (SENSITIVE_HEADERS.has(name.toLowerCase())) {
+    return value.length > 8 ? value.slice(0, 4) + "••••••••" : "••••••••";
+  }
+  return value;
+}
+
+function formatBody(body: string): string {
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
+}
+
 function periodToRange(period: string): { from: string; to: string } {
   const now = new Date();
   const to = now.toISOString();
@@ -140,10 +162,20 @@ function HttpMessageDetail({ message }: { message: NangoLogMessage }) {
             {Object.entries(message.request!.headers).map(([k, v]) => (
               <div key={k} className="flex px-2.5 py-1 border-b border-[var(--color-border)] last:border-0 gap-2 text-xs">
                 <span className="font-mono text-[var(--color-text-muted)] shrink-0 w-36 truncate">{k}</span>
-                <span className="font-mono text-[var(--color-text)] break-all">{v}</span>
+                <span className="font-mono text-[var(--color-text)] break-all">{maskSensitiveHeader(k, v)}</span>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Request body */}
+      {hasRequest && message.request!.body && (
+        <div className="space-y-1">
+          <p className="text-[var(--color-text-muted)] font-medium uppercase tracking-wide text-[10px]">Request Body</p>
+          <pre className="rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-mono text-xs text-[var(--color-text)] whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+            {formatBody(message.request!.body)}
+          </pre>
         </div>
       )}
 
@@ -155,10 +187,20 @@ function HttpMessageDetail({ message }: { message: NangoLogMessage }) {
             {Object.entries(message.response!.headers).map(([k, v]) => (
               <div key={k} className="flex px-2.5 py-1 border-b border-[var(--color-border)] last:border-0 gap-2 text-xs">
                 <span className="font-mono text-[var(--color-text-muted)] shrink-0 w-36 truncate">{k}</span>
-                <span className="font-mono text-[var(--color-text)] break-all">{v}</span>
+                <span className="font-mono text-[var(--color-text)] break-all">{maskSensitiveHeader(k, v)}</span>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Response body */}
+      {hasResponse && message.response!.body && (
+        <div className="space-y-1">
+          <p className="text-[var(--color-text-muted)] font-medium uppercase tracking-wide text-[10px]">Response Body</p>
+          <pre className="rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-mono text-xs text-[var(--color-text)] whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+            {formatBody(message.response!.body)}
+          </pre>
         </div>
       )}
     </div>
@@ -170,6 +212,7 @@ function HttpMessageDetail({ message }: { message: NangoLogMessage }) {
 function OperationDetail({ operation, onClose }: { operation: NangoLogOperation; onClose: () => void }) {
   const messages = useLogsStore((s) => s.messages);
   const messagesLoading = useLogsStore((s) => s.messagesLoading);
+  const messagesError = useLogsStore((s) => s.messagesError);
 
   const httpMessages = useMemo(() => messages.filter((m) => m.type === "http"), [messages]);
   const logMessages = useMemo(() => messages.filter((m) => m.type === "log"), [messages]);
@@ -252,6 +295,13 @@ function OperationDetail({ operation, onClose }: { operation: NangoLogOperation;
           <div className="flex items-center gap-2 py-4 justify-center text-[var(--color-text-muted)]">
             <SpinnerIcon />
             <span>Loading messages…</span>
+          </div>
+        )}
+
+        {/* Messages error */}
+        {messagesError && (
+          <div className="px-3 py-2.5 rounded-md border border-[var(--color-error)]/30 bg-[var(--color-error)]/5 text-xs text-[var(--color-error)]">
+            Failed to load messages: {messagesError}
           </div>
         )}
 
