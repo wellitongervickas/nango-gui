@@ -63,7 +63,7 @@ export interface FieldMappingEdgeData {
   expanded: boolean;
 }
 
-export type NangoAuthType = "oauth2" | "api_key" | "basic" | "none";
+export type NangoAuthType = "oauth2" | "api_key" | "basic" | "jwt_bearer" | "none";
 export type NangoEnvironment = "development" | "staging" | "production";
 
 export interface NangoErrorHandling {

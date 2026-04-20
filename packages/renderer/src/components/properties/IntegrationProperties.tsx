@@ -10,6 +10,7 @@ const AUTH_TYPES: { value: NangoAuthType; label: string }[] = [
   { value: "oauth2", label: "OAuth 2.0" },
   { value: "api_key", label: "API Key" },
   { value: "basic", label: "Basic Auth" },
+  { value: "jwt_bearer", label: "JWT Bearer" },
   { value: "none", label: "None" },
 ];
 
