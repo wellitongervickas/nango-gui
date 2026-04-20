@@ -13,6 +13,7 @@ const mockSyncs: NangoSyncRecord[] = [
     finishedAt: "2026-04-14T10:00:00Z",
     nextScheduledSyncAt: "2026-04-14T10:30:00Z",
     latestResult: { added: 10, updated: 2, deleted: 0 },
+    checkpoint: { last_synced_at: "2026-04-14T10:00:00Z", cursor: "abc123" },
   },
   {
     id: "sync-2",
@@ -23,6 +24,7 @@ const mockSyncs: NangoSyncRecord[] = [
     finishedAt: "2026-04-14T09:00:00Z",
     nextScheduledSyncAt: null,
     latestResult: null,
+    checkpoint: null,
   },
 ];
 

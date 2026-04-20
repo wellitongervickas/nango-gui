@@ -14,6 +14,13 @@ function formatDate(iso: string | null): string {
   }
 }
 
+function formatCheckpoint(checkpoint: Record<string, string | number | boolean> | null): string {
+  if (!checkpoint) return "\u2014";
+  const entries = Object.entries(checkpoint);
+  if (entries.length === 0) return "\u2014";
+  return entries.map(([k, v]) => `${k}: ${v}`).join(", ");
+}
+
 export function SyncRow({
   sync,
   providerConfigKey,
@@ -136,7 +143,17 @@ export function SyncRow({
       </div>
 
       <div className="w-40 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">
-        {formatDate(sync.finishedAt)}
+        {sync.checkpoint ? (
+          <span title={formatCheckpoint(sync.checkpoint)}>
+            {formatDate(sync.finishedAt)}
+          </span>
+        ) : (
+          formatDate(sync.finishedAt)
+        )}
+      </div>
+
+      <div className="w-36 text-xs text-[var(--color-text-secondary)] truncate" title={formatCheckpoint(sync.checkpoint)}>
+        {formatCheckpoint(sync.checkpoint)}
       </div>
 
       <div className="w-40 text-xs text-[var(--color-text-secondary)] whitespace-nowrap">

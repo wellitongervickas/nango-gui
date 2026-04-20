@@ -301,12 +301,16 @@ export type NangoSyncStatus =
   | "ERROR"
   | "SUCCESS";
 
+/** Key-value checkpoint data returned by the Nango Sync Checkpoints API. */
+export type NangoCheckpoint = Record<string, string | number | boolean>;
+
 export interface NangoSyncRecord {
   id: string;
   name: string;
   status: NangoSyncStatus;
   type: string;
   frequency: string | null;
+  /** @deprecated Use `checkpoint` for sync position tracking. Kept for backward compatibility. */
   finishedAt: string | null;
   nextScheduledSyncAt: string | null;
   latestResult: {
@@ -314,6 +318,8 @@ export interface NangoSyncRecord {
     updated: number;
     deleted: number;
   } | null;
+  /** Sync Checkpoints API data — replaces date-based lastSyncDate tracking. */
+  checkpoint: NangoCheckpoint | null;
 }
 
 export interface NangoListSyncsRequest {

@@ -74,6 +74,7 @@ export function SyncsPage() {
         else if (sortKey === "status") { av = a.status; bv = b.status; }
         else if (sortKey === "frequency") { av = a.frequency ?? ""; bv = b.frequency ?? ""; }
         else if (sortKey === "finishedAt") { av = a.finishedAt ?? ""; bv = b.finishedAt ?? ""; }
+        else if (sortKey === "checkpoint") { av = a.checkpoint ? JSON.stringify(a.checkpoint) : ""; bv = b.checkpoint ? JSON.stringify(b.checkpoint) : ""; }
         else { av = a.nextScheduledSyncAt ?? ""; bv = b.nextScheduledSyncAt ?? ""; }
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
@@ -163,6 +164,7 @@ export function SyncsPage() {
             <SortHeader label="Status" sortKey="status" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-24" />
             <SortHeader label="Frequency" sortKey="frequency" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-28" />
             <SortHeader label="Last Run" sortKey="finishedAt" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-40" />
+            <SortHeader label="Checkpoint" sortKey="checkpoint" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
             <SortHeader label="Next Run" sortKey="nextScheduledSyncAt" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-40" />
             <div className="w-20 text-xs text-[var(--color-text-secondary)] text-right">Records</div>
             <div className="w-20" />

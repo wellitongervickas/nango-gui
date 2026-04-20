@@ -243,10 +243,74 @@ describe("IPC handlers", () => {
             name: "get-contacts",
             status: "RUNNING",
             latestResult: { added: 5, updated: 2, deleted: 0 },
+            checkpoint: null,
           },
         ],
       });
       expect(mockSyncStatus).toHaveBeenCalledWith("gh", [], "conn-1");
+    });
+
+    it("extracts checkpoint data from sync status", async () => {
+      mockSyncStatus.mockResolvedValueOnce({
+        syncs: [
+          {
+            id: "s2",
+            name: "get-deals",
+            status: "SUCCESS",
+            type: "INCREMENTAL",
+            frequency: "every 30 minutes",
+            finishedAt: "2024-06-15T12:00:00Z",
+            nextScheduledSyncAt: "2024-06-15T12:30:00Z",
+            latestResult: { added: 10, updated: 3, deleted: 1 },
+            checkpoint: { last_synced_at: "2024-06-15T12:00:00Z", cursor: "abc123", page: 42 },
+          },
+        ],
+      });
+
+      const handler = handlers.get("nango:listSyncs")!;
+      const result = await handler({}, { connectionId: "conn-1", providerConfigKey: "gh" });
+
+      expect(result).toMatchObject({
+        status: "ok",
+        data: [
+          {
+            id: "s2",
+            name: "get-deals",
+            status: "SUCCESS",
+            checkpoint: { last_synced_at: "2024-06-15T12:00:00Z", cursor: "abc123", page: 42 },
+          },
+        ],
+      });
+    });
+
+    it("returns null checkpoint when checkpoint is empty or invalid", async () => {
+      mockSyncStatus.mockResolvedValueOnce({
+        syncs: [
+          {
+            id: "s3",
+            name: "get-users",
+            status: "PAUSED",
+            checkpoint: null,
+          },
+          {
+            id: "s4",
+            name: "get-tasks",
+            status: "STOPPED",
+            checkpoint: {},
+          },
+        ],
+      });
+
+      const handler = handlers.get("nango:listSyncs")!;
+      const result = await handler({}, { connectionId: "conn-1", providerConfigKey: "gh" });
+
+      expect(result).toMatchObject({
+        status: "ok",
+        data: [
+          { id: "s3", checkpoint: null },
+          { id: "s4", checkpoint: null },
+        ],
+      });
     });
   });
 
@@ -435,6 +499,30 @@ describe("IPC handlers", () => {
       });
     });
 
+    it("prefers checkpoint timestamp over finishedAt for lastActivity", async () => {
+      mockListConnections.mockResolvedValueOnce({
+        connections: [
+          { id: 1, connection_id: "c1", provider: "github", provider_config_key: "gh", created: "2024-01-01" },
+        ],
+      });
+      mockSyncStatus.mockResolvedValueOnce({
+        syncs: [
+          {
+            name: "contacts",
+            status: "SUCCESS",
+            finishedAt: "2024-05-01",
+            checkpoint: { last_synced_at: "2024-06-15T12:00:00Z" },
+          },
+        ],
+      });
+
+      const handler = handlers.get("nango:getDashboard")!;
+      const result = (await handler({})) as { status: string; data: { topConnections: Array<{ lastActivity: string | null }> } };
+
+      expect(result.status).toBe("ok");
+      expect(result.data.topConnections[0].lastActivity).toBe("2024-06-15T12:00:00Z");
+    });
+
     it("handles connections with no syncs gracefully", async () => {
       mockListConnections.mockResolvedValueOnce({
         connections: [
@@ -481,7 +569,7 @@ describe("IPC handlers", () => {
         status: "ok",
         data: {
           appVersion: "1.0.0",
-          nangoSdkVersion: "0.69.49",
+          nangoSdkVersion: "0.70.1",
         },
       });
     });

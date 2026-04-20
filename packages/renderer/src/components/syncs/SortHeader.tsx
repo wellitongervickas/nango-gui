@@ -1,7 +1,7 @@
 import { ChevronSortIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
-export type SyncSortKey = "name" | "status" | "frequency" | "finishedAt" | "nextScheduledSyncAt";
+export type SyncSortKey = "name" | "status" | "frequency" | "finishedAt" | "checkpoint" | "nextScheduledSyncAt";
 export type SortDir = "asc" | "desc";
 
 export function SortHeader({

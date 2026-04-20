@@ -31,6 +31,7 @@ import {
   type NangoUpdateSyncFrequencyRequest,
   type NangoUpdateSyncFrequencyResult,
   type NangoSyncRecord,
+  type NangoCheckpoint,
   type NangoListRecordsRequest,
   type NangoListRecordsResult,
   type NangoDashboardData,
@@ -162,6 +163,19 @@ const VALID_SYNC_STATUSES = new Set([
   "SUCCESS",
 ]);
 
+/** Extract a validated NangoCheckpoint from a raw value, or null. */
+function extractCheckpoint(raw: unknown): NangoCheckpoint | null {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  const result: NangoCheckpoint = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+      result[key] = val;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 /** Map a raw Nango sync status object to our typed record with field validation. */
 function mapSyncRecord(raw: unknown): NangoSyncRecord {
   if (raw == null || typeof raw !== "object") {
@@ -208,6 +222,7 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
           deleted: typeof result.deleted === "number" ? result.deleted : 0,
         }
       : null,
+    checkpoint: extractCheckpoint(s.checkpoint),
   };
 }
 
@@ -261,6 +276,25 @@ interface SyncStatsResult {
   syncCounts: SyncCounts;
 }
 
+/**
+ * Derive a timestamp string from checkpoint data for activity tracking.
+ * Looks for common timestamp keys (last_synced_at, updated_at, timestamp, etc.)
+ * and returns the latest one found. Falls back to null.
+ */
+function deriveTimestampFromCheckpoint(checkpoint: unknown): string | null {
+  if (checkpoint == null || typeof checkpoint !== "object" || Array.isArray(checkpoint)) return null;
+  const cp = checkpoint as Record<string, unknown>;
+  const timestampKeys = ["last_synced_at", "updated_at", "timestamp", "synced_at", "completed_at"];
+  let latest: string | null = null;
+  for (const key of timestampKeys) {
+    const val = cp[key];
+    if (typeof val === "string" && val.length > 0) {
+      if (!latest || val > latest) latest = val;
+    }
+  }
+  return latest;
+}
+
 async function aggregateSyncStats(
   client: ReturnType<typeof getNangoClient>,
   connections: ConnectionRow[],
@@ -281,6 +315,7 @@ async function aggregateSyncStats(
         name?: string;
         status?: string;
         finishedAt?: string;
+        checkpoint?: Record<string, unknown> | null;
       }>;
 
       let connLastActivity: string | null = null;
@@ -301,8 +336,11 @@ async function aggregateSyncStats(
             timestamp: s.finishedAt ?? null,
           });
         }
-        if (s.finishedAt && (!connLastActivity || s.finishedAt > connLastActivity)) {
-          connLastActivity = s.finishedAt;
+        // Prefer checkpoint timestamp, fall back to finishedAt
+        const checkpointTs = deriveTimestampFromCheckpoint(s.checkpoint);
+        const activityTs = checkpointTs ?? s.finishedAt ?? null;
+        if (activityTs && (!connLastActivity || activityTs > connLastActivity)) {
+          connLastActivity = activityTs;
         }
       }
       syncCounts.set(key, { syncCount: syncs.length, lastActivity: connLastActivity });
