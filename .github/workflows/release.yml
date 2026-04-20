@@ -22,9 +22,15 @@ jobs:
           - os: windows-latest
             platform: win
             arch: x64
+          - os: windows-latest
+            platform: win
+            arch: arm64
           - os: ubuntu-latest
             platform: linux
             arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
 
     name: Build (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
@@ -40,6 +46,13 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install cross-compilation toolchain (Linux ARM64)
+        if: matrix.platform == 'linux' && matrix.arch == 'arm64'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
       - run: pnpm install --frozen-lockfile
 
       - name: Build renderer and main
@@ -53,7 +66,7 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: pnpm dist:${{ matrix.platform }}
+        run: pnpm dist:${{ matrix.platform }} -- --arch=${{ matrix.arch }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

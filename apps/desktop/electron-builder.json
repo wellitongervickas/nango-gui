@@ -27,7 +27,7 @@
   },
   "win": {
     "target": [
-      { "target": "nsis", "arch": ["x64"] }
+      { "target": "nsis", "arch": ["x64", "arm64"] }
     ]
   },
   "nsis": {
@@ -37,8 +37,8 @@
   },
   "linux": {
     "target": [
-      { "target": "AppImage", "arch": ["x64"] },
-      { "target": "deb", "arch": ["x64"] }
+      { "target": "AppImage", "arch": ["x64", "arm64"] },
+      { "target": "deb", "arch": ["x64", "arm64"] }
     ],
     "category": "Development",
     "maintainer": "nango"
