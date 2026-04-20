@@ -4,6 +4,7 @@ import { useSyncsStore } from "@/store/syncsStore";
 import { PlayIcon, PauseIcon, SpinnerIcon } from "@/components/icons";
 import { StatusBadge } from "./StatusBadge";
 import { cn } from "@/lib/utils";
+import { PermissionGate } from "@/components/common/PermissionGate";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "\u2014";
@@ -148,36 +149,40 @@ export function SyncRow({
       </div>
 
       <div className="w-20 flex items-center gap-1 justify-end">
-        <button
-          onClick={handleTrigger}
-          disabled={isBusy}
-          title="Trigger sync"
-          className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50 opacity-0 group-hover:opacity-100"
-          aria-label="Trigger sync"
-        >
-          {isBusy ? <SpinnerIcon /> : <PlayIcon />}
-        </button>
+        <PermissionGate permission="production_actions">
+          <button
+            onClick={handleTrigger}
+            disabled={isBusy}
+            title="Trigger sync"
+            className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50 opacity-0 group-hover:opacity-100"
+            aria-label="Trigger sync"
+          >
+            {isBusy ? <SpinnerIcon /> : <PlayIcon />}
+          </button>
+        </PermissionGate>
 
-        <button
-          onClick={handleTogglePause}
-          disabled={isBusy || sync.status === "STOPPED"}
-          title={sync.status === "PAUSED" ? "Resume sync" : "Pause sync"}
-          className={cn(
-            "flex items-center justify-center w-7 h-7 rounded-md transition-all cursor-pointer disabled:opacity-50 opacity-0 group-hover:opacity-100",
-            sync.status === "PAUSED"
-              ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-              : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
-          )}
-          aria-label={sync.status === "PAUSED" ? "Resume sync" : "Pause sync"}
-        >
-          {isBusy ? (
-            <SpinnerIcon />
-          ) : sync.status === "PAUSED" ? (
-            <PlayIcon />
-          ) : (
-            <PauseIcon />
-          )}
-        </button>
+        <PermissionGate permission="production_actions">
+          <button
+            onClick={handleTogglePause}
+            disabled={isBusy || sync.status === "STOPPED"}
+            title={sync.status === "PAUSED" ? "Resume sync" : "Pause sync"}
+            className={cn(
+              "flex items-center justify-center w-7 h-7 rounded-md transition-all cursor-pointer disabled:opacity-50 opacity-0 group-hover:opacity-100",
+              sync.status === "PAUSED"
+                ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
+                : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+            )}
+            aria-label={sync.status === "PAUSED" ? "Resume sync" : "Pause sync"}
+          >
+            {isBusy ? (
+              <SpinnerIcon />
+            ) : sync.status === "PAUSED" ? (
+              <PlayIcon />
+            ) : (
+              <PauseIcon />
+            )}
+          </button>
+        </PermissionGate>
       </div>
     </div>
   );

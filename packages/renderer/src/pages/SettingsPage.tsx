@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
+import type { AppTheme, NangoEnvironment, UserRole } from "@nango-gui/shared";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useRbacStore } from "@/store/rbacStore";
+import { useRbac } from "@/hooks/useRbac";
 import { cn } from "@/lib/utils";
 import { navigate } from "@/lib/router";
 import { ErrorBanner } from "../components/common/ErrorBanner";
@@ -42,6 +44,7 @@ export function SettingsPage() {
         <ApiKeySection maskedKey={maskedKey} />
         <EnvironmentSection environment={environment} onUpdate={updateEnvironment} />
         <AppearanceSection theme={theme} onUpdate={updateTheme} />
+        <TeamRolesSection />
         <AboutSection
           appVersion={appVersion}
           electronVersion={electronVersion}
@@ -287,6 +290,103 @@ function AppearanceSection({
       </div>
       {themeError && (
         <p className="mt-2 text-xs text-[var(--color-error)]">{themeError}</p>
+      )}
+    </Section>
+  );
+}
+
+// ── Team Roles ────────────────────────────────────────────────────────────
+
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "full_access", label: "Full Access" },
+  { value: "support", label: "Support" },
+  { value: "contributor", label: "Contributor" },
+];
+
+function TeamRolesSection() {
+  const { hasRbac, canManageTeam } = useRbac();
+  const teamMembers = useRbacStore((s) => s.teamMembers);
+  const fetchTeamMembers = useRbacStore((s) => s.fetchTeamMembers);
+  const updateMemberRole = useRbacStore((s) => s.updateMemberRole);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hasRbac && canManageTeam) {
+      fetchTeamMembers();
+    }
+  }, [hasRbac, canManageTeam, fetchTeamMembers]);
+
+  if (!hasRbac || !canManageTeam) return null;
+
+  async function handleRoleChange(userId: string, role: UserRole) {
+    setUpdatingId(userId);
+    try {
+      await updateMemberRole(userId, role);
+    } catch {
+      // Error handled in store
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  return (
+    <Section title="Team">
+      <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+        Manage your team members and their access levels.
+      </p>
+
+      {teamMembers.length === 0 ? (
+        <p className="text-sm text-[var(--color-text-muted)]">
+          No team members found. Team management requires a Growth or Enterprise plan.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {/* Header row */}
+          <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)] font-medium">
+            <span className="flex-1">Name</span>
+            <span className="w-48">Email</span>
+            <span className="w-36">Role</span>
+          </div>
+
+          {/* Member rows */}
+          {teamMembers.map((member) => (
+            <div
+              key={member.id}
+              className={cn(
+                "flex items-center gap-4 py-2 border-t border-[var(--color-border)]",
+                updatingId === member.id && "opacity-50"
+              )}
+            >
+              <span className="flex-1 text-sm text-[var(--color-text)] truncate">
+                {member.name}
+                {member.isCurrentUser && (
+                  <span className="ml-2 text-xs text-[var(--color-text-muted)]">(you)</span>
+                )}
+              </span>
+              <span className="w-48 text-sm text-[var(--color-text-muted)] truncate">
+                {member.email}
+              </span>
+              <div className="w-36">
+                <select
+                  value={member.role}
+                  onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
+                  disabled={member.isCurrentUser || updatingId === member.id}
+                  aria-label={`Role for ${member.name}`}
+                  className={cn(
+                    "w-full px-2 py-1 text-sm rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-500)]",
+                    member.isCurrentUser && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </Section>
   );

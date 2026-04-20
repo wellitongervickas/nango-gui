@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useEnvironmentStore, type EnvironmentEntry } from "../../store/environmentStore";
+import { useRbac } from "../../hooks/useRbac";
 import { cn } from "../../lib/utils";
 import { navigate } from "../../lib/router";
 import type { NangoEnvironment } from "@nango-gui/shared";
@@ -77,6 +78,12 @@ function ProdConfirmation({
   onCancel: () => void;
 }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const { hasRbac, isAdmin, role } = useRbac();
+
+  const ROLE_LABELS: Record<string, string> = {
+    support: "Support",
+    contributor: "Contributor",
+  };
 
   useEffect(() => {
     confirmRef.current?.focus();
@@ -93,6 +100,8 @@ function ProdConfirmation({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onCancel]);
 
+  const showRoleWarning = hasRbac && !isAdmin;
+
   return (
     <div className="p-3 border-t border-[var(--color-border)]">
       <p className="text-xs font-medium text-[var(--color-text)] mb-1">
@@ -100,6 +109,11 @@ function ProdConfirmation({
       </p>
       <p className="text-xs text-[var(--color-text-muted)] mb-3">
         You are about to operate in the live production environment.
+        {showRoleWarning && (
+          <>
+            {" "}As a <span className="font-semibold">{ROLE_LABELS[role]}</span> member, destructive and trigger actions will be disabled.
+          </>
+        )}
       </p>
       <div className="flex gap-2 justify-end">
         <button

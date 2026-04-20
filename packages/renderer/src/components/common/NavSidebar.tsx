@@ -1,6 +1,6 @@
 import { useHashRoute, navigate } from "../../lib/router";
 import { cn } from "../../lib/utils";
-import { useRbac } from "../../hooks/useRbac";
+import { UserRoleBadge } from "./UserRoleBadge";
 
 interface NavItem {
   label: string;
@@ -51,7 +51,6 @@ function isRouteActive(route: string, currentRoute: string): boolean {
 
 export function NavSidebar() {
   const currentRoute = useHashRoute();
-  const { hasRbac, isAdmin } = useRbac();
 
   return (
     <aside className="w-[200px] shrink-0 bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col overflow-y-auto">
@@ -97,14 +96,7 @@ export function NavSidebar() {
 
       {/* Bottom-anchored Settings */}
       <div className="px-2 pb-3 border-t border-[var(--color-border)] pt-2">
-        {/* RBAC role badge — shown only when the Nango server has RBAC enabled */}
-        {hasRbac && (
-          <div className="px-2 py-1.5 mb-1 flex items-center gap-1.5">
-            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)] uppercase tracking-wide">
-              {isAdmin ? "Admin" : "Viewer"}
-            </span>
-          </div>
-        )}
+        <UserRoleBadge />
         <button
           onClick={() => navigate("settings")}
           className={cn(

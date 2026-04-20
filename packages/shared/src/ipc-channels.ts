@@ -891,6 +891,22 @@ export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
 }
 
+// ── RBAC ─────────────────────────────────────────────────────────────────
+
+export type UserRole = "full_access" | "support" | "contributor";
+
+export interface RbacUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface TeamMember extends RbacUser {
+  joinedAt: string;
+  isCurrentUser: boolean;
+}
+
 // ── Connection Health ─────────────────────────────────────────────────────
 
 export type ConnectionStatus = "active" | "syncing" | "broken" | "expired";

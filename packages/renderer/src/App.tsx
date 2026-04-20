@@ -20,6 +20,7 @@ import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { ProdEnvironmentBanner } from "./components/common/ProdEnvironmentBanner";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
@@ -44,6 +45,7 @@ function AppShell({ children, pageName }: { children: React.ReactNode; pageName:
     <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
       <OfflineBanner />
       <Toolbar />
+      <ProdEnvironmentBanner />
       <div className="flex flex-1 overflow-hidden">
         <NavSidebar />
         <main className="flex-1 relative overflow-hidden">
@@ -169,6 +171,7 @@ function App() {
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
         <OfflineBanner />
         <Toolbar />
+        <ProdEnvironmentBanner />
         <div className="flex flex-1 overflow-hidden">
           <NavSidebar />
           <Sidebar />

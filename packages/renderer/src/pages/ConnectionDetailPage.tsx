@@ -15,6 +15,7 @@ import {
   PauseIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { PermissionGate } from "@/components/common/PermissionGate";
 import { useWebhooksStore } from "@/store/webhooksStore";
 import type { WebhookConflictStrategy } from "@nango-gui/shared";
 
@@ -275,27 +276,31 @@ function SyncMiniRow({
         {formatDate(sync.finishedAt)}
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={handleTrigger}
-          disabled={isBusy}
-          title="Trigger sync"
-          className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
-        >
-          {isBusy ? <SpinnerIcon /> : <PlayIcon />}
-        </button>
-        <button
-          onClick={handleTogglePause}
-          disabled={isBusy || sync.status === "STOPPED"}
-          title={sync.status === "PAUSED" ? "Resume" : "Pause"}
-          className={cn(
-            "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
-            sync.status === "PAUSED"
-              ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-              : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
-          )}
-        >
-          {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
-        </button>
+        <PermissionGate permission="production_actions">
+          <button
+            onClick={handleTrigger}
+            disabled={isBusy}
+            title="Trigger sync"
+            className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isBusy ? <SpinnerIcon /> : <PlayIcon />}
+          </button>
+        </PermissionGate>
+        <PermissionGate permission="production_actions">
+          <button
+            onClick={handleTogglePause}
+            disabled={isBusy || sync.status === "STOPPED"}
+            title={sync.status === "PAUSED" ? "Resume" : "Pause"}
+            className={cn(
+              "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
+              sync.status === "PAUSED"
+                ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
+                : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+            )}
+          >
+            {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
+          </button>
+        </PermissionGate>
       </div>
     </div>
   );
@@ -1075,11 +1080,13 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
         )}
 
         {/* Danger Zone */}
-        <DangerZoneSection
-          connectionId={connectionId}
-          onDelete={handleDelete}
-          isDeleting={isDeleting}
-        />
+        <PermissionGate permission="delete_connection" mode="hide">
+          <DangerZoneSection
+            connectionId={connectionId}
+            onDelete={handleDelete}
+            isDeleting={isDeleting}
+          />
+        </PermissionGate>
       </div>
     </div>
   );
