@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { NangoProxyMethod } from "@nango-gui/shared";
+import type { AsyncActionStatus, NangoProxyMethod } from "@nango-gui/shared";
 import { notifyIpcError } from "./notifyError";
 
 // ── History entry types ────────────────────────────────────────────────────
@@ -15,6 +15,12 @@ export interface ActionHistoryEntry {
   result: unknown | null;
   error: string | null;
   durationMs: number;
+  /** True when this entry was triggered as an async action. */
+  isAsync: boolean;
+  /** Final async status — only set when isAsync is true. */
+  asyncStatus: AsyncActionStatus | null;
+  /** Number of automatic retries reported by Nango. */
+  retryCount: number;
 }
 
 export interface ProxyHistoryEntry {
@@ -38,14 +44,22 @@ export interface ProxyHistoryEntry {
 export type HistoryEntry = ActionHistoryEntry | ProxyHistoryEntry;
 
 const MAX_HISTORY = 20;
+/** Polling interval for async action status (ms). */
+const ASYNC_POLL_INTERVAL_MS = 2_000;
 
 // ── Store interface ────────────────────────────────────────────────────────
 
 interface ActionsState {
-  // Action runner
+  // Sync action runner
   actionResult: unknown | null;
   isExecutingAction: boolean;
   actionError: string | null;
+
+  // Async action runner
+  asyncActionId: string | null;
+  asyncActionStatusUrl: string | null;
+  asyncActionStatus: AsyncActionStatus | null;
+  asyncActionRetryCount: number;
 
   // Proxy tester
   proxyStatus: number | null;
@@ -59,6 +73,12 @@ interface ActionsState {
 
   // Actions
   triggerAction: (
+    integrationId: string,
+    connectionId: string,
+    actionName: string,
+    input: Record<string, unknown>
+  ) => Promise<void>;
+  triggerActionAsync: (
     integrationId: string,
     connectionId: string,
     actionName: string,
@@ -82,10 +102,15 @@ interface ActionsState {
 
 let _nextId = 1;
 
-export const useActionsStore = create<ActionsState>((set) => ({
+export const useActionsStore = create<ActionsState>((set, get) => ({
   actionResult: null,
   isExecutingAction: false,
   actionError: null,
+
+  asyncActionId: null,
+  asyncActionStatusUrl: null,
+  asyncActionStatus: null,
+  asyncActionRetryCount: 0,
 
   proxyStatus: null,
   proxyHeaders: null,
@@ -123,6 +148,9 @@ export const useActionsStore = create<ActionsState>((set) => ({
           result: null,
           error: res.error,
           durationMs,
+          isAsync: false,
+          asyncStatus: null,
+          retryCount: 0,
         };
         set((s) => ({
           actionError: res.error,
@@ -143,6 +171,9 @@ export const useActionsStore = create<ActionsState>((set) => ({
         result: res.data.result,
         error: null,
         durationMs,
+        isAsync: false,
+        asyncStatus: null,
+        retryCount: 0,
       };
       set((s) => ({
         actionResult: res.data.result,
@@ -164,10 +195,199 @@ export const useActionsStore = create<ActionsState>((set) => ({
         result: null,
         error: errorMsg,
         durationMs,
+        isAsync: false,
+        asyncStatus: null,
+        retryCount: 0,
       };
       set((s) => ({
         actionError: errorMsg,
         isExecutingAction: false,
+        history: [entry, ...s.history].slice(0, MAX_HISTORY),
+      }));
+    }
+  },
+
+  triggerActionAsync: async (integrationId, connectionId, actionName, input) => {
+    if (!window.nango) return;
+    set({
+      isExecutingAction: true,
+      actionError: null,
+      actionResult: null,
+      asyncActionId: null,
+      asyncActionStatusUrl: null,
+      asyncActionStatus: "pending",
+      asyncActionRetryCount: 0,
+    });
+    const start = Date.now();
+
+    try {
+      // Step 1: trigger the async action — get back id + statusUrl
+      const triggerRes = await window.nango.triggerActionAsync({
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+      });
+
+      if (triggerRes.status === "error") {
+        notifyIpcError(triggerRes);
+        const durationMs = Date.now() - start;
+        const entry: ActionHistoryEntry = {
+          id: String(_nextId++),
+          type: "action",
+          timestamp: new Date().toISOString(),
+          integrationId,
+          connectionId,
+          actionName,
+          input,
+          result: null,
+          error: triggerRes.error,
+          durationMs,
+          isAsync: true,
+          asyncStatus: "failed",
+          retryCount: 0,
+        };
+        set((s) => ({
+          actionError: triggerRes.error,
+          isExecutingAction: false,
+          asyncActionStatus: "failed",
+          history: [entry, ...s.history].slice(0, MAX_HISTORY),
+        }));
+        return;
+      }
+
+      const { id, statusUrl } = triggerRes.data;
+      set({ asyncActionId: id, asyncActionStatusUrl: statusUrl, asyncActionStatus: "pending" });
+
+      // Step 2: poll until terminal status
+      await new Promise<void>((resolve) => {
+        const poll = async () => {
+          // Guard: if the action was cleared while polling, stop
+          const current = get();
+          if (!current.isExecutingAction) {
+            resolve();
+            return;
+          }
+
+          try {
+            const pollRes = await window.nango.getAsyncActionResult({ id, statusUrl });
+
+            if (pollRes.status === "error") {
+              const durationMs = Date.now() - start;
+              const entry: ActionHistoryEntry = {
+                id: String(_nextId++),
+                type: "action",
+                timestamp: new Date().toISOString(),
+                integrationId,
+                connectionId,
+                actionName,
+                input,
+                result: null,
+                error: pollRes.error,
+                durationMs,
+                isAsync: true,
+                asyncStatus: "failed",
+                retryCount: get().asyncActionRetryCount,
+              };
+              set((s) => ({
+                actionError: pollRes.error,
+                isExecutingAction: false,
+                asyncActionStatus: "failed",
+                history: [entry, ...s.history].slice(0, MAX_HISTORY),
+              }));
+              resolve();
+              return;
+            }
+
+            const data = pollRes.data;
+            const retryCount = data.retryCount ?? 0;
+            set({ asyncActionStatus: data.status, asyncActionRetryCount: retryCount });
+
+            if (data.status === "succeeded") {
+              const durationMs = Date.now() - start;
+              const entry: ActionHistoryEntry = {
+                id: String(_nextId++),
+                type: "action",
+                timestamp: new Date().toISOString(),
+                integrationId,
+                connectionId,
+                actionName,
+                input,
+                result: data.result ?? null,
+                error: null,
+                durationMs,
+                isAsync: true,
+                asyncStatus: "succeeded",
+                retryCount,
+              };
+              set((s) => ({
+                actionResult: data.result ?? null,
+                isExecutingAction: false,
+                asyncActionStatus: "succeeded",
+                history: [entry, ...s.history].slice(0, MAX_HISTORY),
+              }));
+              resolve();
+            } else if (data.status === "failed") {
+              const durationMs = Date.now() - start;
+              const errorMsg = data.error ?? "Async action failed";
+              const entry: ActionHistoryEntry = {
+                id: String(_nextId++),
+                type: "action",
+                timestamp: new Date().toISOString(),
+                integrationId,
+                connectionId,
+                actionName,
+                input,
+                result: null,
+                error: errorMsg,
+                durationMs,
+                isAsync: true,
+                asyncStatus: "failed",
+                retryCount,
+              };
+              set((s) => ({
+                actionError: errorMsg,
+                isExecutingAction: false,
+                asyncActionStatus: "failed",
+                history: [entry, ...s.history].slice(0, MAX_HISTORY),
+              }));
+              resolve();
+            } else {
+              // Still pending or running — continue polling
+              setTimeout(poll, ASYNC_POLL_INTERVAL_MS);
+            }
+          } catch {
+            // Network/IPC error during polling — retry
+            setTimeout(poll, ASYNC_POLL_INTERVAL_MS);
+          }
+        };
+
+        // First poll after a short delay (the action was just enqueued)
+        setTimeout(poll, ASYNC_POLL_INTERVAL_MS);
+      });
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to trigger async action";
+      const entry: ActionHistoryEntry = {
+        id: String(_nextId++),
+        type: "action",
+        timestamp: new Date().toISOString(),
+        integrationId,
+        connectionId,
+        actionName,
+        input,
+        result: null,
+        error: errorMsg,
+        durationMs,
+        isAsync: true,
+        asyncStatus: "failed",
+        retryCount: 0,
+      };
+      set((s) => ({
+        actionError: errorMsg,
+        isExecutingAction: false,
+        asyncActionStatus: "failed",
         history: [entry, ...s.history].slice(0, MAX_HISTORY),
       }));
     }
@@ -284,7 +504,15 @@ export const useActionsStore = create<ActionsState>((set) => ({
   },
 
   clearHistory: () => set({ history: [] }),
-  clearActionResult: () => set({ actionResult: null, actionError: null }),
+  clearActionResult: () =>
+    set({
+      actionResult: null,
+      actionError: null,
+      asyncActionId: null,
+      asyncActionStatusUrl: null,
+      asyncActionStatus: null,
+      asyncActionRetryCount: 0,
+    }),
   clearProxyResult: () =>
     set({
       proxyStatus: null,

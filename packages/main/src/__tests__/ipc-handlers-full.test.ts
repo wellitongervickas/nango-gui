@@ -481,7 +481,7 @@ describe("IPC handlers", () => {
         status: "ok",
         data: {
           appVersion: "1.0.0",
-          nangoSdkVersion: "0.69.49",
+          nangoSdkVersion: "0.70.1",
         },
       });
     });
@@ -508,6 +508,110 @@ describe("IPC handlers", () => {
       const handler = handlers.get("app:setEnvironment")!;
       const result = await handler({}, { environment: "production" });
       expect(result).toMatchObject({ status: "ok" });
+    });
+  });
+
+  // ── Scope discovery handler ──────────────────────────────────────────────
+
+  describe("nango:suggestScopes", () => {
+    it("returns supported scopes for an OAuth2 provider", async () => {
+      mockGetProvider.mockResolvedValueOnce({
+        data: {
+          auth_mode: "OAUTH2",
+          default_scopes: ["read:user", "repo"],
+          available_scopes: ["read:user", "repo", "gist", "notifications"],
+          docs: "https://docs.github.com/en/developers/apps/scopes-for-oauth-apps",
+        },
+      });
+
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, { providerKey: "github" });
+
+      expect(result).toMatchObject({ status: "ok" });
+      const data = (result as { status: "ok"; data: unknown }).data as {
+        supported: boolean;
+        scopes: Array<{ scope: string; recommended: boolean }>;
+      };
+      expect(data.supported).toBe(true);
+      expect(data.scopes).toContainEqual({ scope: "read:user", recommended: true });
+      expect(data.scopes).toContainEqual({ scope: "repo", recommended: true });
+      expect(data.scopes).toContainEqual({ scope: "gist", recommended: false });
+      expect(data.scopes).toContainEqual({ scope: "notifications", recommended: false });
+      // default_scopes should not be duplicated in available_scopes output
+      expect(data.scopes.filter((s) => s.scope === "read:user")).toHaveLength(1);
+    });
+
+    it("returns supported: false for a non-OAuth2 provider", async () => {
+      mockGetProvider.mockResolvedValueOnce({
+        data: {
+          auth_mode: "API_KEY",
+          default_scopes: [],
+          available_scopes: [],
+          docs: "https://docs.example.com",
+        },
+      });
+
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, { providerKey: "some-api-key-provider" });
+
+      expect(result).toMatchObject({ status: "ok" });
+      const data = (result as { status: "ok"; data: unknown }).data as { supported: boolean };
+      expect(data.supported).toBe(false);
+    });
+
+    it("returns supported: false when provider has no scopes", async () => {
+      mockGetProvider.mockResolvedValueOnce({
+        data: {
+          auth_mode: "OAUTH2",
+          default_scopes: [],
+          available_scopes: [],
+          docs: "https://docs.example.com",
+        },
+      });
+
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, { providerKey: "no-scope-provider" });
+
+      expect(result).toMatchObject({ status: "ok" });
+      const data = (result as { status: "ok"; data: unknown }).data as { supported: boolean };
+      expect(data.supported).toBe(false);
+    });
+
+    it("works with only default_scopes and no available_scopes", async () => {
+      mockGetProvider.mockResolvedValueOnce({
+        data: {
+          auth_mode: "OAUTH2",
+          default_scopes: ["profile", "email"],
+          docs: "https://docs.example.com",
+        },
+      });
+
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, { providerKey: "google" });
+
+      expect(result).toMatchObject({ status: "ok" });
+      const data = (result as { status: "ok"; data: unknown }).data as {
+        supported: boolean;
+        scopes: Array<{ scope: string; recommended: boolean }>;
+      };
+      expect(data.supported).toBe(true);
+      expect(data.scopes).toEqual([
+        { scope: "profile", recommended: true },
+        { scope: "email", recommended: true },
+      ]);
+    });
+
+    it("returns error when providerKey is missing", async () => {
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, {});
+      expect(result).toMatchObject({ status: "error" });
+    });
+
+    it("wraps API errors with errorCode", async () => {
+      mockGetProvider.mockRejectedValueOnce(Object.assign(new Error("Not found"), { status: 500 }));
+      const handler = handlers.get("nango:suggestScopes")!;
+      const result = await handler({}, { providerKey: "unknown" });
+      expect(result).toMatchObject({ status: "error", errorCode: "SERVER_ERROR" });
     });
   });
 

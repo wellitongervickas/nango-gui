@@ -8,12 +8,16 @@ interface SettingsState {
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;
+  connectUiTheme: AppTheme;
+  connectUiPrimaryColor: string | null;
   isLoading: boolean;
   error: string | null;
 
   fetchSettings: () => Promise<void>;
   updateTheme: (theme: AppTheme) => Promise<void>;
   updateEnvironment: (env: NangoEnvironment) => Promise<void>;
+  updateConnectUiTheme: (theme: AppTheme) => Promise<void>;
+  updateConnectUiPrimaryColor: (color: string | null) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -23,6 +27,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   appVersion: "",
   electronVersion: "",
   nangoSdkVersion: "",
+  connectUiTheme: "system",
+  connectUiPrimaryColor: null,
   isLoading: false,
   error: null,
 
@@ -35,8 +41,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({ error: res.error, isLoading: false });
         return;
       }
-      const { theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion } = res.data;
-      set({ theme, environment, maskedKey, appVersion, electronVersion, nangoSdkVersion, isLoading: false });
+      const {
+        theme,
+        environment,
+        maskedKey,
+        appVersion,
+        electronVersion,
+        nangoSdkVersion,
+        connectUiTheme,
+        connectUiPrimaryColor,
+      } = res.data;
+      set({
+        theme,
+        environment,
+        maskedKey,
+        appVersion,
+        electronVersion,
+        nangoSdkVersion,
+        connectUiTheme,
+        connectUiPrimaryColor,
+        isLoading: false,
+      });
       applyTheme(theme);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -75,6 +100,38 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       }
     } catch (err) {
       set({ environment: prev });
+      throw err;
+    }
+  },
+
+  updateConnectUiTheme: async (connectUiTheme) => {
+    const prev = get().connectUiTheme;
+    set({ connectUiTheme });
+    if (!window.electronApp) return;
+    try {
+      const res = await window.electronApp.updateSettings({ connectUiTheme });
+      if (res.status === "error") {
+        set({ connectUiTheme: prev });
+        throw new Error(res.error);
+      }
+    } catch (err) {
+      set({ connectUiTheme: prev });
+      throw err;
+    }
+  },
+
+  updateConnectUiPrimaryColor: async (connectUiPrimaryColor) => {
+    const prev = get().connectUiPrimaryColor;
+    set({ connectUiPrimaryColor });
+    if (!window.electronApp) return;
+    try {
+      const res = await window.electronApp.updateSettings({ connectUiPrimaryColor });
+      if (res.status === "error") {
+        set({ connectUiPrimaryColor: prev });
+        throw new Error(res.error);
+      }
+    } catch (err) {
+      set({ connectUiPrimaryColor: prev });
       throw err;
     }
   },

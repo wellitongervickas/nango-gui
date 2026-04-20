@@ -85,8 +85,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@nangohq/node':
-        specifier: ^0.69.49
-        version: 0.69.49
+        specifier: ^0.70.1
+        version: 0.70.1
       electron-log:
         specifier: ^5.4.3
         version: 5.4.3
@@ -122,8 +122,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@nangohq/frontend':
-        specifier: ^0.69.49
-        version: 0.69.49
+        specifier: ^0.70.1
+        version: 0.70.1
       '@tanstack/react-virtual':
         specifier: ^3.13.23
         version: 3.13.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -771,15 +771,15 @@ packages:
     resolution: {integrity: sha512-cXu86tF4VQVfwz8W1SPbhoRyHJkti6mjH/XJIxp40jhO4j2k1m4KYrEykxqWPkFF3vrK4rgQppBh//AwyGSXPA==}
     engines: {node: '>=18'}
 
-  '@nangohq/frontend@0.69.49':
-    resolution: {integrity: sha512-3Ja9qAfExhVpLx3XVP+d92kNamNoHQfJUuH5kdiSTS8yFBnEzH2U2oOj6rJocVyCt31nAyWu5sGCk0E/2dXOWA==}
+  '@nangohq/frontend@0.70.1':
+    resolution: {integrity: sha512-EWyx9MhTdQlbM9I8wY7PxdQa7OnUIHt2kILvTMWZFKr2OPJo5k+AejQxs2t1QTT6A2gvEZlziYLoztxhXsJcTg==}
 
-  '@nangohq/node@0.69.49':
-    resolution: {integrity: sha512-eMg2hhiX3olKkCpCOhksGcgaWZgfQlQo8jaxe9LD09X4QGdkcyscWDg38PfQyI5X7JNV1N8QaDARc7eWakJLSQ==}
+  '@nangohq/node@0.70.1':
+    resolution: {integrity: sha512-WupMNpp96GCCNTs5e5UtEoo/snpnJ6tGNPf58hXqDANwFuZG7ePdjN5giyH1AePoqi0QkcXNNHuqPtLZPr8z5g==}
     engines: {node: '>=20.0'}
 
-  '@nangohq/types@0.69.49':
-    resolution: {integrity: sha512-vBLIsqvP2vgE+F4L75kaqOT9/aWlXhcjTQa4Mc5EpVdSgj4mpb/rlB14z9xI2J5DNEfMZntMa26rv7bKTKRpvg==}
+  '@nangohq/types@0.70.1':
+    resolution: {integrity: sha512-hcmlDwKK5rI2+KSroh4lz6BIH93mLiv9cRle8T3msrgILp14efB8FZVHHGS6UAUziKDtA6d1aS/SU8bUtgEo6Q==}
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -4790,20 +4790,20 @@ snapshots:
       outvariant: 1.4.3
       strict-event-emitter: 0.5.1
 
-  '@nangohq/frontend@0.69.49':
+  '@nangohq/frontend@0.70.1':
     dependencies:
-      '@nangohq/types': 0.69.49
+      '@nangohq/types': 0.70.1
     transitivePeerDependencies:
       - debug
 
-  '@nangohq/node@0.69.49':
+  '@nangohq/node@0.70.1':
     dependencies:
-      '@nangohq/types': 0.69.49
+      '@nangohq/types': 0.70.1
       axios: 1.15.0
     transitivePeerDependencies:
       - debug
 
-  '@nangohq/types@0.69.49':
+  '@nangohq/types@0.70.1':
     dependencies:
       axios: 1.15.0
       json-schema: 0.4.0

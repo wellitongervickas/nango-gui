@@ -3,6 +3,7 @@ import Nango from "@nangohq/frontend";
 import type { ConnectUI, ConnectUIEvent } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
 import { navigate } from "@/lib/router";
+import { getFriendlyErrorMessage, getErrorTitle } from "@/lib/auth-errors";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { StatusBadge } from "@/components/syncs/StatusBadge";
@@ -123,6 +124,7 @@ interface OverviewSectionProps {
   isRefreshing: boolean;
   onReAuthorize: () => void;
   isReAuthorizing: boolean;
+  reAuthError: { title: string; message: string } | null;
 }
 
 function OverviewSection({
@@ -133,6 +135,7 @@ function OverviewSection({
   isRefreshing,
   onReAuthorize,
   isReAuthorizing,
+  reAuthError,
 }: OverviewSectionProps) {
   const expiresAt = detail ? getTokenExpiresAt(detail) : null;
   const expiredSoon = isTokenExpiredOrSoon(expiresAt);
@@ -199,11 +202,39 @@ function OverviewSection({
           Re-authorize
         </button>
       </div>
+
+      {/* Re-auth error with retry */}
+      {reAuthError && (
+        <div className="mt-3 px-3 py-2.5 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm space-y-1">
+          <p className="font-medium text-[var(--color-error)]">{reAuthError.title}</p>
+          <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">{reAuthError.message}</p>
+          <button
+            onClick={onReAuthorize}
+            disabled={isReAuthorizing}
+            className="mt-1 text-xs font-medium text-[var(--color-brand-400)] hover:underline cursor-pointer disabled:opacity-50"
+          >
+            Retry authorization
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
 // ── Syncs section ─────────────────────────────────────────────────────────
+
+function formatCheckpointValue(val: string | number | boolean): string {
+  if (typeof val === "boolean") return val ? "true" : "false";
+  if (typeof val === "number") return val.toLocaleString();
+  if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
+    try {
+      return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(val));
+    } catch {
+      return val;
+    }
+  }
+  return val;
+}
 
 function SyncMiniRow({
   sync,
@@ -216,6 +247,9 @@ function SyncMiniRow({
 }) {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCheckpoint, setShowCheckpoint] = useState(false);
+
+  const hasCheckpoint = sync.checkpoint != null && Object.keys(sync.checkpoint).length > 0;
 
   async function handleTrigger(e: React.MouseEvent) {
     e.stopPropagation();
@@ -253,48 +287,103 @@ function SyncMiniRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-border)] last:border-0 group hover:bg-[var(--color-bg-overlay)]/40 transition-colors">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium font-mono text-[var(--color-text-primary)] truncate">{sync.name}</p>
-        {sync.status === "ERROR" && sync.latestResult && (
-          <p className="text-xs text-[var(--color-error)] mt-0.5">Last run had errors</p>
-        )}
-        {error && (
-          <p className="text-xs text-[var(--color-error)] mt-0.5">{error}</p>
-        )}
-      </div>
-      <div className="w-20 shrink-0">
-        <StatusBadge status={sync.status} />
-      </div>
-      <div className="w-20 text-xs text-[var(--color-text-secondary)] shrink-0 whitespace-nowrap">
-        {sync.frequency ?? "—"}
-      </div>
-      <div className="w-32 text-xs text-[var(--color-text-secondary)] shrink-0 whitespace-nowrap">
-        {formatDate(sync.finishedAt)}
-      </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button
-          onClick={handleTrigger}
-          disabled={isBusy}
-          title="Trigger sync"
-          className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
-        >
-          {isBusy ? <SpinnerIcon /> : <PlayIcon />}
-        </button>
-        <button
-          onClick={handleTogglePause}
-          disabled={isBusy || sync.status === "STOPPED"}
-          title={sync.status === "PAUSED" ? "Resume" : "Pause"}
-          className={cn(
-            "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
-            sync.status === "PAUSED"
-              ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-              : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+    <div className="border-b border-[var(--color-border)] last:border-0">
+      <div className="flex items-center gap-3 px-4 py-2.5 group hover:bg-[var(--color-bg-overlay)]/40 transition-colors">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            {hasCheckpoint && (
+              <button
+                type="button"
+                onClick={() => setShowCheckpoint((v) => !v)}
+                className="flex items-center justify-center w-4 h-4 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer shrink-0"
+                aria-label={showCheckpoint ? "Hide checkpoint" : "Show checkpoint"}
+              >
+                <ChevronIcon direction={showCheckpoint ? "down" : "right"} />
+              </button>
+            )}
+            <p className="text-sm font-medium font-mono text-[var(--color-text-primary)] truncate">{sync.name}</p>
+            {hasCheckpoint && (
+              <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-brand-500)]/10 text-[var(--color-brand-500)] font-medium">
+                checkpoint
+              </span>
+            )}
+          </div>
+          {sync.status === "ERROR" && sync.latestResult && (
+            <p className="text-xs text-[var(--color-error)] mt-0.5">Last run had errors</p>
           )}
-        >
-          {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
-        </button>
+          {error && (
+            <p className="text-xs text-[var(--color-error)] mt-0.5">{error}</p>
+          )}
+        </div>
+        <div className="w-20 shrink-0">
+          <StatusBadge status={sync.status} />
+        </div>
+        <div className="w-20 text-xs text-[var(--color-text-secondary)] shrink-0 whitespace-nowrap">
+          {sync.frequency ?? "—"}
+        </div>
+        <div className="w-32 text-xs text-[var(--color-text-secondary)] shrink-0 whitespace-nowrap">
+          {formatDate(sync.finishedAt)}
+        </div>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <button
+            onClick={handleTrigger}
+            disabled={isBusy}
+            title="Trigger sync"
+            className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isBusy ? <SpinnerIcon /> : <PlayIcon />}
+          </button>
+          <button
+            onClick={handleTogglePause}
+            disabled={isBusy || sync.status === "STOPPED"}
+            title={sync.status === "PAUSED" ? "Resume" : "Pause"}
+            className={cn(
+              "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
+              sync.status === "PAUSED"
+                ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
+                : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+            )}
+          >
+            {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
+          </button>
+        </div>
       </div>
+
+      {/* Checkpoint detail panel */}
+      {hasCheckpoint && showCheckpoint && (
+        <div className="px-4 pb-2.5">
+          <div className="ml-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-base)] p-3">
+            <p className="text-[10px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-1.5">
+              Checkpoint State
+            </p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+              {Object.entries(sync.checkpoint!).map(([key, val]) => (
+                <div key={key} className="contents">
+                  <dt className="text-xs text-[var(--color-text-secondary)] font-mono truncate">{key}</dt>
+                  <dd className="text-xs text-[var(--color-text-primary)] font-mono truncate" title={String(val)}>
+                    {formatCheckpointValue(val)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {sync.recordCount && Object.keys(sync.recordCount).length > 0 && (
+              <>
+                <p className="text-[10px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mt-2 mb-1.5">
+                  Record Counts
+                </p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                  {Object.entries(sync.recordCount).map(([model, count]) => (
+                    <div key={model} className="contents">
+                      <dt className="text-xs text-[var(--color-text-secondary)] font-mono truncate">{model}</dt>
+                      <dd className="text-xs text-[var(--color-text-primary)] font-mono tabular-nums">{count.toLocaleString()}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -726,6 +815,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   const [isReAuthorizing, setIsReAuthorizing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reAuthError, setReAuthError] = useState<{ title: string; message: string } | null>(null);
   const connectUIRef = useRef<ConnectUI | null>(null);
 
   // Find connection summary from store (or wait for it)
@@ -804,6 +894,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   async function handleReAuthorize() {
     if (!window.nango) return;
     setIsReAuthorizing(true);
+    setReAuthError(null);
 
     // Load any advanced config that was saved when this provider was first connected
     const savedCfg = loadSavedAdvancedConfig(providerConfigKey);
@@ -872,12 +963,26 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   }
 
   function handleConnectUIEvent(event: ConnectUIEvent) {
-    if (event.type === "close" || event.type === "connect") {
-      connectUIRef.current?.close();
-      connectUIRef.current = null;
-      if (event.type === "connect") {
-        // Refresh detail after re-auth
+    switch (event.type) {
+      case "close":
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        break;
+      case "connect":
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        setReAuthError(null);
         loadDetail(true);
+        break;
+      case "error": {
+        connectUIRef.current?.close();
+        connectUIRef.current = null;
+        const { errorType, errorMessage } = event.payload;
+        setReAuthError({
+          title: getErrorTitle(errorType),
+          message: getFriendlyErrorMessage(errorType, errorMessage),
+        });
+        break;
       }
     }
   }
@@ -951,6 +1056,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
             isRefreshing={isRefreshing}
             onReAuthorize={handleReAuthorize}
             isReAuthorizing={isReAuthorizing}
+            reAuthError={reAuthError}
           />
         )}
 

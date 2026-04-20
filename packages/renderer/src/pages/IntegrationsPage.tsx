@@ -2,10 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { NangoProvider } from "@nango-gui/shared";
 import { useIntegrationsStore } from "@/store/integrationsStore";
-import { ConnectModal } from "@/components/connections/ConnectModal";
-import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon } from "@/components/icons";
+import { useConnectFlowStore } from "@/store/connectFlowStore";
+import { navigate } from "@/lib/router";
+import { SearchIcon, XIcon, GridIcon, PlusIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
+
+// ── Debounce hook ─────────────────────────────────────────────────────────
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
 
 // ── Provider logo ──────────────────────────────────────────────────────────
 
@@ -102,23 +114,17 @@ function CardSkeleton() {
 
 interface ProviderCardProps {
   provider: NangoProvider;
-  isSelected: boolean;
   onClick: () => void;
 }
 
-function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
+function ProviderCard({ provider, onClick }: ProviderCardProps) {
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => e.key === "Enter" && onClick()}
-      className={cn(
-        "bg-[var(--color-bg-surface)] border rounded-xl p-4 cursor-pointer transition-all hover:border-[var(--color-brand-500)]/50 hover:bg-[var(--color-bg-raised)]",
-        isSelected
-          ? "border-[var(--color-brand-500)] ring-1 ring-[var(--color-brand-500)]/30"
-          : "border-[var(--color-border)]"
-      )}
+      className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl p-4 cursor-pointer transition-all hover:border-[var(--color-brand-500)]/50 hover:bg-[var(--color-bg-raised)]"
     >
       <div className="flex items-start gap-3 mb-3">
         <ProviderLogo provider={provider} size={36} />
@@ -152,115 +158,6 @@ function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
   );
 }
 
-// ── Detail panel ───────────────────────────────────────────────────────────
-
-interface DetailPanelProps {
-  provider: NangoProvider;
-  onClose: () => void;
-}
-
-function DetailPanel({ provider, onClose }: DetailPanelProps) {
-  return (
-    <>
-      <div className="fixed inset-0 z-30" onClick={onClose} />
-      <aside className="fixed right-0 top-12 bottom-6 z-40 w-[380px] bg-[var(--color-bg-surface)] border-l border-[var(--color-border)] flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-[var(--color-border)] shrink-0">
-          <div className="flex items-center gap-3">
-            <ProviderLogo provider={provider} size={44} />
-            <div>
-              <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                {provider.display_name}
-              </h2>
-              <p className="text-xs text-[var(--color-text-secondary)] font-mono">
-                {provider.name}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <XIcon />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Auth info */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
-              Details
-            </h3>
-            <dl className="space-y-2.5">
-              <DetailRow label="Auth mode" value={provider.auth_mode} />
-              <DetailRow label="Provider key" value={provider.name} mono />
-            </dl>
-          </section>
-
-          {/* Categories */}
-          {provider.categories && provider.categories.length > 0 && (
-            <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-3">
-                Categories
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {provider.categories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)]"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Docs link */}
-          {provider.docs && (
-            <a
-              href={provider.docs}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-[var(--color-brand-400)] hover:underline"
-            >
-              <ExternalLinkIcon />
-              View documentation
-            </a>
-          )}
-        </div>
-
-        {/* CTA */}
-        <div className="p-4 border-t border-[var(--color-border)] shrink-0">
-          <ConnectModal>
-            {({ open, isLoading }) => (
-              <button
-                onClick={open}
-                disabled={isLoading}
-                className="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isLoading && <SpinnerIcon />}
-                Connect {provider.display_name}
-              </button>
-            )}
-          </ConnectModal>
-        </div>
-      </aside>
-    </>
-  );
-}
-
-function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-xs text-[var(--color-text-secondary)] shrink-0">{label}</dt>
-      <dd className={cn("text-sm text-[var(--color-text-primary)] text-right truncate", mono && "font-mono")}>{value}</dd>
-    </div>
-  );
-}
-
 // ── Virtualized grid ───────────────────────────────────────────────────────
 
 const COLS = 4;
@@ -268,11 +165,10 @@ const ROW_HEIGHT = 120; // px per row
 
 interface VirtualGridProps {
   providers: NangoProvider[];
-  selected: NangoProvider | null;
   onSelect: (p: NangoProvider) => void;
 }
 
-function VirtualGrid({ providers, selected, onSelect }: VirtualGridProps) {
+function VirtualGrid({ providers, onSelect }: VirtualGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Group providers into rows of COLS items.
@@ -317,7 +213,6 @@ function VirtualGrid({ providers, selected, onSelect }: VirtualGridProps) {
                 <ProviderCard
                   key={provider.name}
                   provider={provider}
-                  isSelected={selected?.name === provider.name}
                   onClick={() => onSelect(provider)}
                 />
               ))}
@@ -344,11 +239,31 @@ export function IntegrationsPage() {
     providers,
   } = useIntegrationsStore();
 
-  const [selected, setSelected] = useState<NangoProvider | null>(null);
+  const openSearch = useConnectFlowStore((s) => s.openSearch);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [localSearch, setLocalSearch] = useState(search);
+  const debouncedSearch = useDebouncedValue(localSearch, 200);
 
   useEffect(() => {
     fetchProviders();
   }, [fetchProviders]);
+
+  // Sync debounced value to store
+  useEffect(() => {
+    setSearch(debouncedSearch);
+  }, [debouncedSearch, setSearch]);
+
+  // Focus search input on Ctrl+F / Cmd+F within the page
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const filtered = filteredProviders();
 
@@ -369,26 +284,51 @@ export function IntegrationsPage() {
     };
   }, [providers]);
 
+  function handleSelectProvider(provider: NangoProvider) {
+    navigate(`integrations/detail/${encodeURIComponent(provider.name)}`);
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-base)]">
       {/* Header */}
       <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] flex items-center gap-4 shrink-0">
         <h1 className="text-sm font-semibold text-[var(--color-text-primary)]">Integrations</h1>
         <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
-          {!isLoading && `${filtered.length} providers`}
+          {!isLoading && `${filtered.length} provider${filtered.length !== 1 ? "s" : ""}`}
         </span>
         <div className="flex-1" />
+
+        {/* New Connection button */}
+        <button
+          onClick={openSearch}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          <PlusIcon />
+          New Connection
+        </button>
+
+        {/* Search */}
         <div className="relative w-64">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]">
             <SearchIcon />
           </span>
           <input
+            ref={searchInputRef}
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search integrations…"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            placeholder="Search integrations..."
             className={searchInputClass}
           />
+          {localSearch && (
+            <button
+              onClick={() => { setLocalSearch(""); searchInputRef.current?.focus(); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
+              aria-label="Clear search"
+            >
+              <XIcon />
+            </button>
+          )}
         </div>
       </div>
 
@@ -417,7 +357,7 @@ export function IntegrationsPage() {
             </div>
           )}
 
-          {/* Empty state */}
+          {/* Empty state — no providers at all */}
           {!isLoading && providers.length === 0 && (
             <div className="flex flex-col items-center justify-center flex-1 gap-5">
               <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-surface)] border border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-secondary)]">
@@ -436,16 +376,36 @@ export function IntegrationsPage() {
 
           {/* No search results */}
           {!isLoading && providers.length > 0 && filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center flex-1 gap-2">
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                No providers match "{search}"
-              </p>
-              <button
-                onClick={() => setSearch("")}
-                className="text-xs text-[var(--color-brand-400)] hover:underline cursor-pointer"
-              >
-                Clear search
-              </button>
+            <div className="flex flex-col items-center justify-center flex-1 gap-3">
+              <div className="w-12 h-12 rounded-xl bg-[var(--color-bg-surface)] border border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-secondary)]">
+                <SearchIcon />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-[var(--color-text-primary)] mb-1">
+                  No results for "{localSearch}"
+                </p>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+                  {activeCategory
+                    ? `Try a different search or clear the "${activeCategory}" filter.`
+                    : "Try a different search term or browse by category."}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setLocalSearch("")}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+                >
+                  Clear search
+                </button>
+                {activeCategory && (
+                  <button
+                    onClick={() => setActiveCategory(null)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)] transition-colors cursor-pointer"
+                  >
+                    Clear category
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -453,20 +413,11 @@ export function IntegrationsPage() {
           {!isLoading && filtered.length > 0 && (
             <VirtualGrid
               providers={filtered}
-              selected={selected}
-              onSelect={(p) => setSelected((s) => (s?.name === p.name ? null : p))}
+              onSelect={handleSelectProvider}
             />
           )}
         </div>
       </div>
-
-      {/* Detail panel */}
-      {selected && (
-        <DetailPanel
-          provider={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </div>
   );
 }

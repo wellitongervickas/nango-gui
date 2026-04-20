@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI } from "@nangohq/frontend";
-import type { ConnectUIEvent, AuthErrorType } from "@nangohq/frontend";
+import type { ConnectUIEvent } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoProvider, NangoConnectionSummary } from "@nango-gui/shared";
 import { useConnectFlowStore } from "@/store/connectFlowStore";
 import { useConnectionsStore } from "@/store/connectionsStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { SearchIcon, SpinnerIcon, XIcon, PlugIcon, ChevronIcon } from "@/components/icons";
 import { AdvancedConnectionForm, validateAdvancedConfig } from "./AdvancedConnectionForm";
+import type { ConnectError } from "@/lib/auth-errors";
+import { getFriendlyErrorMessage, getErrorHighlightField, getErrorTitle, extractProviderDetail } from "@/lib/auth-errors";
+import { buildConnectUIOptions } from "@/lib/connectUiOptions";
 
 const ADVANCED_CONFIG_KEY = "nango-gui:advanced-connection-config";
 
@@ -48,60 +52,6 @@ type FlowState =
   | { kind: "open"; provider: NangoProvider }
   | { kind: "error"; message: string };
 
-type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "authParams";
-
-interface ConnectError {
-  errorType: AuthErrorType;
-  message: string;
-  highlightField?: HighlightField;
-}
-
-/** Maps Nango AuthErrorType codes to developer-friendly messages. */
-function getFriendlyErrorMessage(errorType: AuthErrorType, rawMessage: string): string {
-  switch (errorType) {
-    case "connection_validation_failed":
-      return "Validation failed: the credentials were rejected by the provider. Check your client ID, secret, or auth params and retry.";
-    case "missing_credentials":
-      return "Missing required credentials. Fill in all required fields and retry.";
-    case "blocked_by_browser":
-      return "The OAuth popup was blocked by your browser. Allow popups for this window and try again.";
-    case "window_closed":
-      return "The authorization window was closed before completing. Click Connect to try again.";
-    case "connection_test_failed":
-      return "The provider accepted the credentials but the API connectivity check failed. The integration may have permission or network issues.";
-    case "missing_connect_session_token":
-      return "The session token expired. Click Connect to start a fresh authorization.";
-    case "invalid_host_url":
-      return "Invalid Nango server URL. Check your server URL in the app settings.";
-    case "resource_capped":
-      return "You have reached the connection limit for this integration.";
-    case "missing_auth_token":
-      return "Authorization token missing. Retry the connection.";
-    case "unknown_error":
-    default:
-      return rawMessage || "An unexpected error occurred. Try again or check Nango server logs.";
-  }
-}
-
-/**
- * Best-effort field identification from error type + message.
- * Returns undefined when the source field is not identifiable.
- */
-function getErrorHighlightField(
-  errorType: AuthErrorType,
-  rawMessage: string
-): HighlightField | undefined {
-  if (errorType === "connection_validation_failed") {
-    const msg = rawMessage.toLowerCase();
-    if (msg.includes("client_secret") || msg.includes("client secret")) return "oauthClientSecret";
-    if (msg.includes("client_id") || msg.includes("client id")) return "oauthClientId";
-    if (msg.includes("scope")) return "userScopes";
-    if (msg.includes("param")) return "authParams";
-  }
-  if (errorType === "missing_credentials") return "oauthClientId";
-  return undefined;
-}
-
 interface SuccessToast {
   provider: string;
   syncCount: number;
@@ -136,6 +86,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
   const connections = useConnectionsStore((s) => s.connections);
   const fetchConnections = useConnectionsStore((s) => s.fetchConnections);
   const addConnection = useConnectionsStore((s) => s.addConnection);
+  const connectUiTheme = useSettingsStore((s) => s.connectUiTheme);
+  const connectUiPrimaryColor = useSettingsStore((s) => s.connectUiPrimaryColor);
 
   // Load providers on mount
   useEffect(() => {
@@ -261,6 +213,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
           const err: ConnectError = {
             errorType,
             message: getFriendlyErrorMessage(errorType, errorMessage),
+            providerError: extractProviderDetail(errorType, errorMessage),
             highlightField: getErrorHighlightField(errorType, errorMessage),
           };
           // Return to the configure step so the user can adjust settings and retry.
@@ -343,7 +296,10 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
         if (closedRef.current) return;
 
         const nango = new Nango({ connectSessionToken: res.data.token });
-        const connectUI = nango.openConnectUI({ onEvent: handleEvent });
+        const connectUI = nango.openConnectUI({
+          onEvent: handleEvent,
+          ...buildConnectUIOptions(connectUiTheme, connectUiPrimaryColor),
+        });
         connectUIRef.current = connectUI;
         connectUI.open();
 
@@ -529,7 +485,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             {/* Inline validation error — shown when Connect UI returns an error */}
             {connectError && (
               <div className="mx-4 mt-3 px-3 py-2.5 rounded-lg border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 text-sm text-[var(--color-error)] space-y-1">
-                <p className="font-medium">Authorization failed</p>
+                <p className="font-medium">{getErrorTitle(connectError.errorType)}</p>
                 <p className="text-xs leading-relaxed opacity-90">{connectError.message}</p>
               </div>
             )}
@@ -538,6 +494,8 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             <div className="px-4 pt-3 pb-4">
               <AdvancedConnectionForm
                 providerName={provider.display_name}
+                providerKey={provider.name}
+                authMode={provider.auth_mode}
                 value={advancedConfig}
                 onChange={(cfg) => {
                   setAdvancedConfig(cfg);

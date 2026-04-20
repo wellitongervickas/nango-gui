@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useMcpStore } from "@/store/mcpStore";
 import { McpServerCard } from "@/components/mcp/McpServerCard";
 import { AddServerDialog } from "@/components/mcp/AddServerDialog";
+import { NangoToolBrowserPanel } from "@/components/mcp/NangoToolBrowserPanel";
+import { cn } from "@/lib/utils";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -36,9 +38,13 @@ function RefreshIcon() {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Tab type ──────────────────────────────────────────────────────────────────
 
-export function McpPage() {
+type McpTab = "servers" | "tools";
+
+// ── Servers tab content ───────────────────────────────────────────────────────
+
+function ServersTab() {
   const configs = useMcpStore((s) => s.configs);
   const configFiles = useMcpStore((s) => s.configFiles);
   const selectedServer = useMcpStore((s) => s.selectedServer);
@@ -55,12 +61,10 @@ export function McpPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Initial load
   useEffect(() => {
     void fetchConfigs();
   }, [fetchConfigs]);
 
-  // Subscribe to real-time status changes from main process
   useEffect(() => {
     if (!window.mcp) return;
     window.mcp.onStatusChange(handleStatusChange);
@@ -81,62 +85,53 @@ export function McpPage() {
   const runningCount = configs.filter((c) => c.status === "running").length;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-bg)]">
-      {/* Page header */}
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-sm font-semibold text-[var(--color-text)]">MCP Servers</h1>
-            {configs.length > 0 && (
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                {configs.length} server{configs.length !== 1 ? "s" : ""}
-                {runningCount > 0 && (
-                  <span className="ml-2 text-[var(--color-sync)]">
-                    {runningCount} running
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-          <div className="flex-1" />
-
-          {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            disabled={isLoading || refreshing}
-            title="Refresh server list"
-            className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <RefreshIcon />
-          </button>
-
-          {/* Add server */}
-          <button
-            onClick={() => setShowAddDialog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer"
-          >
-            <PlusIcon />
-            Add Server
-          </button>
+    <div className="flex flex-col h-full">
+      {/* Sub-header */}
+      <div className="px-6 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 flex items-center gap-3">
+        <div className="flex-1">
+          {configs.length > 0 && (
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {configs.length} server{configs.length !== 1 ? "s" : ""}
+              {runningCount > 0 && (
+                <span className="ml-2 text-[var(--color-sync)]">
+                  {runningCount} running
+                </span>
+              )}
+            </p>
+          )}
         </div>
+
+        <button
+          onClick={handleRefresh}
+          disabled={isLoading || refreshing}
+          title="Refresh server list"
+          className="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer disabled:opacity-50"
+        >
+          <RefreshIcon />
+        </button>
+
+        <button
+          onClick={() => setShowAddDialog(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+        >
+          <PlusIcon />
+          Add Server
+        </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Error banner */}
         {error && (
           <div className="mx-6 mt-4 px-4 py-3 rounded-md bg-[var(--color-error)]/10 border border-[var(--color-error)]/20">
             <p className="text-sm text-[var(--color-error)]">{error}</p>
           </div>
         )}
 
-        {/* Loading */}
         {isLoading && configs.length === 0 ? (
           <div className="flex items-center justify-center h-48 text-sm text-[var(--color-text-muted)]">
             Loading MCP servers…
           </div>
         ) : configs.length === 0 ? (
-          /* Empty state */
           <div className="flex flex-col items-center justify-center h-full min-h-[320px] gap-4 py-20 px-6">
             <div className="w-16 h-16 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-muted)]">
               <McpIcon />
@@ -156,7 +151,6 @@ export function McpPage() {
             </button>
           </div>
         ) : (
-          /* Server cards */
           <div className="p-6 space-y-3">
             {configs.map((server) => (
               <McpServerCard
@@ -174,7 +168,6 @@ export function McpPage() {
           </div>
         )}
 
-        {/* Config files footer */}
         {configFiles.length > 0 && (
           <div className="px-6 pb-6">
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
@@ -197,13 +190,58 @@ export function McpPage() {
         )}
       </div>
 
-      {/* Add dialog */}
       {showAddDialog && (
         <AddServerDialog
           onAdd={addConfig}
           onClose={() => setShowAddDialog(false)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export function McpPage() {
+  const [activeTab, setActiveTab] = useState<McpTab>("servers");
+
+  const tabs: { id: McpTab; label: string; description: string }[] = [
+    { id: "servers", label: "Servers", description: "Manage local MCP server processes" },
+    { id: "tools", label: "Tool Browser", description: "Browse and enable Nango-exposed AI agent tools" },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-[var(--color-bg)]">
+      {/* Page header with tab bar */}
+      <div className="px-6 pt-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0">
+        <h1 className="text-sm font-semibold text-[var(--color-text)] mb-3">MCP</h1>
+        <div className="flex items-end gap-1 -mb-px">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              title={tab.description}
+              className={cn(
+                "px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer rounded-t-md",
+                activeTab === tab.id
+                  ? "border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary)]/5"
+                  : "border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)]/50"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === "servers" ? (
+          <ServersTab />
+        ) : (
+          <NangoToolBrowserPanel />
+        )}
+      </div>
     </div>
   );
 }

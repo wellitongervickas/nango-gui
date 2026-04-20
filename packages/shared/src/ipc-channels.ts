@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
 
   // Actions & Proxy
   NANGO_TRIGGER_ACTION: "nango:triggerAction",
+  NANGO_TRIGGER_ACTION_ASYNC: "nango:triggerActionAsync",
+  NANGO_GET_ASYNC_ACTION_RESULT: "nango:getAsyncActionResult",
   NANGO_PROXY_REQUEST: "nango:proxyRequest",
 
   // Connection health
@@ -120,6 +122,9 @@ export const IPC_CHANNELS = {
 
   // Re-authorization (reconnect session)
   NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
+
+  // AI-powered OAuth2 scope discovery
+  NANGO_SUGGEST_SCOPES: "nango:suggestScopes",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -289,11 +294,15 @@ export interface AppSettings {
   appVersion: string;
   electronVersion: string;
   nangoSdkVersion: string;
+  connectUiTheme: AppTheme;
+  connectUiPrimaryColor: string | null;
 }
 
 export interface AppUpdateSettingsRequest {
   environment?: NangoEnvironment;
   theme?: AppTheme;
+  connectUiTheme?: AppTheme;
+  connectUiPrimaryColor?: string | null;
 }
 
 // ── Sync types ────────────────────────────────────────────────────────────
@@ -304,6 +313,9 @@ export type NangoSyncStatus =
   | "STOPPED"
   | "ERROR"
   | "SUCCESS";
+
+/** Flat key-value checkpoint state saved by a sync for resumable progress. */
+export type NangoCheckpoint = Record<string, string | number | boolean>;
 
 export interface NangoSyncRecord {
   id: string;
@@ -318,6 +330,10 @@ export interface NangoSyncRecord {
     updated: number;
     deleted: number;
   } | null;
+  /** Per-model record counts (e.g. { "Contact": 1200, "Deal": 340 }). */
+  recordCount: Record<string, number> | null;
+  /** Last saved checkpoint state for resumable syncs. Null if no checkpoint exists. */
+  checkpoint: NangoCheckpoint | null;
 }
 
 export interface NangoListSyncsRequest {
@@ -407,6 +423,35 @@ export interface NangoTriggerActionRequest {
 
 export interface NangoTriggerActionResult {
   result: unknown;
+}
+
+export interface NangoTriggerActionAsyncRequest {
+  connectionId: string;
+  integrationId: string;
+  actionName: string;
+  input: Record<string, unknown>;
+}
+
+export interface NangoTriggerActionAsyncResult {
+  id: string;
+  statusUrl: string;
+}
+
+export interface NangoGetAsyncActionResultRequest {
+  id?: string;
+  statusUrl?: string;
+}
+
+export type AsyncActionStatus = "pending" | "running" | "succeeded" | "failed";
+
+export interface NangoAsyncActionResultData {
+  status: AsyncActionStatus;
+  /** Set when status is "succeeded". */
+  result?: unknown;
+  /** Set when status is "failed". */
+  error?: string;
+  /** Number of automatic retries attempted so far. */
+  retryCount?: number;
 }
 
 export type NangoProxyMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -849,6 +894,26 @@ export interface AiProviderLoadKeyResult {
 export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
 }
+
+// ── Scope discovery ───────────────────────────────────────────────────────────
+
+export interface NangoSuggestScopesRequest {
+  /** Nango provider key (e.g. "github", "slack"). */
+  providerKey: string;
+}
+
+export interface NangoSuggestedScope {
+  /** The scope string (e.g. "read:user", "repo", "openid"). */
+  scope: string;
+  /** Human-readable description of what this scope grants. */
+  description?: string;
+  /** Pre-checked in the suggestion panel when true (default scopes). */
+  recommended: boolean;
+}
+
+export type NangoSuggestScopesResult =
+  | { supported: true; scopes: NangoSuggestedScope[] }
+  | { supported: false; docsUrl?: string };
 
 // ── Connection Health ─────────────────────────────────────────────────────
 

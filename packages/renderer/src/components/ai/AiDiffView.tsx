@@ -3,8 +3,6 @@ import { DiffEditor } from "@monaco-editor/react";
 import { cn } from "@/lib/utils";
 import type { AiGenerationResult } from "@nango-gui/shared";
 
-type DiffTab = "yaml" | "typescript";
-
 interface AiDiffViewProps {
   /** The definition before the most recent refinement. */
   previous: AiGenerationResult;
@@ -14,16 +12,12 @@ interface AiDiffViewProps {
 }
 
 /**
- * Side-by-side diff comparing the previous AI-generated definition against
- * the latest refinement. Shows YAML and TypeScript tabs.
+ * Side-by-side diff comparing the previous AI-generated TypeScript handlers
+ * against the latest refinement. nango.yaml is no longer surfaced here since
+ * all config is now expressed in TypeScript (nango.config.ts).
  */
 export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
-  const [activeTab, setActiveTab] = useState<DiffTab>("yaml");
   const [renderSideBySide, setRenderSideBySide] = useState(true);
-
-  const original = activeTab === "yaml" ? previous.yaml : previous.typescript;
-  const modified = activeTab === "yaml" ? current.yaml : current.typescript;
-  const language = activeTab === "yaml" ? "yaml" : "typescript";
 
   return (
     <div className="flex flex-col h-full border-t border-[var(--color-border)] bg-[var(--color-bg-surface)]">
@@ -33,26 +27,15 @@ export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
           <span className="text-xs font-medium text-[var(--color-text-primary)]">
             Refinement diff
           </span>
-          {/* Tabs */}
-          <div className="flex items-center gap-0.5 ml-2">
-            {(["yaml", "typescript"] as DiffTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={cn(
-                  "px-2 py-0.5 text-[10px] rounded transition-colors cursor-pointer",
-                  activeTab === tab
-                    ? "bg-[var(--color-bg)] text-[var(--color-text-primary)] font-medium"
-                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                )}
-              >
-                {tab === "yaml" ? "YAML" : "TypeScript"}
-              </button>
-            ))}
-          </div>
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-[var(--color-bg)] text-[var(--color-text-secondary)] font-medium">
+            TypeScript
+          </span>
           <button
             onClick={() => setRenderSideBySide((v) => !v)}
-            className="px-2 py-0.5 text-[10px] rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg)] transition-colors cursor-pointer ml-1"
+            className={cn(
+              "px-2 py-0.5 text-[10px] rounded transition-colors cursor-pointer ml-1",
+              "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg)]",
+            )}
           >
             {renderSideBySide ? "Inline" : "Side-by-side"}
           </button>
@@ -79,9 +62,9 @@ export function AiDiffView({ previous, current, onClose }: AiDiffViewProps) {
       {/* Monaco diff editor */}
       <div className="flex-1 min-h-0">
         <DiffEditor
-          original={original}
-          modified={modified}
-          language={language}
+          original={previous.typescript}
+          modified={current.typescript}
+          language="typescript"
           theme="vs-dark"
           options={{
             readOnly: true,

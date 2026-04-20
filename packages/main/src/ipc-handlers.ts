@@ -34,6 +34,10 @@ import {
   type NangoDashboardTopConnection,
   type NangoTriggerActionRequest,
   type NangoTriggerActionResult,
+  type NangoTriggerActionAsyncRequest,
+  type NangoTriggerActionAsyncResult,
+  type NangoGetAsyncActionResultRequest,
+  type NangoAsyncActionResultData,
   type NangoProxyRequest,
   type NangoProxyResult,
   type CredentialsSaveRequest,
@@ -80,6 +84,9 @@ import {
   type NangoSetMetadataRequest,
   type NangoCreateReconnectSessionRequest,
   type NangoCreateReconnectSessionResult,
+  type NangoSuggestScopesRequest,
+  type NangoSuggestScopesResult,
+  type NangoSuggestedScope,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -90,6 +97,7 @@ import { mcpManager } from "./mcp-manager.js";
 import {
   getNangoClient,
   initNangoClient,
+  isNangoClientReady,
   resetNangoClient,
   validateNangoKey,
 } from "./nango-client.js";
@@ -172,6 +180,30 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
       ? (s.latestResult as Record<string, unknown>)
       : null;
 
+  // Extract per-model record counts
+  let recordCount: Record<string, number> | null = null;
+  if (s.recordCount != null && typeof s.recordCount === "object") {
+    const rc = s.recordCount as Record<string, unknown>;
+    recordCount = {};
+    for (const [key, val] of Object.entries(rc)) {
+      if (typeof val === "number") recordCount[key] = val;
+    }
+    if (Object.keys(recordCount).length === 0) recordCount = null;
+  }
+
+  // Extract checkpoint state (flat key-value of string | number | boolean)
+  let checkpoint: NangoSyncRecord["checkpoint"] = null;
+  if (s.checkpoint != null && typeof s.checkpoint === "object") {
+    const cp = s.checkpoint as Record<string, unknown>;
+    checkpoint = {};
+    for (const [key, val] of Object.entries(cp)) {
+      if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+        checkpoint[key] = val;
+      }
+    }
+    if (Object.keys(checkpoint).length === 0) checkpoint = null;
+  }
+
   return {
     id: String(s.id ?? ""),
     name: String(s.name ?? ""),
@@ -197,6 +229,8 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
           deleted: typeof result.deleted === "number" ? result.deleted : 0,
         }
       : null,
+    recordCount,
+    checkpoint,
   };
 }
 
@@ -350,6 +384,60 @@ function rankTopConnections(
       return b.lastActivity.localeCompare(a.lastActivity);
     })
     .slice(0, limit);
+}
+
+/**
+ * Best-effort sync of the Connect UI primary color to the Nango server.
+ * The Connect UI hosted iframe reads this setting from the Nango API so it
+ * must be persisted server-side for the color to take effect.
+ *
+ * Errors are intentionally swallowed by the caller — a failed sync should
+ * never block the local settings save.
+ */
+async function syncConnectUiPrimaryColorToNango(
+  serverUrl: string,
+  secretKey: string,
+  environment: string,
+  primaryColor: string | null,
+): Promise<void> {
+  // Map our local environment name to the Nango API env slug convention.
+  const envSlug =
+    environment === "development" ? "dev"
+    : environment === "production" ? "prod"
+    : environment; // staging → staging, or any custom name passed through
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${secretKey}`,
+    "Content-Type": "application/json",
+  };
+
+  // Fetch current settings so we only change the primary color field.
+  const getRes = await fetch(`${serverUrl}/api/v1/connect-ui-settings?env=${envSlug}`, { headers });
+  if (!getRes.ok) return;
+
+  const body = await getRes.json() as {
+    data: {
+      theme: { light: { primary: string }; dark: { primary: string } };
+      defaultTheme: string;
+      showWatermark: boolean;
+    };
+  };
+  const current = body.data;
+
+  // When primaryColor is null the user cleared the override; fall back to Nango's default purple.
+  const newPrimary = primaryColor ?? "#7C3AED";
+
+  await fetch(`${serverUrl}/api/v1/connect-ui-settings?env=${envSlug}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({
+      ...current,
+      theme: {
+        light: { ...current.theme.light, primary: newPrimary },
+        dark: { ...current.theme.dark, primary: newPrimary },
+      },
+    }),
+  });
 }
 
 /**
@@ -780,6 +868,41 @@ export function registerIpcHandlers(): void {
       })
   );
 
+  // ── Async action trigger handler ─────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_TRIGGER_ACTION_ASYNC,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoTriggerActionAsyncRequest
+    ): Promise<IpcResponse<NangoTriggerActionAsyncResult>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.triggerActionAsync(
+          args.integrationId,
+          args.connectionId,
+          args.actionName,
+          args.input
+        );
+        return result;
+      })
+  );
+
+  // ── Async action result poll handler ─────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_ASYNC_ACTION_RESULT,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetAsyncActionResultRequest
+    ): Promise<IpcResponse<NangoAsyncActionResultData>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.getAsyncActionResult(args);
+        return result as NangoAsyncActionResultData;
+      })
+  );
+
   // ── Proxy request handler ──────────────────────────────────────────────
 
   ipcMain.handle(
@@ -1040,7 +1163,9 @@ export function registerIpcHandlers(): void {
         maskedKey: credentialStore.loadMaskedKey(),
         appVersion: app.getVersion(),
         electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.69.49",
+        nangoSdkVersion: "0.70.1",
+        connectUiTheme: credentialStore.loadConnectUiTheme(),
+        connectUiPrimaryColor: credentialStore.loadConnectUiPrimaryColor(),
       }))
   );
 
@@ -1061,6 +1186,28 @@ export function registerIpcHandlers(): void {
         }
         if (args.theme !== undefined) {
           credentialStore.saveTheme(args.theme);
+        }
+        if (args.connectUiTheme !== undefined) {
+          credentialStore.saveConnectUiTheme(args.connectUiTheme);
+        }
+        if (args.connectUiPrimaryColor !== undefined) {
+          credentialStore.saveConnectUiPrimaryColor(args.connectUiPrimaryColor);
+          // Best-effort: sync the primary color to the Nango server so the
+          // Connect UI hosted iframe picks it up automatically on next open.
+          const secretKey = credentialStore.load();
+          if (secretKey && isNangoClientReady()) {
+            const client = getNangoClient();
+            const serverUrl = (client as unknown as { serverUrl: string }).serverUrl;
+            const environment = credentialStore.loadEnvironment();
+            syncConnectUiPrimaryColorToNango(
+              serverUrl,
+              secretKey,
+              environment,
+              args.connectUiPrimaryColor,
+            ).catch((err: unknown) => {
+              log.debug("[ConnectUI] primary color sync failed (non-fatal):", err instanceof Error ? err.message : String(err));
+            });
+          }
         }
       })
   );
@@ -1530,4 +1677,52 @@ export function registerIpcHandlers(): void {
       }
     }
   });
+
+  // ── OAuth2 scope discovery ─────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_SUGGEST_SCOPES,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoSuggestScopesRequest
+    ): Promise<IpcResponse<NangoSuggestScopesResult>> =>
+      wrap(async () => {
+        if (!args?.providerKey) {
+          throw new Error("providerKey is required");
+        }
+
+        const client = getNangoClient();
+        const result = await client.getProvider({ provider: args.providerKey });
+        const provider = result.data as {
+          auth_mode?: string;
+          default_scopes?: string[];
+          available_scopes?: string[];
+          docs?: string;
+        };
+
+        // Only OAuth2 providers support scope discovery.
+        const authMode = provider.auth_mode?.toUpperCase() ?? "";
+        if (!authMode.includes("OAUTH2")) {
+          return { supported: false, docsUrl: provider.docs };
+        }
+
+        const defaultScopes = provider.default_scopes ?? [];
+        const availableScopes = provider.available_scopes ?? [];
+
+        if (defaultScopes.length === 0 && availableScopes.length === 0) {
+          return { supported: false, docsUrl: provider.docs };
+        }
+
+        // default_scopes → recommended; available_scopes (minus defaults) → optional.
+        const defaultSet = new Set(defaultScopes);
+        const scopes: NangoSuggestedScope[] = [
+          ...defaultScopes.map((scope) => ({ scope, recommended: true })),
+          ...availableScopes
+            .filter((scope) => !defaultSet.has(scope))
+            .map((scope) => ({ scope, recommended: false })),
+        ];
+
+        return { supported: true, scopes };
+      })
+  );
 }
