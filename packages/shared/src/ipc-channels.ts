@@ -234,6 +234,10 @@ export interface AdvancedConnectionConfig {
   oauthClientId?: string;
   /** Override the registered OAuth client secret for this connection. */
   oauthClientSecret?: string;
+  /** MCP server URL endpoint (used when auth_mode is MCP). */
+  mcpServerUrl?: string;
+  /** API key or token for authenticating to the MCP server. */
+  mcpApiKey?: string;
 }
 
 export interface NangoCreateConnectSessionRequest {

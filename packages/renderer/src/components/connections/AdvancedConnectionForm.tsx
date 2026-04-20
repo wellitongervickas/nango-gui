@@ -16,6 +16,8 @@ type HighlightField = "oauthClientId" | "oauthClientSecret" | "userScopes" | "au
 
 interface AdvancedConnectionFormProps {
   providerName: string;
+  /** Provider auth mode (e.g. "OAUTH2", "API_KEY", "MCP"). */
+  authMode?: string;
   value: AdvancedConnectionConfig;
   onChange: (cfg: AdvancedConnectionConfig) => void;
   /** Client-side validation errors to surface inline. */
@@ -72,11 +74,13 @@ export function validateAdvancedConfig(cfg: AdvancedConnectionConfig): Validatio
  */
 export function AdvancedConnectionForm({
   providerName,
+  authMode,
   value,
   onChange,
   errors = {},
   serverHighlightField,
 }: AdvancedConnectionFormProps) {
+  const isMcpAuth = authMode?.toUpperCase() === "MCP";
   // Auto-expand when the server identified a specific field that needs attention.
   const [isOpen, setIsOpen] = useState(() => serverHighlightField !== undefined);
 
@@ -216,7 +220,8 @@ export function AdvancedConnectionForm({
             </button>
           </div>
 
-          {/* ── Custom OAuth Scopes ──────────────────────────────────────── */}
+          {/* ── Custom OAuth Scopes (hidden for MCP auth) ─────────────────── */}
+          {!isMcpAuth && (
           <div className={`space-y-1.5 rounded-md transition-colors ${serverHighlightField === "userScopes" ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
@@ -235,8 +240,10 @@ export function AdvancedConnectionForm({
               <p className="text-xs text-[var(--color-error)]">{errors.userScopes}</p>
             )}
           </div>
+          )}
 
-          {/* ── Developer App Credentials ────────────────────────────────── */}
+          {/* ── Developer App Credentials (hidden for MCP auth) ──────────── */}
+          {!isMcpAuth && (
           <div className={`space-y-1.5 rounded-md transition-colors ${(serverHighlightField === "oauthClientId" || serverHighlightField === "oauthClientSecret") ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
@@ -263,6 +270,7 @@ export function AdvancedConnectionForm({
               />
             </div>
           </div>
+          )}
         </div>
       )}
     </div>

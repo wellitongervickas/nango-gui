@@ -29,7 +29,9 @@ function saveAdvancedConfig(providerName: string, cfg: AdvancedConnectionConfig)
       !cfg.oauthClientId &&
       !cfg.oauthClientSecret &&
       !(cfg.userScopes ?? []).length &&
-      !Object.keys(cfg.authParams ?? {}).some(Boolean);
+      !Object.keys(cfg.authParams ?? {}).some(Boolean) &&
+      !cfg.mcpServerUrl &&
+      !cfg.mcpApiKey;
     if (isEmpty) {
       delete store[providerName];
     } else {
@@ -295,6 +297,13 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
         return;
       }
 
+      // MCP validation: server URL is required for MCP providers
+      const isMcp = provider.auth_mode.toUpperCase() === "MCP";
+      if (isMcp && !cfg.mcpServerUrl?.trim()) {
+        setAdvancedErrors({ mcpServerUrl: "MCP server URL is required." } as ReturnType<typeof validateAdvancedConfig>);
+        return;
+      }
+
       // Validate before proceeding
       const errs = validateAdvancedConfig(cfg);
       if (Object.keys(errs).length > 0) {
@@ -311,12 +320,26 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
       setFlowState({ kind: "connecting", provider });
 
       try {
+        // Merge MCP fields into authParams for the session
+        const mergedCfg = isMcp
+          ? {
+              ...cfg,
+              authParams: {
+                ...(cfg.authParams ?? {}),
+                ...(cfg.mcpServerUrl ? { mcp_server_url: cfg.mcpServerUrl } : {}),
+                ...(cfg.mcpApiKey ? { mcp_api_key: cfg.mcpApiKey } : {}),
+              },
+            }
+          : cfg;
+
         // Build integrationsConfigDefaults only when advanced config is non-empty
         const hasAdvanced =
-          cfg.oauthClientId ||
-          cfg.oauthClientSecret ||
-          (cfg.userScopes ?? []).length > 0 ||
-          Object.keys(cfg.authParams ?? {}).some(Boolean);
+          mergedCfg.oauthClientId ||
+          mergedCfg.oauthClientSecret ||
+          (mergedCfg.userScopes ?? []).length > 0 ||
+          Object.keys(mergedCfg.authParams ?? {}).some(Boolean) ||
+          mergedCfg.mcpServerUrl ||
+          mergedCfg.mcpApiKey;
 
         const res = await Promise.race([
           window.nango.createConnectSession({
@@ -324,7 +347,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             endUserDisplayName: "Local User",
             allowedIntegrations: [provider.name],
             ...(hasAdvanced
-              ? { integrationsConfigDefaults: { [provider.name]: cfg } }
+              ? { integrationsConfigDefaults: { [provider.name]: mergedCfg } }
               : {}),
           }),
           new Promise<never>((_, reject) =>
@@ -534,10 +557,52 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
+            {/* MCP credential fields — shown only for MCP auth providers */}
+            {provider.auth_mode.toUpperCase() === "MCP" && (
+              <div className="px-4 pt-3 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                    MCP Server URL <span className="text-[var(--color-error)]">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={advancedConfig.mcpServerUrl ?? ""}
+                    onChange={(e) => {
+                      setAdvancedConfig({ ...advancedConfig, mcpServerUrl: e.target.value || undefined });
+                      setAdvancedErrors({});
+                    }}
+                    placeholder="e.g. https://mcp.example.com/sse"
+                    className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)]"
+                  />
+                  {(advancedErrors as Record<string, string>).mcpServerUrl && (
+                    <p className="text-xs text-[var(--color-error)]">
+                      {(advancedErrors as Record<string, string>).mcpServerUrl}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                    MCP API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={advancedConfig.mcpApiKey ?? ""}
+                    onChange={(e) => {
+                      setAdvancedConfig({ ...advancedConfig, mcpApiKey: e.target.value || undefined });
+                    }}
+                    placeholder="Bearer token or API key (optional)"
+                    className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)]"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Advanced section */}
             <div className="px-4 pt-3 pb-4">
               <AdvancedConnectionForm
                 providerName={provider.display_name}
+                authMode={provider.auth_mode}
                 value={advancedConfig}
                 onChange={(cfg) => {
                   setAdvancedConfig(cfg);
