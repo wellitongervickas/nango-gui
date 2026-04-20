@@ -963,12 +963,6 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
           connectionId={connectionId}
         />
 
-        {/* Connection Tags */}
-        <TagsSection
-          metadata={currentMetadata}
-          onSave={handleSaveMetadata}
-        />
-
         {/* Metadata */}
         <MetadataSection
           metadata={currentMetadata}
