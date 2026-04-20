@@ -35,6 +35,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "MONITOR",
     items: [
       { label: "Dashboard", route: "dashboard" },
+      { label: "Logs", route: "logs" },
       { label: "Webhook Inspector", route: "webhooks" },
       { label: "MCP Servers", route: "mcp" },
     ],

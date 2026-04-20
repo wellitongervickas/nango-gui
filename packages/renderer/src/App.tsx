@@ -28,6 +28,7 @@ import { RecordsPage } from "./pages/RecordsPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
+import { LogsPage } from "./pages/LogsPage";
 import { DeployHistoryPage } from "./pages/DeployHistoryPage";
 import { McpPage } from "./pages/McpPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
@@ -154,6 +155,10 @@ function App() {
 
   if (route === "playground") {
     return <AppShell pageName="Playground"><PlaygroundPage /></AppShell>;
+  }
+
+  if (route === "logs") {
+    return <AppShell pageName="Logs"><LogsPage /></AppShell>;
   }
 
   if (route === "webhooks") {

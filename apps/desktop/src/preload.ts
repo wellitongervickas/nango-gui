@@ -52,6 +52,8 @@ import type {
   AiProviderClearKeyRequest,
   NangoSetMetadataRequest,
   NangoCreateReconnectSessionRequest,
+  NangoLogsSearchRequest,
+  NangoLogsMessagesRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -118,6 +120,10 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_RECONNECT_SESSION, args),
   suggestScopes: (providerKey: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_SUGGEST_SCOPES, { providerKey }),
+  searchLogs: (args: NangoLogsSearchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_LOGS_SEARCH, args),
+  getLogMessages: (args: NangoLogsMessagesRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_LOGS_MESSAGES, args),
 });
 
 // Expose window.credentials — secure credential storage
