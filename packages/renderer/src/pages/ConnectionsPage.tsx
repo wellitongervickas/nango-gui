@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NangoConnectionDetail, NangoConnectionSummary, ConnectionHealthStatus, McpToolEntry } from "@nango-gui/shared";
+import type { NangoConnectionDetail, NangoConnectionSummary, ConnectionHealthStatus, McpToolEntry, McpIntegrationSummary } from "@nango-gui/shared";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { useCredentialHealthStore } from "@/store/credentialHealthStore";
 import { useMcpIntegrations } from "@/hooks/useMcpIntegrations";
@@ -311,6 +311,100 @@ function McpToolToggle({ tool, onToggle }: { tool: McpToolEntry; onToggle: (t: M
   );
 }
 
+// ── MCP Connection Card ───────────────────────────────────────────────────
+
+function McpConnectionCard({
+  connection,
+  summary,
+  isSelected,
+  onClick,
+  onDelete,
+}: {
+  connection: NangoConnectionSummary;
+  summary: McpIntegrationSummary | null;
+  isSelected: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
+  const healthEntry = useCredentialHealthStore(
+    (s) => s.entries[`${connection.provider_config_key}:${connection.connection_id}`]
+  );
+  const validate = useCredentialHealthStore((s) => s.validate);
+
+  useEffect(() => {
+    if (!healthEntry) {
+      validate(connection.provider_config_key, connection.connection_id);
+    }
+  }, [connection.provider_config_key, connection.connection_id, healthEntry, validate]);
+
+  const status = healthEntry?.status ?? "unchecked";
+  const toolCount = summary?.toolCount ?? 0;
+  const enabledCount = summary?.enabledCount ?? 0;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => e.key === "Enter" && onClick()}
+      className={cn(
+        "relative flex flex-col gap-3 p-4 rounded-xl border transition-all cursor-pointer group",
+        isSelected
+          ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)]/5 shadow-sm"
+          : "border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-brand-500)]/40 hover:shadow-sm"
+      )}
+    >
+      {/* Header row: avatar + provider name + delete */}
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-500)]/10 flex items-center justify-center text-xs font-bold text-[var(--color-brand-400)] uppercase shrink-0">
+          {(connection.provider_config_key[0] ?? "?").toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+            {connection.provider_config_key}
+          </p>
+          <p className="text-xs text-[var(--color-text-secondary)] truncate">
+            {connection.provider || connection.connection_id}
+          </p>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-all cursor-pointer"
+          aria-label="Delete connection"
+        >
+          <TrashIcon />
+        </button>
+      </div>
+
+      {/* Status + tool count row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <CredentialHealthBadge status={status} />
+        {toolCount > 0 && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--color-bg-overlay)] text-[var(--color-text-secondary)] font-medium">
+            <ToolsIcon />
+            {enabledCount}/{toolCount} tools
+          </span>
+        )}
+      </div>
+
+      {/* Last checked timestamp */}
+      {healthEntry?.lastChecked && (
+        <p className="text-[10px] text-[var(--color-text-secondary)]">
+          Last checked {formatDate(healthEntry.lastChecked)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ToolsIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  );
+}
+
 // ── Detail panel ───────────────────────────────────────────────────────────
 
 interface DetailPanelProps {
@@ -485,7 +579,7 @@ function formatDate(iso: string): string {
 export function ConnectionsPage() {
   const { connections, isLoading, error, fetchConnections, deleteConnection } =
     useConnectionsStore();
-  const { mcpProviderKeys, mcpEndpoint } = useMcpIntegrations();
+  const { mcpProviderKeys, mcpSummaries, mcpEndpoint } = useMcpIntegrations();
 
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created");
@@ -517,6 +611,16 @@ export function ConnectionsPage() {
         return sortDir === "asc" ? cmp : -cmp;
       });
   }, [connections, search, sortKey, sortDir]);
+
+  const { mcpConnections, standardConnections } = useMemo(() => {
+    const mcp: NangoConnectionSummary[] = [];
+    const standard: NangoConnectionSummary[] = [];
+    for (const c of filtered) {
+      if (mcpProviderKeys.has(c.provider_config_key)) mcp.push(c);
+      else standard.push(c);
+    }
+    return { mcpConnections: mcp, standardConnections: standard };
+  }, [filtered, mcpProviderKeys]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -598,19 +702,8 @@ export function ConnectionsPage() {
       {error && <ErrorBanner message={error} className="mx-6 mt-4 shrink-0" />}
       {deleteError && <ErrorBanner message={deleteError} className="mx-6 mt-4 shrink-0" />}
 
-      {/* Table */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Column headers */}
-        {!isLoading && connections.length > 0 && (
-          <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] sticky top-0 z-10">
-            <div className="w-8 shrink-0" />
-            <SortHeader label="Provider" sortKey="provider" current={sortKey} dir={sortDir} onToggle={toggleSort} className="flex-1" />
-            <SortHeader label="Connection ID" sortKey="connection_id" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-48" />
-            <div className="w-28 text-xs text-[var(--color-text-secondary)]">Status</div>
-            <SortHeader label="Created" sortKey="created" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
-          </div>
-        )}
-
         {/* Loading */}
         {isLoading && (
           <>
@@ -649,26 +742,81 @@ export function ConnectionsPage() {
         {/* No search results */}
         {!isLoading && connections.length > 0 && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
-            <p className="text-sm text-[var(--color-text-secondary)]">No connections match "{search}"</p>
+            <p className="text-sm text-[var(--color-text-secondary)]">No connections match &ldquo;{search}&rdquo;</p>
             <button onClick={() => setSearch("")} className="text-xs text-[var(--color-brand-400)] hover:underline cursor-pointer">
               Clear search
             </button>
           </div>
         )}
 
-        {/* Rows */}
-        {filtered.map((conn) => (
-          <ConnectionRow
-            key={`${conn.provider_config_key}:${conn.connection_id}`}
-            connection={conn}
-            isMcp={mcpProviderKeys.has(conn.provider_config_key)}
-            isSelected={selected?.connection_id === conn.connection_id && selected?.provider_config_key === conn.provider_config_key}
-            onClick={() => setSelected((s) =>
-              s?.connection_id === conn.connection_id && s?.provider_config_key === conn.provider_config_key ? null : conn
+        {/* ── AI / MCP Section ─────────────────────────────────────────── */}
+        {!isLoading && mcpConnections.length > 0 && (
+          <section className="px-6 py-5">
+            <div className="flex items-center gap-2 mb-4">
+              <McpBadge />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                AI / MCP
+              </h2>
+              <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                {mcpConnections.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {mcpConnections.map((conn) => (
+                <McpConnectionCard
+                  key={`mcp-${conn.provider_config_key}:${conn.connection_id}`}
+                  connection={conn}
+                  summary={mcpSummaries.get(conn.provider_config_key) ?? null}
+                  isSelected={
+                    selected?.connection_id === conn.connection_id &&
+                    selected?.provider_config_key === conn.provider_config_key
+                  }
+                  onClick={() =>
+                    setSelected((s) =>
+                      s?.connection_id === conn.connection_id &&
+                      s?.provider_config_key === conn.provider_config_key
+                        ? null
+                        : conn
+                    )
+                  }
+                  onDelete={() => setPendingDelete(conn)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Standard Connections Table ────────────────────────────────── */}
+        {!isLoading && standardConnections.length > 0 && (
+          <>
+            {mcpConnections.length > 0 && (
+              <div className="px-6 pb-2 pt-1">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                  Standard Connections
+                </h2>
+              </div>
             )}
-            onDelete={() => setPendingDelete(conn)}
-          />
-        ))}
+            <div className="flex items-center gap-4 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-surface)] sticky top-0 z-10">
+              <div className="w-8 shrink-0" />
+              <SortHeader label="Provider" sortKey="provider" current={sortKey} dir={sortDir} onToggle={toggleSort} className="flex-1" />
+              <SortHeader label="Connection ID" sortKey="connection_id" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-48" />
+              <div className="w-28 text-xs text-[var(--color-text-secondary)]">Status</div>
+              <SortHeader label="Created" sortKey="created" current={sortKey} dir={sortDir} onToggle={toggleSort} className="w-36" />
+            </div>
+            {standardConnections.map((conn) => (
+              <ConnectionRow
+                key={`${conn.provider_config_key}:${conn.connection_id}`}
+                connection={conn}
+                isMcp={false}
+                isSelected={selected?.connection_id === conn.connection_id && selected?.provider_config_key === conn.provider_config_key}
+                onClick={() => setSelected((s) =>
+                  s?.connection_id === conn.connection_id && s?.provider_config_key === conn.provider_config_key ? null : conn
+                )}
+                onDelete={() => setPendingDelete(conn)}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       {/* Detail panel */}
