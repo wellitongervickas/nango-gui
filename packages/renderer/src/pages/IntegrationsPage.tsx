@@ -9,6 +9,7 @@ import { useIntegrationMcpTools } from "@/hooks/useIntegrationMcpTools";
 import { ConnectModal } from "@/components/connections/ConnectModal";
 import { JwtBearerConnectModal } from "@/components/connections/JwtBearerConnectModal";
 import { McpAuthConnectModal } from "@/components/connections/McpAuthConnectModal";
+import { AsyncActionsTab } from "@/components/integrations/AsyncActionsTab";
 import { SearchIcon, XIcon, ExternalLinkIcon, GridIcon, SpinnerIcon, DownloadIcon, ChevronDownIcon, CopyIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { cn, searchInputClass } from "@/lib/utils";
@@ -160,7 +161,7 @@ function ProviderCard({ provider, isSelected, onClick }: ProviderCardProps) {
 
 // ── Detail panel ───────────────────────────────────────────────────────────
 
-type DetailTab = "details" | "documentation" | "models" | "mcp-tools";
+type DetailTab = "details" | "documentation" | "models" | "mcp-tools" | "actions";
 
 interface DetailPanelProps {
   provider: NangoProvider;
@@ -212,6 +213,9 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
           </DetailTabButton>
           <DetailTabButton active={activeTab === "mcp-tools"} onClick={() => setActiveTab("mcp-tools")}>
             MCP Tools
+          </DetailTabButton>
+          <DetailTabButton active={activeTab === "actions"} onClick={() => setActiveTab("actions")}>
+            Actions
           </DetailTabButton>
         </div>
 
@@ -285,6 +289,10 @@ function DetailPanel({ provider, onClose }: DetailPanelProps) {
               error={mcpError}
               onToggle={toggleTool}
             />
+          )}
+
+          {activeTab === "actions" && (
+            <AsyncActionsTab providerKey={provider.name} />
           )}
         </div>
 
