@@ -10,6 +10,15 @@ interface SettingsState {
   nangoSdkVersion: string;
   connectUiTheme: AppTheme;
   connectUiPrimaryColor: string | null;
+  /**
+   * True when the connected Nango server has RBAC enabled (e.g. enterprise tier).
+   * When false, all permission gates are no-ops and the role badge is hidden.
+   */
+  hasRbac: boolean;
+  /** Whether the currently selected Nango environment is flagged as production. */
+  isProduction: boolean;
+  /** Subscription tier of the connected Nango account. */
+  tier: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -29,6 +38,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   nangoSdkVersion: "",
   connectUiTheme: "system",
   connectUiPrimaryColor: null,
+  hasRbac: false,
+  isProduction: false,
+  tier: null,
   isLoading: false,
   error: null,
 
@@ -50,6 +62,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         nangoSdkVersion,
         connectUiTheme,
         connectUiPrimaryColor,
+        hasRbac,
+        isProduction,
+        tier,
       } = res.data;
       set({
         theme,
@@ -60,6 +75,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         nangoSdkVersion,
         connectUiTheme,
         connectUiPrimaryColor,
+        hasRbac,
+        isProduction,
+        tier,
         isLoading: false,
       });
       applyTheme(theme);
@@ -98,6 +116,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({ environment: prev });
         throw new Error(res.error);
       }
+      // Per F6 spec: re-fetch tier/is_production/role when the environment switches.
+      // Re-pulling settings refreshes hasRbac/isProduction/tier; the rbac store is
+      // notified separately via the environment subscription wired in App.tsx.
+      await get().fetchSettings();
     } catch (err) {
       set({ environment: prev });
       throw err;

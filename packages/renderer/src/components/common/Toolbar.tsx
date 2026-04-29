@@ -10,6 +10,7 @@ import { useHashRoute, navigate } from "../../lib/router";
 import { useNavigationStore } from "../../store/navigationStore";
 import { WalkthroughTour, useTourAutoShow } from "./WalkthroughTour";
 import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
+import { PermissionGate } from "./PermissionGate";
 import { RateLimitBadge } from "../rate-limit/RateLimitBadge";
 import { FolderOpenIcon, HelpIcon, ChevronIcon } from "@/components/icons";
 
@@ -223,17 +224,22 @@ export function Toolbar() {
           >
             ✦ AI
           </button>
-          <button
-            onClick={toggleDeployPanel}
-            className={cn(
-              "px-3 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
-              deployPanelOpen
-                ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
-                : "bg-[var(--color-primary)] text-white hover:opacity-90"
-            )}
+          <PermissionGate
+            permission="deploy_production"
+            tooltipText="Deploying to production requires Full Access role"
           >
-            Deploy
-          </button>
+            <button
+              onClick={toggleDeployPanel}
+              className={cn(
+                "px-3 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
+                deployPanelOpen
+                  ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-medium"
+                  : "bg-[var(--color-primary)] text-white hover:opacity-90"
+              )}
+            >
+              Deploy
+            </button>
+          </PermissionGate>
           <button
             onClick={toggleCodePanel}
             className={cn(

@@ -300,6 +300,15 @@ export interface AppSettings {
   nangoSdkVersion: string;
   connectUiTheme: AppTheme;
   connectUiPrimaryColor: string | null;
+  /**
+   * True when the connected Nango server has RBAC enabled (enterprise tier).
+   * Drives whether the role badge and permission gates render.
+   */
+  hasRbac: boolean;
+  /** Whether the currently selected Nango environment is flagged as production. */
+  isProduction: boolean;
+  /** Subscription tier of the connected Nango account (e.g. "free", "enterprise"). */
+  tier: string | null;
 }
 
 export interface AppUpdateSettingsRequest {
@@ -897,6 +906,27 @@ export interface AiProviderLoadKeyResult {
 /** Request to clear an AI provider API key. */
 export interface AiProviderClearKeyRequest {
   provider: AiProviderType;
+}
+
+// ── RBAC ─────────────────────────────────────────────────────────────────
+
+/**
+ * Three built-in Nango roles plus a `custom` fallback used when the server
+ * returns a tier/role we do not explicitly recognise (e.g. an enterprise
+ * customer with a bespoke role configuration).
+ */
+export type UserRole = "full_access" | "support" | "contributor" | "custom";
+
+export interface RbacUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface TeamMember extends RbacUser {
+  joinedAt: string;
+  isCurrentUser: boolean;
 }
 
 // ── Scope discovery ───────────────────────────────────────────────────────────
