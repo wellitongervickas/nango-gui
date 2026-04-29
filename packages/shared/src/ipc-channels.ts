@@ -171,8 +171,8 @@ export interface NangoConnectionSummary {
   provider_config_key: string;
   created: string;
   metadata: Record<string, unknown> | null;
-  /** Key-value tags for this connection. Keys are the tag labels. */
-  tags?: Record<string, string> | null;
+  /** Key-value tags for this connection. Keys are the tag labels. Null when none are set. */
+  tags: Record<string, string> | null;
 }
 
 export interface NangoGetConnectionRequest {
@@ -190,8 +190,8 @@ export interface NangoConnectionDetail {
   provider: string;
   credentials: Record<string, unknown>;
   metadata: Record<string, unknown> | null;
-  /** Key-value tags for this connection. Keys are the tag labels. */
-  tags?: Record<string, string> | null;
+  /** Key-value tags for this connection. Keys are the tag labels. Null when none are set. */
+  tags: Record<string, string> | null;
   created: string;
   updated_at?: string;
 }
@@ -205,8 +205,8 @@ export interface NangoSetMetadataRequest {
 export interface NangoPatchConnectionRequest {
   providerConfigKey: string;
   connectionId: string;
-  /** Key-value tags to set on the connection. Pass null to clear all tags. */
-  tags: Record<string, string> | null;
+  /** Key-value tags to set on the connection. Pass {} to clear all tags. */
+  tags: Record<string, string>;
 }
 
 export interface NangoCreateReconnectSessionRequest {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI, ConnectUIEvent } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
@@ -998,10 +998,11 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
     await fetchConnections();
   }
 
-  // Save tags
+  // Save tags — pass newTags directly; store normalises {} → null internally.
   async function handleSaveTags(newTags: Record<string, string>) {
-    await patchConnection(providerConfigKey, connectionId, Object.keys(newTags).length > 0 ? newTags : null);
-    setDetail((prev) => prev ? { ...prev, tags: Object.keys(newTags).length > 0 ? newTags : null } : prev);
+    await patchConnection(providerConfigKey, connectionId, newTags);
+    const stored = Object.keys(newTags).length > 0 ? newTags : null;
+    setDetail((prev) => prev ? { ...prev, tags: stored } : prev);
   }
 
   // Delete connection
@@ -1024,17 +1025,20 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   const currentTags = detail?.tags ?? connection?.tags ?? null;
 
   // All unique tag keys across the environment (for autocomplete)
-  const allTags = listAllTags();
+  const allTags = useMemo(() => listAllTags(), [connections]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tag usage counts: how many connections carry each tag key
-  const tagUsageCounts: Record<string, number> = {};
-  for (const c of connections) {
-    if (c.tags) {
-      for (const k of Object.keys(c.tags)) {
-        tagUsageCounts[k] = (tagUsageCounts[k] ?? 0) + 1;
+  const tagUsageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of connections) {
+      if (c.tags) {
+        for (const k of Object.keys(c.tags)) {
+          counts[k] = (counts[k] ?? 0) + 1;
+        }
       }
     }
-  }
+    return counts;
+  }, [connections]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-base)] overflow-y-auto">

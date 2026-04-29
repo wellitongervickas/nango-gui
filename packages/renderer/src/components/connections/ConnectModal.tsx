@@ -81,6 +81,7 @@ export function ConnectModal({ onConnected, onClose, children }: ConnectModalPro
             provider_config_key: providerConfigKey,
             created: new Date().toISOString(),
             metadata: null,
+            tags: null,
           });
           await fetchConnections();
           closedRef.current = true;

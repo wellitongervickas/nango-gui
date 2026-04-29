@@ -23,7 +23,8 @@ interface ConnectionsState {
   addConnection: (connection: NangoConnectionSummary) => void;
   deleteConnection: (providerConfigKey: string, connectionId: string) => Promise<void>;
   fetchConnectionHealth: (providerConfigKey: string, connectionId: string) => Promise<void>;
-  patchConnection: (providerConfigKey: string, connectionId: string, tags: Record<string, string> | null) => Promise<void>;
+  /** Pass {} to clear all tags; pass a populated record to set tags. */
+  patchConnection: (providerConfigKey: string, connectionId: string, tags: Record<string, string>) => Promise<void>;
   setStatusFilter: (status: ConnectionStatus | null) => void;
   setTagFilter: (tag: string | null) => void;
   /** Returns all unique tag keys across all loaded connections. */
@@ -113,13 +114,15 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
   },
 
   patchConnection: async (providerConfigKey, connectionId, tags) => {
-    if (!window.nango) return;
+    if (!window.nango) throw new Error("Nango client not available");
     const res = await window.nango.patchConnection({ providerConfigKey, connectionId, tags });
     if (res.status === "error") throw new Error(res.error);
+    // Store null when tags is empty so callers can reliably use null-checks.
+    const stored = Object.keys(tags).length > 0 ? tags : null;
     set((state) => ({
       connections: state.connections.map((c) =>
         c.provider_config_key === providerConfigKey && c.connection_id === connectionId
-          ? { ...c, tags }
+          ? { ...c, tags: stored }
           : c
       ),
     }));

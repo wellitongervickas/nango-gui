@@ -14,6 +14,7 @@ const mockConnections: NangoConnectionSummary[] = [
     provider_config_key: "github",
     created: "2026-01-01T00:00:00Z",
     metadata: null,
+    tags: null,
   },
   {
     id: 2,
@@ -22,6 +23,7 @@ const mockConnections: NangoConnectionSummary[] = [
     provider_config_key: "slack",
     created: "2026-01-02T00:00:00Z",
     metadata: null,
+    tags: null,
   },
 ];
 

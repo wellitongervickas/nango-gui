@@ -71,6 +71,8 @@ function TagChip({ label, onRemove, onRename, isSaving }: TagChipProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(label);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Prevents onBlur from double-firing commitRename when Enter already handled it.
+  const skipBlurRef = useRef(false);
 
   function handleClickLabel() {
     if (isSaving) return;
@@ -88,14 +90,24 @@ function TagChip({ label, onRemove, onRename, isSaving }: TagChipProps) {
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      commitRename();
+      skipBlurRef.current = true;
+      doCommitRename();
     } else if (e.key === "Escape") {
+      skipBlurRef.current = true;
       setIsEditing(false);
       setDraft(label);
     }
   }
 
-  function commitRename() {
+  function handleBlur() {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
+    doCommitRename();
+  }
+
+  function doCommitRename() {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== label) {
       onRename(trimmed);
@@ -110,9 +122,10 @@ function TagChip({ label, onRemove, onRename, isSaving }: TagChipProps) {
           ref={inputRef}
           type="text"
           value={draft}
+          maxLength={64}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={commitRename}
+          onBlur={handleBlur}
           className="bg-transparent outline-none text-[var(--color-text-primary)] w-24 min-w-0"
           style={{ width: `${Math.max(draft.length, 3) + 2}ch` }}
         />
@@ -160,8 +173,11 @@ function AddTagInput({ existingTags, suggestions, onAdd, disabled }: AddTagInput
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const lowerExisting = existingTags.map((t) => t.toLowerCase());
   const filteredSuggestions = suggestions.filter(
-    (s) => !existingTags.includes(s) && s.toLowerCase().includes(value.toLowerCase().trim())
+    (s) =>
+      !lowerExisting.includes(s.toLowerCase()) &&
+      s.toLowerCase().includes(value.toLowerCase().trim())
   );
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -176,7 +192,8 @@ function AddTagInput({ existingTags, suggestions, onAdd, disabled }: AddTagInput
 
   function commitAdd(tag: string) {
     const trimmed = tag.trim();
-    if (trimmed && !existingTags.includes(trimmed)) {
+    // Case-insensitive duplicate check
+    if (trimmed && !lowerExisting.includes(trimmed.toLowerCase())) {
       onAdd(trimmed);
       setValue("");
       setShowSuggestions(false);
@@ -208,6 +225,7 @@ function AddTagInput({ existingTags, suggestions, onAdd, disabled }: AddTagInput
         onFocus={() => setShowSuggestions(true)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
+        maxLength={64}
         placeholder="Add tag…"
         className={cn(
           "text-xs px-2.5 py-0.5 rounded-full border border-dashed outline-none transition-colors",
@@ -284,6 +302,8 @@ export function TagsSection({ tags, allTags, tagUsageCounts, onSave }: TagsSecti
   function handleRename(oldTag: string, newTag: string) {
     if (newTag === oldTag) return;
     const next = { ...(tags ?? {}) };
+    // Prevent silently overwriting a pre-existing tag with the same name.
+    if (newTag in next) return;
     delete next[oldTag];
     next[newTag] = newTag;
     applyTags(next);
