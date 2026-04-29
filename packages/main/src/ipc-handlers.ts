@@ -851,17 +851,35 @@ export function registerIpcHandlers(): void {
   /** Map a raw ApiPublicIntegration into our NangoIntegration shape. */
   function toIntegration(raw: unknown): NangoIntegration {
     const i = (raw ?? {}) as Record<string, unknown>;
+    const uniqueKey = String(i.unique_key ?? "");
+    // Empty string falls back to unique_key (use ||, not ??).
+    const displayName =
+      (typeof i.display_name === "string" && i.display_name) || uniqueKey;
+    // Only accept credentials with a recognizable `type` discriminator;
+    // unknown shapes are passed through as a safe fallback the renderer can
+    // detect, rather than blindly cast into the discriminated union.
+    let credentials: NangoIntegrationCredentials | null = null;
+    if (i.credentials && typeof i.credentials === "object") {
+      const c = i.credentials as Record<string, unknown>;
+      if (typeof c.type === "string") {
+        credentials = c as unknown as NangoIntegrationCredentials;
+      } else {
+        log.warn(
+          "[IPC] toIntegration: dropping credentials payload missing string `type` discriminator",
+        );
+      }
+    }
     return {
-      unique_key: String(i.unique_key ?? ""),
+      unique_key: uniqueKey,
       provider: String(i.provider ?? ""),
-      display_name: String(i.display_name ?? i.unique_key ?? ""),
+      display_name: displayName,
       logo: String(i.logo ?? ""),
       created_at: String(i.created_at ?? ""),
       updated_at: String(i.updated_at ?? ""),
       forward_webhooks: Boolean(i.forward_webhooks ?? false),
       webhook_url:
         typeof i.webhook_url === "string" ? i.webhook_url : null,
-      credentials: (i.credentials ?? null) as NangoIntegrationCredentials | null,
+      credentials,
     };
   }
 
@@ -886,8 +904,13 @@ export function registerIpcHandlers(): void {
               counts.set(key, (counts.get(key) ?? 0) + 1);
             }
           }
-        } catch {
-          // Connection-count enrichment is best-effort; fall through with zeros.
+        } catch (err) {
+          // Connection-count enrichment is best-effort; surface failures to
+          // the log so a silent zero-count row can be diagnosed.
+          log.warn(
+            "[IPC] NANGO_LIST_INTEGRATIONS: connection-count enrichment failed; returning zeros",
+            err instanceof Error ? err.message : String(err),
+          );
         }
 
         return integrations.map((i) => ({

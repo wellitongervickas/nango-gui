@@ -99,8 +99,8 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
       set({ error: res.error });
       return null;
     }
-    // Patch the cached row in place so the list view reflects the change without
-    // a round-trip; full refresh follows for connection-count sync.
+    // Patch the cached row in place so the list view reflects the change
+    // immediately without waiting on a round-trip.
     const updated = res.data;
     set((state) => ({
       integrations: state.integrations.map((i) =>
@@ -115,6 +115,15 @@ export const useIntegrationsStore = create<IntegrationsState>((set, get) => ({
           : i,
       ),
     }));
+    // If the unique_key was renamed, the cached row's connectionCount is now
+    // keyed against a stale identifier; resync from the server. We don't await
+    // so the optimistic UI stays snappy.
+    if (
+      typeof args.unique_key === "string" &&
+      args.unique_key !== args.uniqueKey
+    ) {
+      void get().fetchIntegrations();
+    }
     return updated;
   },
 

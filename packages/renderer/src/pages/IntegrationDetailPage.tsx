@@ -150,6 +150,7 @@ function EditForm({ integration, onCancel, onSaved }: EditFormProps) {
       : null;
   const isOAuth = !!oauthCreds;
 
+  const initialScopes = oauthCreds?.scopes ?? "";
   const [displayName, setDisplayName] = useState(integration.display_name);
   const [uniqueKey, setUniqueKey] = useState(integration.unique_key);
   const [forwardWebhooks, setForwardWebhooks] = useState(
@@ -157,7 +158,7 @@ function EditForm({ integration, onCancel, onSaved }: EditFormProps) {
   );
   const [clientId, setClientId] = useState(oauthCreds?.client_id ?? "");
   const [clientSecret, setClientSecret] = useState("");
-  const [scopes, setScopes] = useState(oauthCreds?.scopes ?? "");
+  const [scopes, setScopes] = useState(initialScopes);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,12 +167,27 @@ function EditForm({ integration, onCancel, onSaved }: EditFormProps) {
     setError(null);
     setSaving(true);
 
+    // Empty-vs-omit policy for the update body:
+    //  - display_name: required; trimmed; we send only when the trimmed value
+    //    differs from the existing display_name. We never send "" — the input
+    //    is `required` so the form blocks submit before reaching this code.
+    //  - scopes: empty string is meaningful (= clear). We compare against the
+    //    initial value and pass the new value through verbatim, including ""
+    //    when the user explicitly cleared it.
+    const trimmedDisplayName = displayName.trim();
+    const scopesChanged = scopes !== initialScopes;
+
     let credentials: NangoIntegrationCredentialsInput | undefined;
-    if (isOAuth && (clientId || clientSecret || scopes)) {
+    if (isOAuth && (clientId || clientSecret || scopesChanged)) {
       // Only send credentials when at least one OAuth field is touched.
-      // The Nango API requires both client_id and client_secret together.
+      // The Nango API requires both client_id and client_secret together,
+      // even when the only intent is to clear or change scopes.
       if (!clientId || !clientSecret) {
-        setError("Client ID and Client Secret are both required to update credentials.");
+        setError(
+          scopesChanged && !clientSecret
+            ? "To change scopes, please re-enter the Client ID and Client Secret."
+            : "Client ID and Client Secret are both required to update credentials.",
+        );
         setSaving(false);
         return;
       }
@@ -179,15 +195,16 @@ function EditForm({ integration, onCancel, onSaved }: EditFormProps) {
         type: oauthCreds!.type,
         client_id: clientId,
         client_secret: clientSecret,
-        ...(scopes ? { scopes } : {}),
+        // Send scopes verbatim — "" intentionally clears them on the server.
+        scopes,
       };
     }
 
     const next = await updateIntegration({
       uniqueKey: integration.unique_key,
       ...(uniqueKey !== integration.unique_key ? { unique_key: uniqueKey } : {}),
-      ...(displayName !== integration.display_name
-        ? { display_name: displayName }
+      ...(trimmedDisplayName !== integration.display_name
+        ? { display_name: trimmedDisplayName }
         : {}),
       ...(forwardWebhooks !== integration.forward_webhooks
         ? { forward_webhooks: forwardWebhooks }

@@ -270,12 +270,46 @@ describe("useIntegrationsStore", () => {
       expect(cached?.forward_webhooks).toBe(false);
     });
 
-    it("renames the cached row when unique_key changes", async () => {
+    it("returns the renamed integration and triggers a list refresh when unique_key changes", async () => {
+      // Rename returns a fresh listing where the row is keyed by its new name
+      // so the connectionCount stays in sync with the server-side identifier.
+      mockListIntegrations.mockResolvedValueOnce({
+        status: "ok",
+        data: [
+          {
+            unique_key: "github-renamed",
+            provider: "github",
+            display_name: "GitHub Prod",
+            logo: "https://example.com/github.png",
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-03-01T00:00:00Z",
+            forward_webhooks: true,
+            connectionCount: 3,
+          },
+          {
+            unique_key: "slack-team",
+            provider: "slack",
+            display_name: "Slack Team",
+            logo: "https://example.com/slack.png",
+            created_at: "2026-02-01T00:00:00Z",
+            updated_at: "2026-02-01T00:00:00Z",
+            forward_webhooks: false,
+            connectionCount: 0,
+          },
+        ],
+        error: null,
+      });
+
       const result = await useIntegrationsStore.getState().updateIntegration({
         uniqueKey: "github-prod",
         unique_key: "github-renamed",
       });
       expect(result?.unique_key).toBe("github-renamed");
+
+      // Allow the fire-and-forget fetchIntegrations() refresh to settle.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(mockListIntegrations).toHaveBeenCalledTimes(1);
       const renamed = useIntegrationsStore
         .getState()
         .integrations.find((i) => i.unique_key === "github-renamed");
@@ -285,6 +319,16 @@ describe("useIntegrationsStore", () => {
           .getState()
           .integrations.find((i) => i.unique_key === "github-prod"),
       ).toBeUndefined();
+    });
+
+    it("does not refresh the listing when unique_key is unchanged", async () => {
+      await useIntegrationsStore.getState().updateIntegration({
+        uniqueKey: "github-prod",
+        display_name: "GitHub Renamed",
+      });
+      // Allow any unintended fire-and-forget fetch to settle.
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockListIntegrations).not.toHaveBeenCalled();
     });
 
     it("returns null and stores error on failure", async () => {

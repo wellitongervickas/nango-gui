@@ -14,6 +14,11 @@ const mockStartSync = vi.fn();
 const mockListRecords = vi.fn();
 const mockTriggerAction = vi.fn();
 const mockProxy = vi.fn();
+const mockListIntegrations = vi.fn();
+const mockGetIntegration = vi.fn();
+const mockCreateIntegration = vi.fn();
+const mockUpdateIntegration = vi.fn();
+const mockDeleteIntegration = vi.fn();
 
 vi.mock("@nangohq/node", () => ({
   Nango: vi.fn().mockImplementation(() => ({
@@ -29,6 +34,11 @@ vi.mock("@nangohq/node", () => ({
     listRecords: mockListRecords,
     triggerAction: mockTriggerAction,
     proxy: mockProxy,
+    listIntegrations: mockListIntegrations,
+    getIntegration: mockGetIntegration,
+    createIntegration: mockCreateIntegration,
+    updateIntegration: mockUpdateIntegration,
+    deleteIntegration: mockDeleteIntegration,
   })),
 }));
 
@@ -612,6 +622,91 @@ describe("IPC handlers", () => {
       const handler = handlers.get("nango:suggestScopes")!;
       const result = await handler({}, { providerKey: "unknown" });
       expect(result).toMatchObject({ status: "error", errorCode: "SERVER_ERROR" });
+    });
+  });
+
+  // ── Integration handlers ─────────────────────────────────────────────────
+
+  describe("nango:listIntegrations connection-count enrichment", () => {
+    it("groups listConnections by provider_config_key in a single call", async () => {
+      mockListIntegrations.mockResolvedValueOnce({
+        configs: [
+          { unique_key: "github-prod", provider: "github", display_name: "GitHub Prod" },
+          { unique_key: "slack-team", provider: "slack", display_name: "Slack" },
+          { unique_key: "stripe", provider: "stripe", display_name: "Stripe" },
+        ],
+      });
+      mockListConnections.mockResolvedValueOnce({
+        connections: [
+          { provider_config_key: "github-prod" },
+          { provider_config_key: "github-prod" },
+          { provider_config_key: "github-prod" },
+          { provider_config_key: "slack-team" },
+          // stripe has no connections — should report 0
+          // a stray connection for an unknown integration is just ignored
+          { provider_config_key: "deleted-integration" },
+        ],
+      });
+
+      const handler = handlers.get("nango:listIntegrations")!;
+      const result = (await handler({})) as {
+        status: string;
+        data: Array<{ unique_key: string; connectionCount: number }>;
+      };
+
+      expect(mockListConnections).toHaveBeenCalledTimes(1);
+      expect(mockListConnections).toHaveBeenCalledWith({});
+      expect(result.status).toBe("ok");
+      expect(result.data).toEqual([
+        expect.objectContaining({ unique_key: "github-prod", connectionCount: 3 }),
+        expect.objectContaining({ unique_key: "slack-team", connectionCount: 1 }),
+        expect.objectContaining({ unique_key: "stripe", connectionCount: 0 }),
+      ]);
+    });
+
+    it("falls back to zero counts when listConnections rejects", async () => {
+      mockListIntegrations.mockResolvedValueOnce({
+        configs: [
+          { unique_key: "github-prod", provider: "github", display_name: "GitHub" },
+        ],
+      });
+      mockListConnections.mockRejectedValueOnce(new Error("nango is sad"));
+
+      const handler = handlers.get("nango:listIntegrations")!;
+      const result = (await handler({})) as {
+        status: string;
+        data: Array<{ unique_key: string; connectionCount: number }>;
+      };
+
+      // Enrichment failure must not fail the whole handler — it should
+      // gracefully return zero counts. (The handler also log.warn's the
+      // failure; we don't assert on the logger here to avoid coupling
+      // the test to logger plumbing.)
+      expect(result.status).toBe("ok");
+      expect(result.data).toEqual([
+        expect.objectContaining({ unique_key: "github-prod", connectionCount: 0 }),
+      ]);
+    });
+
+    it("ignores connections with non-string provider_config_key", async () => {
+      mockListIntegrations.mockResolvedValueOnce({
+        configs: [{ unique_key: "github-prod", provider: "github" }],
+      });
+      mockListConnections.mockResolvedValueOnce({
+        connections: [
+          { provider_config_key: "github-prod" },
+          { provider_config_key: undefined },
+          { provider_config_key: 42 },
+        ],
+      });
+
+      const handler = handlers.get("nango:listIntegrations")!;
+      const result = (await handler({})) as {
+        status: string;
+        data: Array<{ unique_key: string; connectionCount: number }>;
+      };
+
+      expect(result.data[0].connectionCount).toBe(1);
     });
   });
 
