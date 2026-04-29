@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { NangoSyncRecord, NangoSyncStatus } from "@nango-gui/shared";
+import type {
+  NangoBulkUpdateSyncScheduleEntry,
+  NangoBulkUpdateSyncScheduleResult,
+  NangoSyncRecord,
+  NangoSyncStatus,
+} from "@nango-gui/shared";
 import { notifyIpcError } from "./notifyError";
 
 interface SyncsState {
@@ -35,6 +40,16 @@ interface SyncsState {
     connectionId: string,
     frequency: string | null
   ) => Promise<void>;
+  /**
+   * Apply schedule (frequency) updates to several syncs in one round-trip.
+   * Returns the per-entry result so callers can surface partial failures.
+   * On error entries the local state is rolled back to the prior frequency.
+   */
+  bulkUpdateSyncSchedule: (
+    providerConfigKey: string,
+    connectionId: string,
+    entries: NangoBulkUpdateSyncScheduleEntry[]
+  ) => Promise<NangoBulkUpdateSyncScheduleResult>;
   reset: () => void;
 }
 
@@ -243,6 +258,79 @@ export const useSyncsStore = create<SyncsState>((set, get) => ({
         const next = { ...state.syncActionLoading };
         delete next[syncName];
         return { syncActionLoading: next };
+      });
+    }
+  },
+
+  bulkUpdateSyncSchedule: async (providerConfigKey, connectionId, entries) => {
+    if (!window.nango) {
+      return { results: [], allSucceeded: false };
+    }
+    if (entries.length === 0) {
+      return { results: [], allSucceeded: true };
+    }
+
+    // Snapshot prior frequencies so we can roll back individual entries
+    // whose underlying call fails. We also mark each touched sync as loading
+    // to keep per-row UI affordances consistent with the single-sync path.
+    const snapshot = new Map<string, string | null>();
+    for (const entry of entries) {
+      const current = get().syncs.find((s) => s.name === entry.syncName);
+      snapshot.set(entry.syncName, current?.frequency ?? null);
+    }
+
+    set((state) => {
+      const nextLoading = { ...state.syncActionLoading };
+      for (const entry of entries) nextLoading[entry.syncName] = true;
+      return {
+        syncActionLoading: nextLoading,
+        syncs: state.syncs.map((s) => {
+          const match = entries.find((e) => e.syncName === s.name);
+          return match ? { ...s, frequency: match.frequency } : s;
+        }),
+      };
+    });
+
+    try {
+      const res = await window.nango.bulkUpdateSyncSchedule({
+        providerConfigKey,
+        connectionId,
+        entries,
+      });
+
+      if (res.status === "error") {
+        // Whole-batch failure: roll every touched sync back to its snapshot.
+        set((state) => ({
+          syncs: state.syncs.map((s) =>
+            snapshot.has(s.name)
+              ? { ...s, frequency: snapshot.get(s.name) ?? null }
+              : s
+          ),
+        }));
+        notifyIpcError(res);
+        throw new Error(res.error);
+      }
+
+      // Reconcile per-entry: apply server-confirmed frequency on success,
+      // roll back to snapshot on per-entry failure. Surfaces partial failures
+      // through the returned result without throwing.
+      set((state) => ({
+        syncs: state.syncs.map((s) => {
+          const entryResult = res.data.results.find((r) => r.syncName === s.name);
+          if (!entryResult) return s;
+          if (entryResult.status === "ok") {
+            return { ...s, frequency: entryResult.frequency };
+          }
+          return { ...s, frequency: snapshot.get(s.name) ?? null };
+        }),
+      }));
+
+      return res.data;
+    } finally {
+      set((state) => {
+        const nextLoading = { ...state.syncActionLoading };
+        for (const entry of entries) delete nextLoading[entry.syncName];
+        return { syncActionLoading: nextLoading };
       });
     }
   },

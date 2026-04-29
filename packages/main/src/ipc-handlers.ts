@@ -26,6 +26,9 @@ import {
   type NangoStartSyncRequest,
   type NangoUpdateSyncFrequencyRequest,
   type NangoUpdateSyncFrequencyResult,
+  type NangoBulkUpdateSyncScheduleRequest,
+  type NangoBulkUpdateSyncScheduleResult,
+  type NangoBulkUpdateSyncScheduleEntryResult,
   type NangoSyncRecord,
   type NangoListRecordsRequest,
   type NangoListRecordsResult,
@@ -820,6 +823,66 @@ export function registerIpcHandlers(): void {
           args.frequency
         );
         return { frequency: result.frequency };
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_BULK_UPDATE_SYNC_SCHEDULE,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoBulkUpdateSyncScheduleRequest
+    ): Promise<IpcResponse<NangoBulkUpdateSyncScheduleResult>> =>
+      wrap(async () => {
+        if (!args?.providerConfigKey || !args?.connectionId) {
+          throw new Error("providerConfigKey and connectionId are required");
+        }
+        if (!Array.isArray(args.entries) || args.entries.length === 0) {
+          throw new Error("entries must be a non-empty array");
+        }
+        const client = getNangoClient();
+
+        // Run sequentially: the Nango API is rate-limited per environment,
+        // and parallel fan-out on a large batch can trip 429s. Each entry's
+        // failure is captured independently so a single bad sync doesn't
+        // abort the rest of the batch.
+        const results: NangoBulkUpdateSyncScheduleEntryResult[] = [];
+        for (const entry of args.entries) {
+          if (!entry?.syncName) {
+            results.push({
+              syncName: entry?.syncName ?? "",
+              status: "error",
+              error: "syncName is required",
+            });
+            continue;
+          }
+          try {
+            const result = await client.updateSyncConnectionFrequency(
+              args.providerConfigKey,
+              entry.syncName,
+              args.connectionId,
+              entry.frequency
+            );
+            results.push({
+              syncName: entry.syncName,
+              status: "ok",
+              frequency: result.frequency,
+            });
+          } catch (err: unknown) {
+            const message =
+              err instanceof Error ? err.message : "Unknown error";
+            log.warn(
+              `[bulkUpdateSyncSchedule] ${entry.syncName} failed: ${message}`
+            );
+            results.push({
+              syncName: entry.syncName,
+              status: "error",
+              error: message,
+            });
+          }
+        }
+
+        const allSucceeded = results.every((r) => r.status === "ok");
+        return { results, allSucceeded };
       })
   );
 

@@ -19,6 +19,8 @@ import type {
   NangoStartSyncRequest,
   NangoUpdateSyncFrequencyRequest,
   NangoUpdateSyncFrequencyResult,
+  NangoBulkUpdateSyncScheduleRequest,
+  NangoBulkUpdateSyncScheduleResult,
   NangoSyncRecord,
   NangoGetConnectionHealthRequest,
   NangoConnectionHealthData,
@@ -119,6 +121,10 @@ declare global {
       updateSyncFrequency(
         args: NangoUpdateSyncFrequencyRequest
       ): Promise<IpcResponse<NangoUpdateSyncFrequencyResult>>;
+      /** Update the schedule frequency of multiple syncs in a single batch. */
+      bulkUpdateSyncSchedule(
+        args: NangoBulkUpdateSyncScheduleRequest
+      ): Promise<IpcResponse<NangoBulkUpdateSyncScheduleResult>>;
       /** Generate a new integration from a plain-English prompt. */
       aiGenerateIntegration(
         args: AiGenerateRequest
