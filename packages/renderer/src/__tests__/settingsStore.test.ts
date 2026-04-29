@@ -27,6 +27,9 @@ const mockSettings: AppSettings = {
   nangoSdkVersion: "0.70.1",
   connectUiTheme: "system",
   connectUiPrimaryColor: null,
+  hasRbac: false,
+  isProduction: false,
+  tier: null,
 };
 
 const mockGetSettings = vi.fn((): Promise<IpcResponse<AppSettings>> =>
@@ -57,6 +60,9 @@ beforeEach(() => {
     nangoSdkVersion: "",
     connectUiTheme: "system",
     connectUiPrimaryColor: null,
+    hasRbac: false,
+    isProduction: false,
+    tier: null,
     isLoading: false,
     error: null,
   });
@@ -160,6 +166,14 @@ describe("updateTheme", () => {
 describe("updateEnvironment", () => {
   it("optimistically sets environment and calls IPC", async () => {
     useSettingsStore.setState({ environment: "development" });
+    // Per F6 spec, updateEnvironment re-fetches settings after success so role-aware
+    // state (tier/is_production/hasRbac) reflects the new environment. Stub the
+    // post-switch fetch to return production so the test reflects the spec'd flow.
+    mockGetSettings.mockResolvedValueOnce({
+      status: "ok",
+      data: { ...mockSettings, environment: "production", isProduction: true },
+      error: null,
+    } as IpcResponse<AppSettings>);
     await useSettingsStore.getState().updateEnvironment("production");
     expect(mockUpdateSettings).toHaveBeenCalledWith({ environment: "production" });
     expect(useSettingsStore.getState().environment).toBe("production");

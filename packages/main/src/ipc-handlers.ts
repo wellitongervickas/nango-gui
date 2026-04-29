@@ -1162,16 +1162,59 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.APP_GET_SETTINGS,
     async (): Promise<IpcResponse<AppSettings>> =>
-      wrap(async () => ({
-        environment: credentialStore.loadEnvironment(),
-        theme: credentialStore.loadTheme(),
-        maskedKey: credentialStore.loadMaskedKey(),
-        appVersion: app.getVersion(),
-        electronVersion: process.versions.electron ?? "unknown",
-        nangoSdkVersion: "0.70.1",
-        connectUiTheme: credentialStore.loadConnectUiTheme(),
-        connectUiPrimaryColor: credentialStore.loadConnectUiPrimaryColor(),
-      }))
+      wrap(async () => {
+        // Per F6 spec, also fetch tier + is_production from the Nango
+        // /environments endpoint so the renderer can drive the role badge
+        // and permission gates. Failures are non-fatal — the UI degrades
+        // gracefully to RBAC-disabled when the server is unreachable.
+        let hasRbac = false;
+        let isProduction = false;
+        let tier: string | null = null;
+        try {
+          if (isNangoClientReady()) {
+            const client = getNangoClient() as unknown as {
+              serverUrl: string;
+              secretKey: string;
+            };
+            const env = credentialStore.loadEnvironment();
+            const res = await fetch(`${client.serverUrl}/environments`, {
+              headers: { Authorization: `Bearer ${client.secretKey}` },
+            });
+            if (res.ok) {
+              const data = (await res.json()) as {
+                environments?: Array<{
+                  name?: string;
+                  tier?: string;
+                  is_production?: boolean;
+                  has_rbac?: boolean;
+                }>;
+                tier?: string;
+                has_rbac?: boolean;
+              };
+              const list = Array.isArray(data.environments) ? data.environments : [];
+              const current = list.find((e) => e.name === env) ?? list[0];
+              tier = current?.tier ?? data.tier ?? null;
+              isProduction = current?.is_production ?? false;
+              hasRbac = current?.has_rbac ?? data.has_rbac ?? tier === "enterprise";
+            }
+          }
+        } catch {
+          // Non-fatal — defaults already set
+        }
+        return {
+          environment: credentialStore.loadEnvironment(),
+          theme: credentialStore.loadTheme(),
+          maskedKey: credentialStore.loadMaskedKey(),
+          appVersion: app.getVersion(),
+          electronVersion: process.versions.electron ?? "unknown",
+          nangoSdkVersion: "0.70.1",
+          connectUiTheme: credentialStore.loadConnectUiTheme(),
+          connectUiPrimaryColor: credentialStore.loadConnectUiPrimaryColor(),
+          hasRbac,
+          isProduction,
+          tier,
+        };
+      })
   );
 
   ipcMain.handle(

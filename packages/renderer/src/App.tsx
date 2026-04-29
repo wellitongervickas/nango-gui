@@ -20,6 +20,7 @@ import { SetupWizard } from "./components/setup/SetupWizard";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { ErrorToasts } from "./components/ErrorToasts";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { ProdEnvironmentBanner } from "./components/common/ProdEnvironmentBanner";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
@@ -34,8 +35,10 @@ import { McpPage } from "./pages/McpPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
 import { IntegrationDetailPage } from "./pages/IntegrationDetailPage";
-import { applyTheme } from "./store/settingsStore";
+import { useSettingsStore } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
+import { useRbacStore } from "./store/rbacStore";
+import { useErrorStore } from "./store/errorStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
 
@@ -44,6 +47,7 @@ function AppShell({ children, pageName }: { children: React.ReactNode; pageName:
   return (
     <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
       <OfflineBanner />
+      <ProdEnvironmentBanner />
       <Toolbar />
       <div className="flex flex-1 overflow-hidden">
         <NavSidebar />
@@ -72,14 +76,40 @@ function App() {
   const closeAiBuilder = useAiBuilderPanelStore((s) => s.close);
 
   // Apply persisted theme preference and initialize environment as early as possible.
+  // Also bootstrap settings (which carries hasRbac/tier/isProduction) and the RBAC
+  // user so the role badge and permission gates have the data they need.
   useEffect(() => {
-    window.electronApp
-      ?.getSettings()
-      .then((res) => {
-        if (res.status === "ok") applyTheme(res.data.theme);
-      })
-      .catch(() => {/* ignore — falls back to system */});
+    void useSettingsStore.getState().fetchSettings();
+    void useRbacStore.getState().fetchCurrentUser();
     useEnvironmentStore.getState().initialize();
+  }, []);
+
+  // Per F6 spec, re-fetch the RBAC user when the environment changes so the
+  // role badge/gates reflect the active environment's tier and is_production.
+  useEffect(() => {
+    const unsub = useSettingsStore.subscribe((state, prev) => {
+      if (state.environment !== prev.environment) {
+        void useRbacStore.getState().fetchCurrentUser();
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Per F6 spec, a 403 mid-session means the user's role may have changed —
+  // refetch settings + the current user so the badge and gates update without
+  // requiring a manual page refresh. Triggered by AUTH_INVALID error toasts.
+  useEffect(() => {
+    let lastSeenId: string | null = null;
+    const unsub = useErrorStore.subscribe((state) => {
+      const latest = state.notifications[state.notifications.length - 1];
+      if (!latest || latest.id === lastSeenId) return;
+      lastSeenId = latest.id;
+      if (latest.errorCode === "AUTH_INVALID") {
+        void useSettingsStore.getState().fetchSettings();
+        void useRbacStore.getState().fetchCurrentUser();
+      }
+    });
+    return unsub;
   }, []);
 
   // Auto-open AI Builder panel when navigating via ai-builder route
@@ -178,6 +208,7 @@ function App() {
     <ReactFlowProvider>
       <div className="flex flex-col h-screen w-screen bg-[var(--color-bg)]">
         <OfflineBanner />
+        <ProdEnvironmentBanner />
         <Toolbar />
         <div className="flex flex-1 overflow-hidden">
           <NavSidebar />
