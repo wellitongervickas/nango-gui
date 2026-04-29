@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NangoLogOperation, NangoLogMessage, NangoLogType, NangoLogStatus } from "@nango-gui/shared";
-import { useLogsStore } from "../store/logsStore";
+import { useLogsStore, usePollInProgressOperations } from "../store/logsStore";
 import { cn } from "../lib/utils";
 import { RefreshIcon, XIcon, SearchIcon, SpinnerIcon, AlertTriangleIcon } from "@/components/icons";
 
@@ -415,10 +415,32 @@ function LogsFilterBar() {
   const filterType = useLogsStore((s) => s.filterType);
   const filterStatus = useLogsStore((s) => s.filterStatus);
   const filterPeriodFrom = useLogsStore((s) => s.filterPeriodFrom);
+  const filterConnectionId = useLogsStore((s) => s.filterConnectionId);
+  const filterIntegrationId = useLogsStore((s) => s.filterIntegrationId);
+  const operations = useLogsStore((s) => s.operations);
   const setFilterType = useLogsStore((s) => s.setFilterType);
   const setFilterStatus = useLogsStore((s) => s.setFilterStatus);
   const setFilterPeriod = useLogsStore((s) => s.setFilterPeriod);
+  const setFilterConnectionId = useLogsStore((s) => s.setFilterConnectionId);
+  const setFilterIntegrationId = useLogsStore((s) => s.setFilterIntegrationId);
   const fetchOperations = useLogsStore((s) => s.fetchOperations);
+
+  // Local state for debounced text input
+  const [connectionIdDraft, setConnectionIdDraft] = useState(filterConnectionId ?? "");
+
+  // Sync from store when cleared externally (e.g. clearFilters)
+  useEffect(() => {
+    setConnectionIdDraft(filterConnectionId ?? "");
+  }, [filterConnectionId]);
+
+  // Debounce: commit to store 400 ms after the user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next = connectionIdDraft.trim() || null;
+      if (next !== filterConnectionId) setFilterConnectionId(next);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [connectionIdDraft]);
 
   const activePeriod = useMemo(() => {
     if (!filterPeriodFrom) return null;
@@ -431,6 +453,15 @@ function LogsFilterBar() {
     }
     return "custom";
   }, [filterPeriodFrom]);
+
+  // Unique integration names derived from the current result set
+  const integrationOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const op of operations) {
+      if (op.configName) names.add(op.configName);
+    }
+    return Array.from(names).sort();
+  }, [operations]);
 
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 flex-wrap">
@@ -496,6 +527,27 @@ function LogsFilterBar() {
         ))}
       </select>
 
+      {/* Connection ID text input */}
+      <input
+        type="text"
+        value={connectionIdDraft}
+        onChange={(e) => setConnectionIdDraft(e.target.value)}
+        placeholder="Connection ID"
+        className="px-2 py-1 text-xs bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] transition-colors w-36"
+      />
+
+      {/* Integration select */}
+      <select
+        value={filterIntegrationId ?? ""}
+        onChange={(e) => setFilterIntegrationId(e.target.value || null)}
+        className="px-2 py-1 text-xs bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] transition-colors cursor-pointer"
+      >
+        <option value="">All integrations</option>
+        {integrationOptions.map((name) => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </select>
+
       <div className="flex-1" />
 
       {/* Refresh */}
@@ -554,8 +606,12 @@ export function LogsPage() {
   const filterType = useLogsStore((s) => s.filterType);
   const filterStatus = useLogsStore((s) => s.filterStatus);
   const filterPeriodFrom = useLogsStore((s) => s.filterPeriodFrom);
+  const filterConnectionId = useLogsStore((s) => s.filterConnectionId);
+  const filterIntegrationId = useLogsStore((s) => s.filterIntegrationId);
 
-  const hasFilters = !!(filterType || filterStatus || filterPeriodFrom);
+  const hasFilters = !!(filterType || filterStatus || filterPeriodFrom || filterConnectionId || filterIntegrationId);
+
+  usePollInProgressOperations();
   const selectedOp = useMemo(
     () => operations.find((o) => o.id === selectedOperationId) ?? null,
     [operations, selectedOperationId],

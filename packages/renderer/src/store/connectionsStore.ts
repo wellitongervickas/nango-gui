@@ -16,12 +16,19 @@ interface ConnectionsState {
   healthFetching: Set<string>;
   /** Active status filter. null = show all. */
   statusFilter: ConnectionStatus | null;
+  /** Active tag filter. null = show all. */
+  tagFilter: string | null;
 
   fetchConnections: (integrationId?: string) => Promise<void>;
   addConnection: (connection: NangoConnectionSummary) => void;
   deleteConnection: (providerConfigKey: string, connectionId: string) => Promise<void>;
   fetchConnectionHealth: (providerConfigKey: string, connectionId: string) => Promise<void>;
+  /** Pass {} to clear all tags; pass a populated record to set tags. */
+  patchConnection: (providerConfigKey: string, connectionId: string, tags: Record<string, string>) => Promise<void>;
   setStatusFilter: (status: ConnectionStatus | null) => void;
+  setTagFilter: (tag: string | null) => void;
+  /** Returns all unique tag keys across all loaded connections. */
+  listAllTags: () => string[];
   reset: () => void;
 }
 
@@ -36,6 +43,7 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
   healthData: {},
   healthFetching: new Set(),
   statusFilter: null,
+  tagFilter: null,
 
   fetchConnections: async (integrationId?: string) => {
     await asyncFetch(
@@ -105,7 +113,37 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
     }
   },
 
+  patchConnection: async (providerConfigKey, connectionId, tags) => {
+    if (!window.nango) throw new Error("Nango client not available");
+    const res = await window.nango.patchConnection({ providerConfigKey, connectionId, tags });
+    if (res.status === "error") throw new Error(res.error);
+    // Store null when tags is empty so callers can reliably use null-checks.
+    const stored = Object.keys(tags).length > 0 ? tags : null;
+    set((state) => ({
+      connections: state.connections.map((c) =>
+        c.provider_config_key === providerConfigKey && c.connection_id === connectionId
+          ? { ...c, tags: stored }
+          : c
+      ),
+    }));
+  },
+
   setStatusFilter: (status) => set({ statusFilter: status }),
+
+  setTagFilter: (tag) => set({ tagFilter: tag }),
+
+  listAllTags: () => {
+    const { connections } = get();
+    const seen = new Set<string>();
+    for (const c of connections) {
+      if (c.tags) {
+        for (const k of Object.keys(c.tags)) {
+          seen.add(k);
+        }
+      }
+    }
+    return Array.from(seen).sort();
+  },
 
   reset: () =>
     set({
@@ -115,5 +153,6 @@ export const useConnectionsStore = create<ConnectionsState>((set, get) => ({
       healthData: {},
       healthFetching: new Set(),
       statusFilter: null,
+      tagFilter: null,
     }),
 }));

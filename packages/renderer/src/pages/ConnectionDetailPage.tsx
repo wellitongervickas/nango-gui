@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import type { ConnectUI, ConnectUIEvent } from "@nangohq/frontend";
 import type { AdvancedConnectionConfig, NangoConnectionDetail, NangoConnectionSummary, NangoSyncRecord } from "@nango-gui/shared";
@@ -8,6 +8,7 @@ import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { PermissionGate } from "@/components/common/PermissionGate";
 import { StatusBadge } from "@/components/syncs/StatusBadge";
+import { TagsSection } from "@/components/connections/TagsSection";
 import {
   ChevronIcon,
   RefreshIcon,
@@ -817,7 +818,7 @@ interface ConnectionDetailPageProps {
 }
 
 export function ConnectionDetailPage({ providerConfigKey, connectionId }: ConnectionDetailPageProps) {
-  const { connections, fetchConnections, deleteConnection } = useConnectionsStore();
+  const { connections, fetchConnections, deleteConnection, patchConnection, listAllTags } = useConnectionsStore();
   const [detail, setDetail] = useState<NangoConnectionDetail | null>(null);
   const [syncs, setSyncs] = useState<NangoSyncRecord[]>([]);
   const [isDetailLoading, setIsDetailLoading] = useState(true);
@@ -1011,6 +1012,13 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
     await fetchConnections();
   }
 
+  // Save tags — pass newTags directly; store normalises {} → null internally.
+  async function handleSaveTags(newTags: Record<string, string>) {
+    await patchConnection(providerConfigKey, connectionId, newTags);
+    const stored = Object.keys(newTags).length > 0 ? newTags : null;
+    setDetail((prev) => prev ? { ...prev, tags: stored } : prev);
+  }
+
   // Delete connection
   async function handleDelete() {
     setIsDeleting(true);
@@ -1026,6 +1034,25 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
 
   // Current metadata: prefer from detail (fresher), fall back to connection summary
   const currentMetadata = detail?.metadata ?? connection?.metadata ?? null;
+
+  // Current tags: prefer from detail (fresher), fall back to connection summary
+  const currentTags = detail?.tags ?? connection?.tags ?? null;
+
+  // All unique tag keys across the environment (for autocomplete)
+  const allTags = useMemo(() => listAllTags(), [connections, listAllTags]);
+
+  // Tag usage counts: how many connections carry each tag key
+  const tagUsageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of connections) {
+      if (c.tags) {
+        for (const k of Object.keys(c.tags)) {
+          counts[k] = (counts[k] ?? 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }, [connections]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-base)] overflow-y-auto">
@@ -1073,6 +1100,14 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
             reAuthError={reAuthError}
           />
         )}
+
+        {/* Tags */}
+        <TagsSection
+          tags={currentTags}
+          allTags={allTags}
+          tagUsageCounts={tagUsageCounts}
+          onSave={handleSaveTags}
+        />
 
         {/* Syncs */}
         <SyncsSection

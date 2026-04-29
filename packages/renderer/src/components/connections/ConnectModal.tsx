@@ -129,6 +129,7 @@ export function ConnectModal({
             provider_config_key: providerConfigKey,
             created: new Date().toISOString(),
             metadata: null,
+            tags: null,
           });
           await fetchConnections();
           connectUIRef.current?.close();

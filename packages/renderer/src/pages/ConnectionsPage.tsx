@@ -349,10 +349,13 @@ export function ConnectionsPage() {
     error,
     healthData,
     statusFilter,
+    tagFilter,
     fetchConnections,
     deleteConnection,
     fetchConnectionHealth,
     setStatusFilter,
+    setTagFilter,
+    listAllTags,
   } = useConnectionsStore();
 
   const [search, setSearch] = useState("");
@@ -363,23 +366,28 @@ export function ConnectionsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const parentRef = useRef<HTMLDivElement>(null);
+
+  // All unique tag keys across loaded connections
+  const allTags = useMemo(() => listAllTags(), [connections, listAllTags]);
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
 
-  // Close status dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!showStatusDropdown) return;
+    if (!showStatusDropdown && !showTagDropdown) return;
     function handleClick() {
       setShowStatusDropdown(false);
+      setShowTagDropdown(false);
     }
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
-  }, [showStatusDropdown]);
+  }, [showStatusDropdown, showTagDropdown]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -399,7 +407,11 @@ export function ConnectionsPage() {
           const key = `${c.provider_config_key}:${c.connection_id}`;
           const health = healthData[key];
           if (!health) return true; // Show while loading
-          return health.status === statusFilter;
+          if (health.status !== statusFilter) return false;
+        }
+        // Tag filter
+        if (tagFilter) {
+          if (!c.tags || !(tagFilter in c.tags)) return false;
         }
         return true;
       })
@@ -411,7 +423,7 @@ export function ConnectionsPage() {
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [connections, search, sortKey, sortDir, statusFilter, healthData]);
+  }, [connections, search, sortKey, sortDir, statusFilter, tagFilter, healthData]);
 
   // TanStack Virtual
   const rowVirtualizer = useVirtualizer({
@@ -511,6 +523,60 @@ export function ConnectionsPage() {
                   )}
                 >
                   {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tag filter dropdown */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowTagDropdown((v) => !v);
+            }}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors cursor-pointer",
+              tagFilter
+                ? "border-[var(--color-brand-500)] text-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10"
+                : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+            )}
+          >
+            <FilterIcon />
+            {tagFilter ? tagFilter : "Tag"}
+          </button>
+          {showTagDropdown && (
+            <div
+              className="absolute top-full right-0 mt-1 w-44 bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-lg shadow-xl z-20 py-1 max-h-60 overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => { setTagFilter(null); setShowTagDropdown(false); }}
+                className={cn(
+                  "w-full text-left px-3 py-1.5 text-xs transition-colors cursor-pointer",
+                  tagFilter === null
+                    ? "text-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10"
+                    : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+                )}
+              >
+                All tags
+              </button>
+              {allTags.length === 0 && (
+                <p className="px-3 py-2 text-xs text-[var(--color-text-disabled)]">No tags yet</p>
+              )}
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => { setTagFilter(tag); setShowTagDropdown(false); }}
+                  className={cn(
+                    "w-full text-left px-3 py-1.5 text-xs transition-colors cursor-pointer",
+                    tagFilter === tag
+                      ? "text-[var(--color-brand-500)] bg-[var(--color-brand-500)]/10"
+                      : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-overlay)]"
+                  )}
+                >
+                  {tag}
                 </button>
               ))}
             </div>

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import type {
   NangoLogOperation,
@@ -24,6 +25,8 @@ interface LogsState {
   filterStatus: NangoLogStatus | null;
   filterPeriodFrom: string | null;
   filterPeriodTo: string | null;
+  filterConnectionId: string | null;
+  filterIntegrationId: string | null;
 
   fetchOperations(reset?: boolean): Promise<void>;
   fetchMessages(operationId: string): Promise<void>;
@@ -31,6 +34,8 @@ interface LogsState {
   setFilterType(type: NangoLogType | null): void;
   setFilterStatus(status: NangoLogStatus | null): void;
   setFilterPeriod(from: string | null, to: string | null): void;
+  setFilterConnectionId(id: string | null): void;
+  setFilterIntegrationId(id: string | null): void;
   clearFilters(): void;
 }
 
@@ -48,6 +53,8 @@ export const useLogsStore = create<LogsState>((set, get) => ({
   filterStatus: null,
   filterPeriodFrom: null,
   filterPeriodTo: null,
+  filterConnectionId: null,
+  filterIntegrationId: null,
 
   fetchOperations: async (reset = true) => {
     if (!window.nango) return;
@@ -65,6 +72,8 @@ export const useLogsStore = create<LogsState>((set, get) => ({
       if (state.filterPeriodFrom && state.filterPeriodTo) {
         args.period = { from: state.filterPeriodFrom, to: state.filterPeriodTo };
       }
+      if (state.filterConnectionId) args.connectionId = state.filterConnectionId;
+      if (state.filterIntegrationId) args.integrationId = state.filterIntegrationId;
       if (!reset && state.cursor) args.cursor = state.cursor;
 
       const res = await window.nango.searchLogs(args);
@@ -128,13 +137,59 @@ export const useLogsStore = create<LogsState>((set, get) => ({
     void get().fetchOperations(true);
   },
 
+  setFilterConnectionId: (id: string | null) => {
+    set({ filterConnectionId: id });
+    void get().fetchOperations(true);
+  },
+
+  setFilterIntegrationId: (id: string | null) => {
+    set({ filterIntegrationId: id });
+    void get().fetchOperations(true);
+  },
+
   clearFilters: () => {
     set({
       filterType: null,
       filterStatus: null,
       filterPeriodFrom: null,
       filterPeriodTo: null,
+      filterConnectionId: null,
+      filterIntegrationId: null,
     });
     void get().fetchOperations(true);
   },
 }));
+
+/**
+ * Hook that auto-refreshes the operation list every 3 s while any operation
+ * has `running` status.  Polling pauses when the page is not visible and
+ * resumes (with an immediate tick) when it becomes visible again.
+ */
+export function usePollInProgressOperations() {
+  const hasRunning = useLogsStore((s) => s.operations.some((op) => op.status === "running"));
+  const fetchOperations = useLogsStore((s) => s.fetchOperations);
+
+  useEffect(() => {
+    if (!hasRunning) return;
+
+    const tick = () => {
+      if (document.visibilityState === "visible") {
+        void fetchOperations(true);
+      }
+    };
+
+    const intervalId = setInterval(tick, 3000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchOperations(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [hasRunning, fetchOperations]);
+}

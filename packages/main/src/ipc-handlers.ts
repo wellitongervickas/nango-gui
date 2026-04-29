@@ -85,6 +85,7 @@ import {
   type NangoConnectionHealthData,
   type ConnectionStatus,
   type NangoSetMetadataRequest,
+  type NangoPatchConnectionRequest,
   type NangoCreateReconnectSessionRequest,
   type NangoCreateReconnectSessionResult,
   type NangoSuggestScopesRequest,
@@ -327,6 +328,16 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
   };
 }
 
+/** Maps a raw `tags` field from the Nango API into our typed Record or null. */
+function mapTagsField(rawTags: unknown): Record<string, string> | null {
+  if (rawTags == null || typeof rawTags !== "object" || Array.isArray(rawTags)) return null;
+  const mapped: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rawTags as Record<string, unknown>)) {
+    if (typeof v === "string") mapped[k] = v;
+  }
+  return Object.keys(mapped).length > 0 ? mapped : null;
+}
+
 function toConnectionSummary(raw: unknown): NangoConnectionSummary {
   const conn = raw as Record<string, unknown>;
   return {
@@ -336,6 +347,7 @@ function toConnectionSummary(raw: unknown): NangoConnectionSummary {
     provider_config_key: String(conn.provider_config_key ?? ""),
     created: String(conn.created ?? ""),
     metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
+    tags: mapTagsField(conn.tags),
   };
 }
 
@@ -348,6 +360,7 @@ function toConnectionDetail(raw: unknown): NangoConnectionDetail {
     provider: String(conn.provider ?? ""),
     credentials: (conn.credentials as Record<string, unknown>) ?? {},
     metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
+    tags: mapTagsField(conn.tags),
     created: String(conn.created ?? ""),
     ...(conn.updated_at != null ? { updated_at: String(conn.updated_at) } : {}),
   };
@@ -638,6 +651,22 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         await client.setMetadata(args.providerConfigKey, args.connectionId, args.metadata);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_PATCH_CONNECTION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoPatchConnectionRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        // Pass args.tags directly: {} clears all tags, a populated object sets them.
+        await client.patchConnection(
+          { connectionId: args.connectionId, provider_config_key: args.providerConfigKey },
+          { tags: args.tags }
+        );
       })
   );
 

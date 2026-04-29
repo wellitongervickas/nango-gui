@@ -52,6 +52,7 @@ import type {
   AiProviderLoadKeyRequest,
   AiProviderClearKeyRequest,
   NangoSetMetadataRequest,
+  NangoPatchConnectionRequest,
   NangoCreateReconnectSessionRequest,
   NangoLogsSearchRequest,
   NangoLogsMessagesRequest,
@@ -119,6 +120,8 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_CONNECTION_HEALTH, args),
   setMetadata: (args: NangoSetMetadataRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_SET_METADATA, args),
+  patchConnection: (args: NangoPatchConnectionRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_PATCH_CONNECTION, args),
   createReconnectSession: (args: NangoCreateReconnectSessionRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_RECONNECT_SESSION, args),
   suggestScopes: (providerKey: string) =>

@@ -181,6 +181,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
             provider_config_key: providerConfigKey,
             created: new Date().toISOString(),
             metadata: null,
+            tags: null,
           });
           // Fetch full connections list and count syncs
           await fetchConnections();
