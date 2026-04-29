@@ -3,7 +3,7 @@ import { join } from "path";
 import log from "@nango-gui/main/logger.js";
 import { registerIpcHandlers } from "@nango-gui/main/ipc-handlers.js";
 import { credentialStore } from "@nango-gui/main/credential-store.js";
-import { initNangoClient } from "@nango-gui/main/nango-client.js";
+import { registerEnvironmentClient } from "@nango-gui/main/nango-client.js";
 import { initAutoUpdater, downloadUpdate, installUpdate } from "@nango-gui/main/auto-updater.js";
 import { IPC_CHANNELS } from "@nango-gui/shared";
 
@@ -68,7 +68,10 @@ async function bootstrap(): Promise<void> {
     const storedKey = credentialStore.load();
     if (storedKey) {
       try {
-        await initNangoClient(storedKey);
+        // Bind the stored key to the persisted environment so the active
+        // Nango client is scoped correctly from the very first IPC call.
+        const storedEnv = credentialStore.loadEnvironment();
+        await registerEnvironmentClient(storedEnv, storedKey);
         startRoute = "/";
       } catch (err) {
         log.warn("[Bootstrap] Stored key failed validation, redirecting to setup:", err);

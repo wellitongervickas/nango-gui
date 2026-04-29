@@ -1,31 +1,80 @@
 // IPC channel names shared between main process and renderer.
 // All cross-process communication must use these constants.
+//
+// Canonical naming convention (NANA-263):
+//   {namespace}:{resource}:{action}
+//
+// `namespace` groups channels by subsystem (nango, app, credentials, cli, …).
+// `resource` names the noun being operated on (connections, syncs, …).
+// `action` is the verb (list, get, create, …). Renderer→main events use
+// past-tense or noun forms (statusChanged, event, alert, output, exit, …).
+//
+// Use `nangoChannel(resource, action)` to construct ad-hoc channels safely.
+
+/**
+ * Canonical Nango channel resources. Adding a new Nango call MUST extend this
+ * union and pick a verb action — drive-by ad-hoc strings are review blocks.
+ */
+export type NangoChannelResource =
+  | "connections"
+  | "syncs"
+  | "records"
+  | "actions"
+  | "providers"
+  | "proxy"
+  | "dashboard"
+  | "auth"
+  | "connect"
+  | "logs"
+  | "scopes"
+  | "ai"
+  | "webhookSettings"
+  | "integrations"
+  | "health";
+
+/**
+ * Build a canonical Nango IPC channel name. Centralizing construction makes
+ * it impossible to accidentally diverge from the agreed convention.
+ */
+export function nangoChannel(
+  resource: NangoChannelResource,
+  action: string,
+): `nango:${NangoChannelResource}:${string}` {
+  return `nango:${resource}:${action}`;
+}
 
 export const IPC_CHANNELS = {
-  // Nango SDK operations
-  NANGO_LIST_CONNECTIONS: "nango:listConnections",
-  NANGO_GET_CONNECTION: "nango:getConnection",
-  NANGO_DELETE_CONNECTION: "nango:deleteConnection",
-  NANGO_VALIDATE_KEY: "nango:validateKey",
-  NANGO_CREATE_CONNECT_SESSION: "nango:createConnectSession",
-  NANGO_LIST_PROVIDERS: "nango:listProviders",
-  NANGO_GET_PROVIDER: "nango:getProvider",
+  // Nango SDK operations — connections
+  NANGO_LIST_CONNECTIONS: "nango:connections:list",
+  NANGO_GET_CONNECTION: "nango:connections:get",
+  NANGO_DELETE_CONNECTION: "nango:connections:delete",
+  NANGO_GET_CONNECTION_HEALTH: "nango:connections:getHealth",
+  NANGO_SET_METADATA: "nango:connections:setMetadata",
+
+  // Nango SDK operations — auth/connect
+  NANGO_VALIDATE_KEY: "nango:auth:validateKey",
+  NANGO_CREATE_CONNECT_SESSION: "nango:connect:createSession",
+  NANGO_CREATE_RECONNECT_SESSION: "nango:connect:createReconnectSession",
+
+  // Nango SDK operations — providers
+  NANGO_LIST_PROVIDERS: "nango:providers:list",
+  NANGO_GET_PROVIDER: "nango:providers:get",
 
   // Integration CRUD (configured integrations on the user's Nango account)
-  NANGO_LIST_INTEGRATIONS: "nango:listIntegrations",
-  NANGO_GET_INTEGRATION: "nango:getIntegration",
-  NANGO_CREATE_INTEGRATION: "nango:createIntegration",
-  NANGO_UPDATE_INTEGRATION: "nango:updateIntegration",
-  NANGO_DELETE_INTEGRATION: "nango:deleteIntegration",
+  NANGO_LIST_INTEGRATIONS: "nango:integrations:list",
+  NANGO_GET_INTEGRATION: "nango:integrations:get",
+  NANGO_CREATE_INTEGRATION: "nango:integrations:create",
+  NANGO_UPDATE_INTEGRATION: "nango:integrations:update",
+  NANGO_DELETE_INTEGRATION: "nango:integrations:delete",
 
   // Sync operations
-  NANGO_LIST_SYNCS: "nango:listSyncs",
-  NANGO_GET_SYNC_STATUS: "nango:getSyncStatus",
-  NANGO_TRIGGER_SYNC: "nango:triggerSync",
-  NANGO_PAUSE_SYNC: "nango:pauseSync",
-  NANGO_START_SYNC: "nango:startSync",
-  NANGO_UPDATE_SYNC_FREQUENCY: "nango:updateSyncFrequency",
-  NANGO_BULK_UPDATE_SYNC_SCHEDULE: "nango:bulkUpdateSyncSchedule",
+  NANGO_LIST_SYNCS: "nango:syncs:list",
+  NANGO_GET_SYNC_STATUS: "nango:syncs:status",
+  NANGO_TRIGGER_SYNC: "nango:syncs:trigger",
+  NANGO_PAUSE_SYNC: "nango:syncs:pause",
+  NANGO_START_SYNC: "nango:syncs:start",
+  NANGO_UPDATE_SYNC_FREQUENCY: "nango:syncs:updateFrequency",
+  NANGO_BULK_UPDATE_SYNC_SCHEDULE: "nango:syncs:bulkUpdateSchedule",
 
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
@@ -38,19 +87,19 @@ export const IPC_CHANNELS = {
   APP_SET_ENVIRONMENT: "app:setEnvironment",
 
   // Records
-  NANGO_LIST_RECORDS: "nango:listRecords",
+  NANGO_LIST_RECORDS: "nango:records:list",
 
   // Dashboard
-  NANGO_GET_DASHBOARD: "nango:getDashboard",
+  NANGO_GET_DASHBOARD: "nango:dashboard:get",
 
   // Actions & Proxy
-  NANGO_TRIGGER_ACTION: "nango:triggerAction",
-  NANGO_TRIGGER_ACTION_ASYNC: "nango:triggerActionAsync",
-  NANGO_GET_ASYNC_ACTION_RESULT: "nango:getAsyncActionResult",
-  NANGO_PROXY_REQUEST: "nango:proxyRequest",
+  NANGO_TRIGGER_ACTION: "nango:actions:trigger",
+  NANGO_TRIGGER_ACTION_ASYNC: "nango:actions:triggerAsync",
+  NANGO_GET_ASYNC_ACTION_RESULT: "nango:actions:getAsyncResult",
+  NANGO_PROXY_REQUEST: "nango:proxy:request",
 
-  // Connection health
-  NANGO_GET_CONNECTION_HEALTH: "nango:getConnectionHealth",
+  // Reachability heuristic for offline detection (Feature 7)
+  NANGO_REACHABILITY: "nango:health:reachability",
 
   // App settings (env + theme + version info)
   APP_GET_SETTINGS: "app:getSettings",
@@ -96,10 +145,10 @@ export const IPC_CHANNELS = {
   RATE_LIMIT_ALERT: "rateLimit:alert",
 
   // AI Integration Builder
-  NANGO_AI_GENERATE: "nango:aiGenerate",
-  NANGO_AI_REFINE: "nango:aiRefine",
+  NANGO_AI_GENERATE: "nango:ai:generate",
+  NANGO_AI_REFINE: "nango:ai:refine",
   /** Main → renderer push event: a partial token streamed from the AI endpoint. */
-  NANGO_AI_STREAM_TOKEN: "nango:aiStreamToken",
+  NANGO_AI_STREAM_TOKEN: "nango:ai:streamToken",
 
   // AI Integration Builder v2 — real provider-backed tool-calling loop
   AI_BUILDER_RUN: "ai:builderRun",
@@ -122,24 +171,18 @@ export const IPC_CHANNELS = {
   MCP_STATUS_CHANGED: "mcp:statusChanged",
 
   // Nango webhook settings (outgoing webhook URL configuration)
-  NANGO_GET_WEBHOOK_SETTINGS: "nango:getWebhookSettings",
-  NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:updateWebhookSettings",
-
-  // Connection metadata management
-  NANGO_SET_METADATA: "nango:setMetadata",
+  NANGO_GET_WEBHOOK_SETTINGS: "nango:webhookSettings:get",
+  NANGO_UPDATE_WEBHOOK_SETTINGS: "nango:webhookSettings:update",
 
   // Connection tags management
-  NANGO_PATCH_CONNECTION: "nango:patchConnection",
-
-  // Re-authorization (reconnect session)
-  NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
+  NANGO_PATCH_CONNECTION: "nango:connections:patch",
 
   // Nango Logs (operations search & messages)
-  NANGO_LOGS_SEARCH: "nango:logsSearch",
-  NANGO_LOGS_MESSAGES: "nango:logsMessages",
+  NANGO_LOGS_SEARCH: "nango:logs:search",
+  NANGO_LOGS_MESSAGES: "nango:logs:messages",
 
   // AI-powered OAuth2 scope discovery
-  NANGO_SUGGEST_SCOPES: "nango:suggestScopes",
+  NANGO_SUGGEST_SCOPES: "nango:scopes:suggest",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -173,6 +216,30 @@ export type IpcResponse<T> =
     };
 
 export type NangoEnvironment = "development" | "staging" | "production";
+
+// ── Reachability heuristic (Feature 7 offline detection) ────────────────────
+
+/**
+ * Result of the reachability probe.
+ * - `online`: the Nango control plane responded with a 2xx.
+ * - `degraded`: an HTTP response was received but it was non-2xx — Nango is
+ *    reachable but having issues (use for "Nango is having problems" UX).
+ * - `offline`: no HTTP response — DNS, socket, or timeout failure. Use for
+ *    the true "you are offline" UX.
+ */
+export type NangoReachabilityState = "online" | "offline" | "degraded";
+
+export interface NangoReachabilityResult {
+  state: NangoReachabilityState;
+  /** Round-trip latency in ms when state is online/degraded; null offline. */
+  latencyMs: number | null;
+  /** HTTP status code from the probe; null offline. */
+  httpStatus: number | null;
+  /** Underlying error message when offline; null otherwise. */
+  error: string | null;
+  /** ISO timestamp when the probe completed. */
+  checkedAt: string;
+}
 
 // Per-channel request/response types
 
