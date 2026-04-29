@@ -96,6 +96,13 @@ import {
   type NangoLogsMessagesRequest,
   type NangoLogsMessagesResult,
   type AdvancedConnectionConfig,
+  type NangoIntegration,
+  type NangoIntegrationSummary,
+  type NangoIntegrationCredentials,
+  type NangoGetIntegrationRequest,
+  type NangoCreateIntegrationRequest,
+  type NangoUpdateIntegrationRequest,
+  type NangoDeleteIntegrationRequest,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -836,6 +843,152 @@ export function registerIpcHandlers(): void {
           categories: p.categories,
           docs: p.docs,
         };
+      })
+  );
+
+  // ── Integration CRUD handlers ───────────────────────────────────────────
+
+  /** Map a raw ApiPublicIntegration into our NangoIntegration shape. */
+  function toIntegration(raw: unknown): NangoIntegration {
+    const i = (raw ?? {}) as Record<string, unknown>;
+    return {
+      unique_key: String(i.unique_key ?? ""),
+      provider: String(i.provider ?? ""),
+      display_name: String(i.display_name ?? i.unique_key ?? ""),
+      logo: String(i.logo ?? ""),
+      created_at: String(i.created_at ?? ""),
+      updated_at: String(i.updated_at ?? ""),
+      forward_webhooks: Boolean(i.forward_webhooks ?? false),
+      webhook_url:
+        typeof i.webhook_url === "string" ? i.webhook_url : null,
+      credentials: (i.credentials ?? null) as NangoIntegrationCredentials | null,
+    };
+  }
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_LIST_INTEGRATIONS,
+    async (
+      _event: IpcMainInvokeEvent
+    ): Promise<IpcResponse<NangoIntegrationSummary[]>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        const result = await client.listIntegrations();
+        const configs = (result.configs ?? []) as unknown[];
+        const integrations = configs.map(toIntegration);
+
+        // Derive connection counts via a single listConnections() call.
+        const counts = new Map<string, number>();
+        try {
+          const connRes = await client.listConnections({});
+          for (const c of (connRes.connections ?? []) as Array<{ provider_config_key?: string }>) {
+            const key = c.provider_config_key;
+            if (typeof key === "string") {
+              counts.set(key, (counts.get(key) ?? 0) + 1);
+            }
+          }
+        } catch {
+          // Connection-count enrichment is best-effort; fall through with zeros.
+        }
+
+        return integrations.map((i) => ({
+          unique_key: i.unique_key,
+          provider: i.provider,
+          display_name: i.display_name,
+          logo: i.logo,
+          created_at: i.created_at,
+          updated_at: i.updated_at,
+          forward_webhooks: i.forward_webhooks,
+          connectionCount: counts.get(i.unique_key) ?? 0,
+        }));
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_GET_INTEGRATION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoGetIntegrationRequest
+    ): Promise<IpcResponse<NangoIntegration>> =>
+      wrap(async () => {
+        if (!args?.uniqueKey) {
+          throw new Error("uniqueKey is required");
+        }
+        const client = getNangoClient();
+        const include = args.include?.length
+          ? { include: args.include }
+          : undefined;
+        const result = await client.getIntegration(
+          { uniqueKey: args.uniqueKey },
+          include
+        );
+        return toIntegration(result.data);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_CREATE_INTEGRATION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoCreateIntegrationRequest
+    ): Promise<IpcResponse<NangoIntegration>> =>
+      wrap(async () => {
+        if (!args?.provider || !args?.unique_key) {
+          throw new Error("provider and unique_key are required");
+        }
+        const client = getNangoClient();
+        const body: NangoCreateIntegrationRequest = {
+          provider: args.provider,
+          unique_key: args.unique_key,
+          ...(args.display_name !== undefined ? { display_name: args.display_name } : {}),
+          ...(args.credentials ? { credentials: args.credentials } : {}),
+          ...(args.forward_webhooks !== undefined
+            ? { forward_webhooks: args.forward_webhooks }
+            : {}),
+        };
+        const result = await client.createIntegration(body);
+        return toIntegration(result.data);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_UPDATE_INTEGRATION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoUpdateIntegrationRequest
+    ): Promise<IpcResponse<NangoIntegration>> =>
+      wrap(async () => {
+        if (!args?.uniqueKey) {
+          throw new Error("uniqueKey is required");
+        }
+        const client = getNangoClient();
+        const body: Omit<NangoUpdateIntegrationRequest, "uniqueKey"> = {
+          ...(args.unique_key !== undefined ? { unique_key: args.unique_key } : {}),
+          ...(args.display_name !== undefined ? { display_name: args.display_name } : {}),
+          ...(args.credentials ? { credentials: args.credentials } : {}),
+          ...(args.forward_webhooks !== undefined
+            ? { forward_webhooks: args.forward_webhooks }
+            : {}),
+        };
+        const result = await client.updateIntegration(
+          { uniqueKey: args.uniqueKey },
+          body
+        );
+        return toIntegration(result.data);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_DELETE_INTEGRATION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoDeleteIntegrationRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        if (!args?.uniqueKey) {
+          throw new Error("uniqueKey is required");
+        }
+        const client = getNangoClient();
+        await client.deleteIntegration(args.uniqueKey);
       })
   );
 
