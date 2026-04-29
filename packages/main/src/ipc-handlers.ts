@@ -112,7 +112,11 @@ import {
 import { credentialStore } from "./credential-store.js";
 
 /** Classify an error into an IpcErrorCode for the renderer to act on. */
-function classifyError(err: unknown): { code: IpcErrorCode; message: string } {
+function classifyError(err: unknown): {
+  code: IpcErrorCode;
+  message: string;
+  fieldErrors?: Record<string, string>;
+} {
   if (err instanceof Error && err.message === "Nango client not initialized. Call initNangoClient() first.") {
     return { code: "CLIENT_NOT_READY", message: "Nango client not initialized. Please configure your API key in Settings." };
   }
@@ -123,6 +127,10 @@ function classifyError(err: unknown): { code: IpcErrorCode; message: string } {
   }
   if (status === 429) {
     return { code: "RATE_LIMITED", message: "Nango API rate limit reached. Please wait a moment and try again." };
+  }
+  if (status === 422) {
+    const { message, fieldErrors } = parseValidationError(err);
+    return { code: "VALIDATION_ERROR", message, fieldErrors };
   }
   if (status && status >= 500) {
     return { code: "SERVER_ERROR", message: "The Nango server returned an error. Please try again later." };
@@ -147,15 +155,91 @@ function classifyError(err: unknown): { code: IpcErrorCode; message: string } {
   return { code: "UNKNOWN", message };
 }
 
+/**
+ * Convert a Nango 422 response into a flat `field -> message` map plus a
+ * human-readable summary. Nango errors typically carry one of:
+ *   - { errors: [{ path: ["end_user","email"], message: "..." }, ...] }
+ *   - { error: { errors: [...] } }
+ *   - { fieldErrors: { endUserEmail: "..." } } (already flat)
+ */
+function parseValidationError(err: unknown): {
+  message: string;
+  fieldErrors: Record<string, string>;
+} {
+  const fieldErrors: Record<string, string> = {};
+  const body =
+    (err as { response?: { data?: unknown } })?.response?.data ??
+    (err as { data?: unknown })?.data ??
+    (err as { body?: unknown })?.body ??
+    {};
+
+  const inner =
+    (body as { error?: unknown })?.error && typeof (body as { error?: unknown }).error === "object"
+      ? ((body as { error: unknown }).error as Record<string, unknown>)
+      : (body as Record<string, unknown>);
+
+  // Already-flat shape from a previous classifier.
+  const flat = (inner as { fieldErrors?: unknown }).fieldErrors;
+  if (flat && typeof flat === "object" && !Array.isArray(flat)) {
+    for (const [k, v] of Object.entries(flat as Record<string, unknown>)) {
+      if (typeof v === "string") fieldErrors[k] = v;
+    }
+  }
+
+  // Array shape: { errors: [{ path, message }] }
+  const errs = (inner as { errors?: unknown }).errors;
+  if (Array.isArray(errs)) {
+    for (const item of errs) {
+      if (!item || typeof item !== "object") continue;
+      const e = item as { path?: unknown; message?: unknown; field?: unknown };
+      const message = typeof e.message === "string" ? e.message : "Invalid value";
+      const path =
+        Array.isArray(e.path)
+          ? e.path.filter((s) => typeof s === "string").join(".")
+          : typeof e.field === "string"
+            ? e.field
+            : "";
+      const key = mapPathToFormField(path);
+      if (key) fieldErrors[key] = message;
+    }
+  }
+
+  const baseMessage =
+    (typeof (inner as { message?: unknown }).message === "string"
+      ? ((inner as { message: string }).message)
+      : null) ??
+    (err instanceof Error ? err.message : "Validation failed");
+
+  return { message: baseMessage, fieldErrors };
+}
+
+/** Map a dotted Nango error path to the renderer-side form field name. */
+function mapPathToFormField(path: string): string | null {
+  if (!path) return null;
+  const lookup: Record<string, string> = {
+    "end_user.id": "endUserId",
+    "end_user.email": "endUserEmail",
+    "end_user.display_name": "endUserDisplayName",
+    "allowed_integrations": "allowedIntegrations",
+  };
+  return lookup[path] ?? path;
+}
+
 /** Wrap a handler body in the standard IpcResponse envelope. */
 async function wrap<T>(fn: () => Promise<T>): Promise<IpcResponse<T>> {
   try {
     const data = await fn();
     return { status: "ok", data, error: null };
   } catch (err: unknown) {
-    const { code, message } = classifyError(err);
+    const { code, message, fieldErrors } = classifyError(err);
     log.error(`[IPC] ${code}: ${message}`, err instanceof Error ? err.stack : "");
-    return { status: "error", data: null, error: message, errorCode: code };
+    return {
+      status: "error",
+      data: null,
+      error: message,
+      errorCode: code,
+      ...(fieldErrors && Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}),
+    };
   }
 }
 
@@ -619,9 +703,10 @@ export function registerIpcHandlers(): void {
             )
           : undefined;
 
-        const result = await client.createConnectSession({
+        const result = (await client.createConnectSession({
           end_user: {
             id: args.endUserId,
+            ...(args.endUserEmail ? { email: args.endUserEmail } : {}),
             ...(args.endUserDisplayName
               ? { display_name: args.endUserDisplayName }
               : {}),
@@ -632,9 +717,12 @@ export function registerIpcHandlers(): void {
           ...(integrations_config_defaults
             ? { integrations_config_defaults }
             : {}),
-        });
+        })) as {
+          data: { token: string; connect_link?: string; expires_at: string };
+        };
         return {
           token: result.data.token,
+          connectLink: result.data.connect_link ?? "",
           expiresAt: result.data.expires_at,
         };
       })
