@@ -32,6 +32,7 @@ function saveAdvancedConfig(providerName: string, cfg: AdvancedConnectionConfig)
     const isEmpty =
       !cfg.oauthClientId &&
       !cfg.oauthClientSecret &&
+      !cfg.useNangoDevApp &&
       !(cfg.userScopes ?? []).length &&
       !Object.keys(cfg.authParams ?? {}).some(Boolean);
     if (isEmpty) {
@@ -268,6 +269,7 @@ function ConnectSearchModalInner({ onClose }: { onClose: () => void }) {
         const hasAdvanced =
           cfg.oauthClientId ||
           cfg.oauthClientSecret ||
+          cfg.useNangoDevApp ||
           (cfg.userScopes ?? []).length > 0 ||
           Object.keys(cfg.authParams ?? {}).some(Boolean);
 

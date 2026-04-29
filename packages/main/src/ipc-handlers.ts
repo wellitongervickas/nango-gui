@@ -94,6 +94,7 @@ import {
   type NangoLogsSearchResult,
   type NangoLogsMessagesRequest,
   type NangoLogsMessagesResult,
+  type AdvancedConnectionConfig,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -533,6 +534,50 @@ async function syncConnectUiPrimaryColorToNango(
 }
 
 /**
+ * Translate our `AdvancedConnectionConfig` (renderer-friendly shape) into the
+ * `integrations_config_defaults` payload Nango expects on connect/reconnect
+ * session creation.
+ *
+ * When `useNangoDevApp` is set we deliberately omit the OAuth client overrides
+ * so Nango uses its pre-configured developer app for the provider. This lets
+ * users test an integration without registering their own OAuth app.
+ */
+function buildIntegrationsConfigDefaults(
+  configs: Record<string, AdvancedConnectionConfig> | undefined
+): Record<string, Record<string, unknown>> | undefined {
+  if (!configs) return undefined;
+  return Object.fromEntries(
+    Object.entries(configs).map(([key, cfg]) => {
+      const includeOverrides =
+        !cfg.useNangoDevApp && (cfg.oauthClientId || cfg.oauthClientSecret);
+      return [
+        key,
+        {
+          ...(cfg.userScopes?.length
+            ? { user_scopes: cfg.userScopes.join(" ") }
+            : {}),
+          ...(cfg.authParams && Object.keys(cfg.authParams).length
+            ? { authorization_params: cfg.authParams }
+            : {}),
+          ...(includeOverrides
+            ? {
+                connection_config: {
+                  ...(cfg.oauthClientId
+                    ? { oauth_client_id_override: cfg.oauthClientId }
+                    : {}),
+                  ...(cfg.oauthClientSecret
+                    ? { oauth_client_secret_override: cfg.oauthClientSecret }
+                    : {}),
+                },
+              }
+            : {}),
+        },
+      ];
+    })
+  );
+}
+
+/**
  * Register all IPC handlers. Call once from the main process after app ready.
  */
 export function registerIpcHandlers(): void {
@@ -605,33 +650,9 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         // Build per-integration config defaults from the advanced connection config.
-        const integrations_config_defaults = args.integrationsConfigDefaults
-          ? Object.fromEntries(
-              Object.entries(args.integrationsConfigDefaults).map(([key, cfg]) => [
-                key,
-                {
-                  ...(cfg.userScopes?.length
-                    ? { user_scopes: cfg.userScopes.join(" ") }
-                    : {}),
-                  ...(cfg.authParams && Object.keys(cfg.authParams).length
-                    ? { authorization_params: cfg.authParams }
-                    : {}),
-                  ...((cfg.oauthClientId || cfg.oauthClientSecret)
-                    ? {
-                        connection_config: {
-                          ...(cfg.oauthClientId
-                            ? { oauth_client_id_override: cfg.oauthClientId }
-                            : {}),
-                          ...(cfg.oauthClientSecret
-                            ? { oauth_client_secret_override: cfg.oauthClientSecret }
-                            : {}),
-                        },
-                      }
-                    : {}),
-                },
-              ])
-            )
-          : undefined;
+        const integrations_config_defaults = buildIntegrationsConfigDefaults(
+          args.integrationsConfigDefaults
+        );
 
         const result = await (client as unknown as {
           createReconnectSession(args: {
@@ -675,33 +696,9 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         // Build per-integration config defaults from the advanced connection config.
-        const integrations_config_defaults = args.integrationsConfigDefaults
-          ? Object.fromEntries(
-              Object.entries(args.integrationsConfigDefaults).map(([key, cfg]) => [
-                key,
-                {
-                  ...(cfg.userScopes?.length
-                    ? { user_scopes: cfg.userScopes.join(" ") }
-                    : {}),
-                  ...(cfg.authParams && Object.keys(cfg.authParams).length
-                    ? { authorization_params: cfg.authParams }
-                    : {}),
-                  ...((cfg.oauthClientId || cfg.oauthClientSecret)
-                    ? {
-                        connection_config: {
-                          ...(cfg.oauthClientId
-                            ? { oauth_client_id_override: cfg.oauthClientId }
-                            : {}),
-                          ...(cfg.oauthClientSecret
-                            ? { oauth_client_secret_override: cfg.oauthClientSecret }
-                            : {}),
-                        },
-                      }
-                    : {}),
-                },
-              ])
-            )
-          : undefined;
+        const integrations_config_defaults = buildIntegrationsConfigDefaults(
+          args.integrationsConfigDefaults
+        );
 
         const result = (await client.createConnectSession({
           end_user: {

@@ -147,11 +147,18 @@ export function AdvancedConnectionForm({
     onChange({ ...value, oauthClientSecret: clientSecret || undefined });
   };
 
+  const handleUseNangoDevAppChange = (checked: boolean) => {
+    onChange({ ...value, useNangoDevApp: checked || undefined });
+  };
+
+  const useNangoDevApp = value.useNangoDevApp === true;
+
   const hasContent =
     Object.values(value.authParams ?? {}).some(Boolean) ||
     (value.userScopes ?? []).length > 0 ||
     value.oauthClientId ||
-    value.oauthClientSecret;
+    value.oauthClientSecret ||
+    useNangoDevApp;
 
   return (
     <div className="mt-2 rounded-lg border border-[var(--color-border)] overflow-hidden">
@@ -242,29 +249,75 @@ export function AdvancedConnectionForm({
           />
 
           {/* ── Developer App Credentials ────────────────────────────────── */}
-          <div className={`space-y-1.5 rounded-md transition-colors ${(serverHighlightField === "oauthClientId" || serverHighlightField === "oauthClientSecret") ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
+          <div className={`space-y-2.5 rounded-md transition-colors ${(serverHighlightField === "oauthClientId" || serverHighlightField === "oauthClientSecret") ? "ring-1 ring-[var(--color-error)] p-2 -m-2" : ""}`}>
             <div className="flex items-center gap-1.5">
               <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                 Developer App Credentials
               </label>
               <Tooltip text={`Override the ${providerName} OAuth client ID and secret registered in your Nango integration. Use this to test with your own developer app. Leave blank to use the values from your Nango dashboard.`} />
             </div>
-            <div className="space-y-2">
+
+            {/* Toggle: use Nango's pre-configured dev app for zero-setup testing */}
+            <label className="flex items-start gap-2.5 p-2.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-base)]/50 cursor-pointer hover:bg-[var(--color-bg-base)] transition-colors">
+              <input
+                type="checkbox"
+                checked={useNangoDevApp}
+                onChange={(e) => handleUseNangoDevAppChange(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[var(--color-brand-400)]"
+              />
+              <span className="flex-1 text-xs leading-relaxed">
+                <span className="font-medium text-[var(--color-text-primary)]">
+                  Use Nango dev app
+                </span>
+                <span className="block text-[var(--color-text-secondary)] mt-0.5">
+                  Skip registering your own OAuth app — connect with Nango&apos;s
+                  pre-configured developer credentials.
+                  {" "}<a
+                    href="https://docs.nango.dev/integrate/guides/authorize-an-api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--color-brand-400)] hover:underline"
+                  >
+                    Learn more ↗
+                  </a>
+                </span>
+              </span>
+            </label>
+
+            {useNangoDevApp && (
+              <div
+                role="note"
+                className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 text-[11px] leading-relaxed text-[var(--color-warning)]"
+              >
+                <span aria-hidden>⚠</span>
+                <span>
+                  Test-only — Nango&apos;s shared dev app is for evaluating the
+                  integration. Register your own OAuth app before going to
+                  production.
+                </span>
+              </div>
+            )}
+
+            <div className={`space-y-2 transition-opacity ${useNangoDevApp ? "opacity-50 pointer-events-none" : ""}`}>
               <input
                 type="text"
                 value={value.oauthClientId ?? ""}
                 onChange={(e) => handleClientIdChange(e.target.value)}
                 placeholder="Client ID (leave blank to use dashboard value)"
-                className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)]"
+                className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)] disabled:cursor-not-allowed"
                 autoComplete="off"
+                disabled={useNangoDevApp}
+                aria-disabled={useNangoDevApp}
               />
               <input
                 type="password"
                 value={value.oauthClientSecret ?? ""}
                 onChange={(e) => handleClientSecretChange(e.target.value)}
                 placeholder="Client Secret (leave blank to use dashboard value)"
-                className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)]"
+                className="w-full px-2.5 py-1.5 text-sm bg-[var(--color-bg-base)] border border-[var(--color-border)] rounded-md text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--color-brand-400)] focus:border-[var(--color-brand-400)] disabled:cursor-not-allowed"
                 autoComplete="new-password"
+                disabled={useNangoDevApp}
+                aria-disabled={useNangoDevApp}
               />
             </div>
           </div>

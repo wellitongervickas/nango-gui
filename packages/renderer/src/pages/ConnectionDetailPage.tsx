@@ -914,6 +914,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
     const hasAdvanced =
       savedCfg.oauthClientId ||
       savedCfg.oauthClientSecret ||
+      savedCfg.useNangoDevApp ||
       (savedCfg.userScopes ?? []).length > 0 ||
       Object.keys(savedCfg.authParams ?? {}).some(Boolean);
     const configDefaults = hasAdvanced

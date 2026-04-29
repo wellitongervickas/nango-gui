@@ -139,6 +139,76 @@ describe("nango:createConnectSession IPC handler", () => {
     });
   });
 
+  it("forwards advanced config oauth client overrides as connection_config", async () => {
+    mockCreateConnectSession.mockResolvedValueOnce({
+      data: { token: "tok_adv", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
+    });
+
+    const handler = await captureHandler("nango:createConnectSession");
+    await handler!(
+      {},
+      {
+        endUserId: "u4",
+        integrationsConfigDefaults: {
+          github: {
+            oauthClientId: "client-123",
+            oauthClientSecret: "secret-xyz",
+            userScopes: ["repo", "read:user"],
+            authParams: { tenant: "acme" },
+          },
+        },
+      }
+    );
+
+    expect(mockCreateConnectSession).toHaveBeenCalledWith({
+      end_user: { id: "u4" },
+      integrations_config_defaults: {
+        github: {
+          user_scopes: "repo read:user",
+          authorization_params: { tenant: "acme" },
+          connection_config: {
+            oauth_client_id_override: "client-123",
+            oauth_client_secret_override: "secret-xyz",
+          },
+        },
+      },
+    });
+  });
+
+  it("omits oauth client overrides when useNangoDevApp is true", async () => {
+    mockCreateConnectSession.mockResolvedValueOnce({
+      data: { token: "tok_dev", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
+    });
+
+    const handler = await captureHandler("nango:createConnectSession");
+    await handler!(
+      {},
+      {
+        endUserId: "u5",
+        integrationsConfigDefaults: {
+          github: {
+            // These overrides MUST be ignored when useNangoDevApp is set,
+            // so Nango falls back to its pre-configured developer app.
+            oauthClientId: "should-be-ignored",
+            oauthClientSecret: "also-ignored",
+            useNangoDevApp: true,
+            userScopes: ["repo"],
+          },
+        },
+      }
+    );
+
+    expect(mockCreateConnectSession).toHaveBeenCalledWith({
+      end_user: { id: "u5" },
+      integrations_config_defaults: {
+        github: {
+          user_scopes: "repo",
+          // Note: no `connection_config` key — the dev app flag suppresses it.
+        },
+      },
+    });
+  });
+
   it("returns error envelope when client is not initialized", async () => {
     resetNangoClient();
 
