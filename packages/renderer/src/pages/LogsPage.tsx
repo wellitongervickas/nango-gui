@@ -440,7 +440,6 @@ function LogsFilterBar() {
       if (next !== filterConnectionId) setFilterConnectionId(next);
     }, 400);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionIdDraft]);
 
   const activePeriod = useMemo(() => {

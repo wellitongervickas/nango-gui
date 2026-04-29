@@ -369,7 +369,7 @@ export function ConnectionsPage() {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // All unique tag keys across loaded connections
-  const allTags = useMemo(() => listAllTags(), [connections]); // eslint-disable-line react-hooks/exhaustive-deps
+  const allTags = useMemo(() => listAllTags(), [connections, listAllTags]);
 
   useEffect(() => {
     fetchConnections();

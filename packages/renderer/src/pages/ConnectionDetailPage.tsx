@@ -1025,7 +1025,7 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
   const currentTags = detail?.tags ?? connection?.tags ?? null;
 
   // All unique tag keys across the environment (for autocomplete)
-  const allTags = useMemo(() => listAllTags(), [connections]); // eslint-disable-line react-hooks/exhaustive-deps
+  const allTags = useMemo(() => listAllTags(), [connections, listAllTags]);
 
   // Tag usage counts: how many connections carry each tag key
   const tagUsageCounts = useMemo(() => {
