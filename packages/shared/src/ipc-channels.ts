@@ -120,6 +120,9 @@ export const IPC_CHANNELS = {
   // Connection metadata management
   NANGO_SET_METADATA: "nango:setMetadata",
 
+  // Connection tags management
+  NANGO_PATCH_CONNECTION: "nango:patchConnection",
+
   // Re-authorization (reconnect session)
   NANGO_CREATE_RECONNECT_SESSION: "nango:createReconnectSession",
 
@@ -157,6 +160,8 @@ export type NangoEnvironment = "development" | "staging" | "production";
 export interface NangoListConnectionsRequest {
   /** Filter by integration ID (formerly providerConfigKey). */
   integrationId?: string;
+  /** Filter by tag key-value pairs. */
+  tags?: Record<string, string>;
 }
 
 export interface NangoConnectionSummary {
@@ -166,6 +171,8 @@ export interface NangoConnectionSummary {
   provider_config_key: string;
   created: string;
   metadata: Record<string, unknown> | null;
+  /** Key-value tags for this connection. Keys are the tag labels. */
+  tags?: Record<string, string> | null;
 }
 
 export interface NangoGetConnectionRequest {
@@ -183,6 +190,8 @@ export interface NangoConnectionDetail {
   provider: string;
   credentials: Record<string, unknown>;
   metadata: Record<string, unknown> | null;
+  /** Key-value tags for this connection. Keys are the tag labels. */
+  tags?: Record<string, string> | null;
   created: string;
   updated_at?: string;
 }
@@ -191,6 +200,13 @@ export interface NangoSetMetadataRequest {
   providerConfigKey: string;
   connectionId: string;
   metadata: Record<string, unknown>;
+}
+
+export interface NangoPatchConnectionRequest {
+  providerConfigKey: string;
+  connectionId: string;
+  /** Key-value tags to set on the connection. Pass null to clear all tags. */
+  tags: Record<string, string> | null;
 }
 
 export interface NangoCreateReconnectSessionRequest {

@@ -82,6 +82,7 @@ import {
   type NangoConnectionHealthData,
   type ConnectionStatus,
   type NangoSetMetadataRequest,
+  type NangoPatchConnectionRequest,
   type NangoCreateReconnectSessionRequest,
   type NangoCreateReconnectSessionResult,
   type NangoSuggestScopesRequest,
@@ -241,6 +242,16 @@ function mapSyncRecord(raw: unknown): NangoSyncRecord {
 
 function toConnectionSummary(raw: unknown): NangoConnectionSummary {
   const conn = raw as Record<string, unknown>;
+  const rawTags = conn.tags;
+  let tags: Record<string, string> | null = null;
+  if (rawTags != null && typeof rawTags === "object" && !Array.isArray(rawTags)) {
+    const t = rawTags as Record<string, unknown>;
+    const mapped: Record<string, string> = {};
+    for (const [k, v] of Object.entries(t)) {
+      if (typeof v === "string") mapped[k] = v;
+    }
+    tags = Object.keys(mapped).length > 0 ? mapped : null;
+  }
   return {
     id: Number(conn.id ?? 0),
     connection_id: String(conn.connection_id ?? ""),
@@ -248,11 +259,22 @@ function toConnectionSummary(raw: unknown): NangoConnectionSummary {
     provider_config_key: String(conn.provider_config_key ?? ""),
     created: String(conn.created ?? ""),
     metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
+    tags,
   };
 }
 
 function toConnectionDetail(raw: unknown): NangoConnectionDetail {
   const conn = raw as Record<string, unknown>;
+  const rawTags = conn.tags;
+  let tags: Record<string, string> | null = null;
+  if (rawTags != null && typeof rawTags === "object" && !Array.isArray(rawTags)) {
+    const t = rawTags as Record<string, unknown>;
+    const mapped: Record<string, string> = {};
+    for (const [k, v] of Object.entries(t)) {
+      if (typeof v === "string") mapped[k] = v;
+    }
+    tags = Object.keys(mapped).length > 0 ? mapped : null;
+  }
   return {
     id: Number(conn.id ?? 0),
     connection_id: String(conn.connection_id ?? ""),
@@ -260,6 +282,7 @@ function toConnectionDetail(raw: unknown): NangoConnectionDetail {
     provider: String(conn.provider ?? ""),
     credentials: (conn.credentials as Record<string, unknown>) ?? {},
     metadata: (conn.metadata as Record<string, unknown> | null) ?? null,
+    tags,
     created: String(conn.created ?? ""),
     ...(conn.updated_at != null ? { updated_at: String(conn.updated_at) } : {}),
   };
@@ -506,6 +529,21 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         const client = getNangoClient();
         await client.setMetadata(args.providerConfigKey, args.connectionId, args.metadata);
+      })
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_PATCH_CONNECTION,
+    async (
+      _event: IpcMainInvokeEvent,
+      args: NangoPatchConnectionRequest
+    ): Promise<IpcResponse<void>> =>
+      wrap(async () => {
+        const client = getNangoClient();
+        await client.patchConnection(
+          { connectionId: args.connectionId, provider_config_key: args.providerConfigKey },
+          { tags: args.tags ?? undefined }
+        );
       })
   );
 

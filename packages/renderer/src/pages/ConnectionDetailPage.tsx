@@ -7,6 +7,7 @@ import { getFriendlyErrorMessage, getErrorTitle } from "@/lib/auth-errors";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
 import { StatusBadge } from "@/components/syncs/StatusBadge";
+import { TagsSection } from "@/components/connections/TagsSection";
 import {
   ChevronIcon,
   RefreshIcon,
@@ -804,7 +805,7 @@ interface ConnectionDetailPageProps {
 }
 
 export function ConnectionDetailPage({ providerConfigKey, connectionId }: ConnectionDetailPageProps) {
-  const { connections, fetchConnections, deleteConnection } = useConnectionsStore();
+  const { connections, fetchConnections, deleteConnection, patchConnection, listAllTags } = useConnectionsStore();
   const [detail, setDetail] = useState<NangoConnectionDetail | null>(null);
   const [syncs, setSyncs] = useState<NangoSyncRecord[]>([]);
   const [isDetailLoading, setIsDetailLoading] = useState(true);
@@ -997,6 +998,12 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
     await fetchConnections();
   }
 
+  // Save tags
+  async function handleSaveTags(newTags: Record<string, string>) {
+    await patchConnection(providerConfigKey, connectionId, Object.keys(newTags).length > 0 ? newTags : null);
+    setDetail((prev) => prev ? { ...prev, tags: Object.keys(newTags).length > 0 ? newTags : null } : prev);
+  }
+
   // Delete connection
   async function handleDelete() {
     setIsDeleting(true);
@@ -1012,6 +1019,22 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
 
   // Current metadata: prefer from detail (fresher), fall back to connection summary
   const currentMetadata = detail?.metadata ?? connection?.metadata ?? null;
+
+  // Current tags: prefer from detail (fresher), fall back to connection summary
+  const currentTags = detail?.tags ?? connection?.tags ?? null;
+
+  // All unique tag keys across the environment (for autocomplete)
+  const allTags = listAllTags();
+
+  // Tag usage counts: how many connections carry each tag key
+  const tagUsageCounts: Record<string, number> = {};
+  for (const c of connections) {
+    if (c.tags) {
+      for (const k of Object.keys(c.tags)) {
+        tagUsageCounts[k] = (tagUsageCounts[k] ?? 0) + 1;
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-[var(--color-bg-base)] overflow-y-auto">
@@ -1059,6 +1082,14 @@ export function ConnectionDetailPage({ providerConfigKey, connectionId }: Connec
             reAuthError={reAuthError}
           />
         )}
+
+        {/* Tags */}
+        <TagsSection
+          tags={currentTags}
+          allTags={allTags}
+          tagUsageCounts={tagUsageCounts}
+          onSave={handleSaveTags}
+        />
 
         {/* Syncs */}
         <SyncsSection

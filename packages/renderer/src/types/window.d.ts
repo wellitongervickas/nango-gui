@@ -13,6 +13,7 @@ import type {
   NangoCreateConnectSessionRequest,
   NangoCreateConnectSessionResult,
   NangoSetMetadataRequest,
+  NangoPatchConnectionRequest,
   NangoCreateReconnectSessionRequest,
   NangoCreateReconnectSessionResult,
   NangoListSyncsRequest,
@@ -168,6 +169,7 @@ declare global {
         args: NangoGetConnectionHealthRequest
       ): Promise<IpcResponse<NangoConnectionHealthData>>;
       setMetadata(args: NangoSetMetadataRequest): Promise<IpcResponse<void>>;
+      patchConnection(args: NangoPatchConnectionRequest): Promise<IpcResponse<void>>;
       createReconnectSession(args: NangoCreateReconnectSessionRequest): Promise<IpcResponse<NangoCreateReconnectSessionResult>>;
       searchLogs(args: NangoLogsSearchRequest): Promise<IpcResponse<NangoLogsSearchResult>>;
       getLogMessages(args: NangoLogsMessagesRequest): Promise<IpcResponse<NangoLogsMessagesResult>>;
