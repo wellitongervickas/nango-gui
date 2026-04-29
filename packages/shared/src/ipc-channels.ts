@@ -18,6 +18,7 @@ export const IPC_CHANNELS = {
   NANGO_PAUSE_SYNC: "nango:pauseSync",
   NANGO_START_SYNC: "nango:startSync",
   NANGO_UPDATE_SYNC_FREQUENCY: "nango:updateSyncFrequency",
+  NANGO_BULK_UPDATE_SYNC_SCHEDULE: "nango:bulkUpdateSyncSchedule",
 
   // Credential storage
   CREDENTIALS_SAVE: "credentials:save",
@@ -381,6 +382,36 @@ export interface NangoUpdateSyncFrequencyRequest {
 export interface NangoUpdateSyncFrequencyResult {
   /** The applied frequency string returned by the Nango API. */
   frequency: string;
+}
+
+/** A single sync schedule update inside a bulk request. */
+export interface NangoBulkUpdateSyncScheduleEntry {
+  syncName: string;
+  /** Frequency string (e.g. "every 5m") or null to reset to the integration default. */
+  frequency: string | null;
+}
+
+/**
+ * Bulk wrapper around `updateSyncConnectionFrequency()` for batch frequency
+ * updates. The Nango SDK only exposes a per-sync method, so this fans out
+ * one underlying call per entry and reports per-entry status.
+ */
+export interface NangoBulkUpdateSyncScheduleRequest {
+  providerConfigKey: string;
+  connectionId: string;
+  entries: NangoBulkUpdateSyncScheduleEntry[];
+}
+
+/** Outcome for a single entry in a bulk schedule update. */
+export type NangoBulkUpdateSyncScheduleEntryResult =
+  | { syncName: string; status: "ok"; frequency: string }
+  | { syncName: string; status: "error"; error: string };
+
+export interface NangoBulkUpdateSyncScheduleResult {
+  /** One result per request entry, in the same order as `entries`. */
+  results: NangoBulkUpdateSyncScheduleEntryResult[];
+  /** True only when every entry succeeded. Partial failures keep this false. */
+  allSucceeded: boolean;
 }
 
 // ── Records ─────────────────────────────────────────────────────────────────
