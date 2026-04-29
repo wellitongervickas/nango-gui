@@ -42,9 +42,9 @@ describe("nango:createConnectSession IPC handler", () => {
     resetNangoClient();
   });
 
-  it("returns a token on success", async () => {
+  it("returns a token, connect_link and expiry on success", async () => {
     mockCreateConnectSession.mockResolvedValueOnce({
-      data: { token: "sess_abc123", connect_link: "https://connect.nango.dev", expires_at: "2026-01-01T00:00:00Z" },
+      data: { token: "sess_abc123", connect_link: "https://connect.nango.dev/abc", expires_at: "2026-01-01T00:00:00Z" },
     });
 
     const handler = await captureHandler("nango:createConnectSession");
@@ -52,17 +52,21 @@ describe("nango:createConnectSession IPC handler", () => {
 
     const result = await handler!(
       {},
-      { endUserId: "user-1", endUserDisplayName: "Test User" }
+      { endUserId: "user-1", endUserEmail: "user@example.com", endUserDisplayName: "Test User" }
     );
 
     expect(result).toEqual({
       status: "ok",
-      data: { token: "sess_abc123", expiresAt: "2026-01-01T00:00:00Z" },
+      data: {
+        token: "sess_abc123",
+        connectLink: "https://connect.nango.dev/abc",
+        expiresAt: "2026-01-01T00:00:00Z",
+      },
       error: null,
     });
 
     expect(mockCreateConnectSession).toHaveBeenCalledWith({
-      end_user: { id: "user-1", display_name: "Test User" },
+      end_user: { id: "user-1", email: "user@example.com", display_name: "Test User" },
     });
   });
 
@@ -80,7 +84,7 @@ describe("nango:createConnectSession IPC handler", () => {
     });
   });
 
-  it("omits display_name when not provided", async () => {
+  it("omits display_name and email when not provided", async () => {
     mockCreateConnectSession.mockResolvedValueOnce({
       data: { token: "tok_min", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
@@ -90,6 +94,34 @@ describe("nango:createConnectSession IPC handler", () => {
 
     expect(mockCreateConnectSession).toHaveBeenCalledWith({
       end_user: { id: "u3" },
+    });
+  });
+
+  it("surfaces 422 fieldErrors from the Nango API", async () => {
+    const apiError = Object.assign(new Error("Validation failed"), {
+      status: 422,
+      response: {
+        data: {
+          errors: [
+            { path: ["end_user", "email"], message: "Invalid email address" },
+            { path: ["end_user", "id"], message: "ID is required" },
+          ],
+        },
+      },
+    });
+    mockCreateConnectSession.mockRejectedValueOnce(apiError);
+
+    const handler = await captureHandler("nango:createConnectSession");
+    const result = await handler!({}, { endUserId: "" });
+
+    expect(result).toMatchObject({
+      status: "error",
+      data: null,
+      errorCode: "VALIDATION_ERROR",
+      fieldErrors: {
+        endUserEmail: "Invalid email address",
+        endUserId: "ID is required",
+      },
     });
   });
 

@@ -139,6 +139,7 @@ export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 export type IpcErrorCode =
   | "AUTH_INVALID"      // 401/403 — key expired or revoked
   | "RATE_LIMITED"      // 429 — API rate limit hit
+  | "VALIDATION_ERROR"  // 422 — request body validation failed
   | "SERVER_ERROR"      // 5xx — Nango server error
   | "NETWORK_ERROR"     // fetch/DNS/timeout failure
   | "CLIENT_NOT_READY"  // Nango SDK not yet initialized
@@ -148,7 +149,17 @@ export type IpcErrorCode =
 // Errors are always wrapped; never throw raw across IPC.
 export type IpcResponse<T> =
   | { status: "ok"; data: T; error: null }
-  | { status: "error"; data: null; error: string; errorCode: IpcErrorCode };
+  | {
+      status: "error";
+      data: null;
+      error: string;
+      errorCode: IpcErrorCode;
+      /**
+       * Map of field name -> message, populated for VALIDATION_ERROR (422)
+       * responses so callers can render inline form errors instead of toasts.
+       */
+      fieldErrors?: Record<string, string>;
+    };
 
 export type NangoEnvironment = "development" | "staging" | "production";
 
@@ -248,6 +259,8 @@ export interface AdvancedConnectionConfig {
 export interface NangoCreateConnectSessionRequest {
   /** Stable end-user identifier (e.g. app user ID). */
   endUserId: string;
+  /** Optional contact email for the end user. */
+  endUserEmail?: string;
   /** Optional display name shown in the Connect UI. */
   endUserDisplayName?: string;
   /** Restrict which integrations appear in the Connect UI. */
@@ -259,9 +272,20 @@ export interface NangoCreateConnectSessionRequest {
   integrationsConfigDefaults?: Record<string, AdvancedConnectionConfig>;
 }
 
+/**
+ * Field name -> human-readable validation error. Sourced from a 422 response
+ * body so the renderer can surface inline errors next to the offending input.
+ */
+export type NangoConnectSessionFieldErrors = Partial<
+  Record<"endUserId" | "endUserEmail" | "endUserDisplayName" | "allowedIntegrations", string>
+>;
+
 export interface NangoCreateConnectSessionResult {
   /** Short-lived token to pass to @nangohq/frontend's openConnectUI. */
   token: string;
+  /** Hosted Nango Connect link the end user can open directly. */
+  connectLink: string;
+  /** ISO timestamp at which the token and link expire. */
   expiresAt: string;
 }
 

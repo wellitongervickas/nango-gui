@@ -5,6 +5,7 @@ import { navigate } from "../lib/router";
 const ICON_MAP: Record<IpcErrorCode, string> = {
   AUTH_INVALID: "\u{1F511}",
   RATE_LIMITED: "\u{23F3}",
+  VALIDATION_ERROR: "\u{26A0}\u{FE0F}",
   SERVER_ERROR: "\u{1F4A5}",
   NETWORK_ERROR: "\u{1F4E1}",
   CLIENT_NOT_READY: "\u{2699}\u{FE0F}",
