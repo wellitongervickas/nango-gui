@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type {
   IpcResponse,
   NangoTriggerActionResult,
+  NangoTriggerActionAsyncResult,
+  NangoGetAsyncActionResultResult,
   NangoProxyResult,
 } from "@nango-gui/shared";
 
@@ -12,6 +14,24 @@ const mockTriggerAction = vi.fn(
     Promise.resolve({
       status: "ok",
       data: { result: { id: "contact-1", name: "Alice" } },
+      error: null,
+    })
+);
+
+const mockTriggerActionAsync = vi.fn(
+  (): Promise<IpcResponse<NangoTriggerActionAsyncResult>> =>
+    Promise.resolve({
+      status: "ok",
+      data: { id: "job-1", statusUrl: "/jobs/job-1" },
+      error: null,
+    })
+);
+
+const mockGetAsyncActionResult = vi.fn(
+  (): Promise<IpcResponse<NangoGetAsyncActionResultResult>> =>
+    Promise.resolve({
+      status: "ok",
+      data: { status: "pending" },
       error: null,
     })
 );
@@ -32,6 +52,8 @@ const mockProxyRequest = vi.fn(
 vi.stubGlobal("window", {
   nango: {
     triggerAction: mockTriggerAction,
+    triggerActionAsync: mockTriggerActionAsync,
+    getAsyncActionResult: mockGetAsyncActionResult,
     proxyRequest: mockProxyRequest,
   },
 });
@@ -43,6 +65,11 @@ beforeEach(() => {
     actionResult: null,
     isExecutingAction: false,
     actionError: null,
+    asyncJobId: null,
+    asyncStatus: null,
+    asyncPollCount: 0,
+    isPollingAsync: false,
+    lastAsyncAction: null,
     proxyStatus: null,
     proxyHeaders: null,
     proxyData: null,
@@ -55,6 +82,20 @@ beforeEach(() => {
     Promise.resolve({
       status: "ok" as const,
       data: { result: { id: "contact-1", name: "Alice" } },
+      error: null,
+    })
+  );
+  mockTriggerActionAsync.mockImplementation(() =>
+    Promise.resolve({
+      status: "ok" as const,
+      data: { id: "job-1", statusUrl: "/jobs/job-1" },
+      error: null,
+    })
+  );
+  mockGetAsyncActionResult.mockImplementation(() =>
+    Promise.resolve({
+      status: "ok" as const,
+      data: { status: "pending" },
       error: null,
     })
   );
@@ -305,6 +346,256 @@ describe("useActionsStore", () => {
       expect(state.proxyHeaders).toBeNull();
       expect(state.proxyData).toBeNull();
       expect(state.proxyError).toBeNull();
+    });
+  });
+
+  // ── Async actions ──────────────────────────────────────────────────────
+
+  describe("triggerActionAsync", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      // Cancel any active polling so timers from one test do not leak into the next.
+      useActionsStore.getState().cancelAsyncPolling();
+      vi.useRealTimers();
+    });
+
+    it("polls until success and records history with asyncStatus=success", async () => {
+      mockGetAsyncActionResult
+        .mockResolvedValueOnce({
+          status: "ok",
+          data: { status: "running" },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          status: "ok",
+          data: { status: "success", output: { ok: true, value: 42 } },
+          error: null,
+        });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "long-job", { foo: "bar" });
+
+      // After the initial trigger, polling has started.
+      expect(useActionsStore.getState().asyncJobId).toBe("job-1");
+      expect(useActionsStore.getState().isPollingAsync).toBe(true);
+      expect(useActionsStore.getState().asyncStatus).toBe("pending");
+      expect(useActionsStore.getState().lastAsyncAction).toEqual({
+        integrationId: "github",
+        connectionId: "user-1",
+        actionName: "long-job",
+        input: { foo: "bar" },
+      });
+
+      // First poll → running.
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(useActionsStore.getState().asyncStatus).toBe("running");
+      expect(useActionsStore.getState().isPollingAsync).toBe(true);
+
+      // Second poll → success.
+      await vi.advanceTimersByTimeAsync(5_000);
+      const state = useActionsStore.getState();
+      expect(state.asyncStatus).toBe("success");
+      expect(state.isPollingAsync).toBe(false);
+      expect(state.actionResult).toEqual({ ok: true, value: 42 });
+      expect(state.history).toHaveLength(1);
+      expect(state.history[0]!.type).toBe("action");
+      if (state.history[0]!.type === "action") {
+        expect(state.history[0]!.asyncStatus).toBe("success");
+        expect(state.history[0]!.result).toEqual({ ok: true, value: 42 });
+        expect(state.history[0]!.error).toBeNull();
+      }
+    });
+
+    it("polls until failed and records history with error message", async () => {
+      mockGetAsyncActionResult.mockResolvedValueOnce({
+        status: "ok",
+        data: { status: "failed", error: "Upstream service exploded" },
+        error: null,
+      });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "long-job", {});
+
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const state = useActionsStore.getState();
+      expect(state.asyncStatus).toBe("failed");
+      expect(state.isPollingAsync).toBe(false);
+      expect(state.actionError).toBe("Upstream service exploded");
+      expect(state.history).toHaveLength(1);
+      if (state.history[0]!.type === "action") {
+        expect(state.history[0]!.asyncStatus).toBe("failed");
+        expect(state.history[0]!.error).toBe("Upstream service exploded");
+      }
+    });
+
+    it("times out after 10 minutes and records asyncStatus=timed_out", async () => {
+      // Always return pending so we drive the timeout branch.
+      mockGetAsyncActionResult.mockResolvedValue({
+        status: "ok",
+        data: { status: "pending" },
+        error: null,
+      });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "long-job", {});
+
+      // Advance past the 10-minute cap (poll runs every 5s).
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1_000 + 5_000);
+
+      const state = useActionsStore.getState();
+      expect(state.asyncStatus).toBe("timed_out");
+      expect(state.isPollingAsync).toBe(false);
+      expect(state.actionError).toBe("Async action timed out after 10 minutes");
+      const last = state.history[0];
+      expect(last?.type).toBe("action");
+      if (last?.type === "action") {
+        expect(last.asyncStatus).toBe("timed_out");
+        expect(last.error).toBe("Async action timed out after 10 minutes");
+      }
+    });
+
+    it("records a failed history entry when the initial trigger IPC errors", async () => {
+      mockTriggerActionAsync.mockResolvedValueOnce({
+        status: "error",
+        data: null,
+        error: "Action not found",
+        errorCode: "UNKNOWN",
+      });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "missing", {});
+
+      const state = useActionsStore.getState();
+      expect(state.actionError).toBe("Action not found");
+      expect(state.isPollingAsync).toBe(false);
+      expect(state.asyncJobId).toBeNull();
+      expect(state.history).toHaveLength(1);
+      if (state.history[0]!.type === "action") {
+        expect(state.history[0]!.asyncStatus).toBe("failed");
+        expect(state.history[0]!.error).toBe("Action not found");
+      }
+      // No polling timer should have been scheduled.
+      expect(mockGetAsyncActionResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cancelAsyncPolling", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("clears the timer and resets all async state fields", async () => {
+      mockGetAsyncActionResult.mockResolvedValue({
+        status: "ok",
+        data: { status: "pending" },
+        error: null,
+      });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "long-job", {});
+
+      expect(useActionsStore.getState().isPollingAsync).toBe(true);
+
+      useActionsStore.getState().cancelAsyncPolling();
+
+      const state = useActionsStore.getState();
+      expect(state.isPollingAsync).toBe(false);
+      expect(state.asyncJobId).toBeNull();
+      expect(state.asyncStatus).toBeNull();
+      expect(state.asyncPollCount).toBe(0);
+
+      // Subsequent timer ticks must NOT invoke the poll API after cancel.
+      mockGetAsyncActionResult.mockClear();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(mockGetAsyncActionResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("retryLastAsyncAction", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      useActionsStore.getState().cancelAsyncPolling();
+      vi.useRealTimers();
+    });
+
+    it("re-invokes the last async action with the saved params", async () => {
+      mockGetAsyncActionResult.mockResolvedValue({
+        status: "ok",
+        data: { status: "pending" },
+        error: null,
+      });
+
+      await useActionsStore
+        .getState()
+        .triggerActionAsync("github", "user-1", "long-job", { id: 7 });
+
+      mockTriggerActionAsync.mockClear();
+
+      await useActionsStore.getState().retryLastAsyncAction();
+
+      expect(mockTriggerActionAsync).toHaveBeenCalledTimes(1);
+      expect(mockTriggerActionAsync).toHaveBeenCalledWith({
+        integrationId: "github",
+        connectionId: "user-1",
+        actionName: "long-job",
+        input: { id: 7 },
+      });
+    });
+
+    it("is a no-op when there is no last async action", async () => {
+      await useActionsStore.getState().retryLastAsyncAction();
+      expect(mockTriggerActionAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getHistoryForIntegration", () => {
+    it("returns only action entries for the requested integration", async () => {
+      await useActionsStore
+        .getState()
+        .triggerAction("github", "user-1", "create-contact", { name: "A" });
+      await useActionsStore
+        .getState()
+        .triggerAction("slack", "user-2", "send-message", { text: "hi" });
+      await useActionsStore
+        .getState()
+        .sendProxyRequest("github", "user-1", "GET", "/api/users");
+
+      const githubHistory = useActionsStore
+        .getState()
+        .getHistoryForIntegration("github");
+
+      expect(githubHistory).toHaveLength(1);
+      expect(githubHistory[0]!.type).toBe("action");
+      expect(githubHistory[0]!.integrationId).toBe("github");
+      expect(githubHistory[0]!.actionName).toBe("create-contact");
+    });
+
+    it("returns an empty array when no entries match", async () => {
+      await useActionsStore
+        .getState()
+        .triggerAction("github", "user-1", "create-contact", {});
+
+      const result = useActionsStore
+        .getState()
+        .getHistoryForIntegration("nonexistent");
+
+      expect(result).toEqual([]);
     });
   });
 });

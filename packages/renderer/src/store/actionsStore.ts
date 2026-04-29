@@ -278,6 +278,7 @@ export const useActionsStore = create<ActionsState>((set, get) => ({
         const state = get();
         if (!state.isPollingAsync || !window.nango) {
           clearAsyncPollTimer();
+          set({ isPollingAsync: false });
           return;
         }
 
