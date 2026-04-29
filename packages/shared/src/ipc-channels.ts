@@ -243,6 +243,13 @@ export interface AdvancedConnectionConfig {
   oauthClientId?: string;
   /** Override the registered OAuth client secret for this connection. */
   oauthClientSecret?: string;
+  /**
+   * When true, use Nango's pre-configured developer app for this provider so
+   * the user can test the connection without registering their own OAuth app.
+   * When set, any `oauthClientId`/`oauthClientSecret` overrides are ignored.
+   * Test-only — production connections should use the user's own credentials.
+   */
+  useNangoDevApp?: boolean;
 }
 
 export interface NangoCreateConnectSessionRequest {
