@@ -92,6 +92,36 @@ import {
   type NangoLogsSearchResult,
   type NangoLogsMessagesRequest,
   type NangoLogsMessagesResult,
+  type CacheConnectionsListRequest,
+  type CacheConnectionsGetRequest,
+  type CacheConnectionsUpsertRequest,
+  type CacheConnectionsDeleteRequest,
+  type CacheSyncsListRequest,
+  type CacheSyncsGetRequest,
+  type CacheSyncsUpsertRequest,
+  type CacheSyncsDeleteRequest,
+  type CacheRecordsListRequest,
+  type CacheRecordsGetRequest,
+  type CacheRecordsUpsertRequest,
+  type CacheRecordsDeleteRequest,
+  type CacheRecordsDeleteBySyncRequest,
+  type CacheLogsListRequest,
+  type CacheLogsGetRequest,
+  type CacheLogsInsertRequest,
+  type CacheLogsInsertResult,
+  type CacheWebhookEventsListRequest,
+  type CacheWebhookEventsGetRequest,
+  type CacheWebhookEventsInsertRequest,
+  type CacheWebhookEventsMarkProcessedRequest,
+  type CacheWebhookEventsDeleteRequest,
+  type CacheDryrunRunsListRequest,
+  type CacheDryrunRunsGetRequest,
+  type CacheDryrunRunsInsertRequest,
+  type CacheDryrunRunsDeleteRequest,
+  type CacheMcpToolCallsListRequest,
+  type CacheMcpToolCallsGetRequest,
+  type CacheMcpToolCallsInsertRequest,
+  type CacheMcpToolCallsDeleteRequest,
 } from "@nango-gui/shared";
 import { webhookServer } from "./webhook-server.js";
 import { deploySnapshotStore } from "./deploy-snapshot-store.js";
@@ -100,6 +130,16 @@ import { aiService } from "./ai-service.js";
 import { runAiBuilder } from "./ai-builder-service.js";
 import { mcpManager } from "./mcp-manager.js";
 import { logsService } from "./logs-service.js";
+import {
+  clearCacheDb,
+  listConnections, getConnection, upsertConnection, deleteConnection,
+  listSyncs, getSync, upsertSync, deleteSync,
+  listRecords, getRecord, upsertRecord, deleteRecord, deleteRecordsBySync,
+  listLogs, getLog, insertLog,
+  listWebhookEvents, getWebhookEvent, insertWebhookEvent, markWebhookEventProcessed, deleteWebhookEvent,
+  listDryrunRuns, getDryrunRun, insertDryrunRun, deleteDryrunRun,
+  listMcpToolCalls, getMcpToolCall, insertMcpToolCall, deleteMcpToolCall,
+} from "./cache/index.js";
 import {
   getNangoClient,
   initNangoClient,
@@ -1793,4 +1833,114 @@ export function registerIpcHandlers(): void {
         return logsService.getMessages(args);
       })
   );
+
+  // ── Cache IPC handlers (NANA-265) ─────────────────────────────────────────
+
+  ipcMain.handle(IPC_CHANNELS.CACHE_CLEAR,
+    (_e: IpcMainInvokeEvent): IpcResponse<null> => {
+      try { clearCacheDb(); return { status: "ok", data: null, error: null }; }
+      catch (e) { log.error("[IPC] cache:clear error", e); return { status: "error", data: null, error: String(e), errorCode: "UNKNOWN" }; }
+    }
+  );
+
+  // connections
+  ipcMain.handle(IPC_CHANNELS.CACHE_CONNECTIONS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheConnectionsListRequest) =>
+      wrap(async () => listConnections(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_CONNECTIONS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheConnectionsGetRequest) =>
+      wrap(async () => getConnection(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_CONNECTIONS_UPSERT,
+    (_e: IpcMainInvokeEvent, args: CacheConnectionsUpsertRequest) =>
+      wrap(async () => { upsertConnection({ ...args, display_name: args.display_name ?? null, metadata: args.metadata ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_CONNECTIONS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheConnectionsDeleteRequest) =>
+      wrap(async () => { deleteConnection(args.id); return null; }));
+
+  // syncs
+  ipcMain.handle(IPC_CHANNELS.CACHE_SYNCS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheSyncsListRequest) =>
+      wrap(async () => listSyncs(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_SYNCS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheSyncsGetRequest) =>
+      wrap(async () => getSync(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_SYNCS_UPSERT,
+    (_e: IpcMainInvokeEvent, args: CacheSyncsUpsertRequest) =>
+      wrap(async () => { upsertSync({ ...args, frequency: args.frequency ?? null, last_sync_date: args.last_sync_date ?? null, next_sync_date: args.next_sync_date ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_SYNCS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheSyncsDeleteRequest) =>
+      wrap(async () => { deleteSync(args.id); return null; }));
+
+  // records
+  ipcMain.handle(IPC_CHANNELS.CACHE_RECORDS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheRecordsListRequest) =>
+      wrap(async () => listRecords(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_RECORDS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheRecordsGetRequest) =>
+      wrap(async () => getRecord(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_RECORDS_UPSERT,
+    (_e: IpcMainInvokeEvent, args: CacheRecordsUpsertRequest) =>
+      wrap(async () => { upsertRecord({ ...args, external_id: args.external_id ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_RECORDS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheRecordsDeleteRequest) =>
+      wrap(async () => { deleteRecord(args.id); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_RECORDS_DELETE_BY_SYNC,
+    (_e: IpcMainInvokeEvent, args: CacheRecordsDeleteBySyncRequest) =>
+      wrap(async () => { deleteRecordsBySync(args.sync_id); return null; }));
+
+  // logs
+  ipcMain.handle(IPC_CHANNELS.CACHE_LOGS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheLogsListRequest) =>
+      wrap(async () => listLogs(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_LOGS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheLogsGetRequest) =>
+      wrap(async () => getLog(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_LOGS_INSERT,
+    (_e: IpcMainInvokeEvent, args: CacheLogsInsertRequest): Promise<IpcResponse<CacheLogsInsertResult>> =>
+      wrap(async () => ({ id: insertLog({ ...args, context: args.context ?? null }) })));
+
+  // webhook_events
+  ipcMain.handle(IPC_CHANNELS.CACHE_WEBHOOK_EVENTS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheWebhookEventsListRequest) =>
+      wrap(async () => listWebhookEvents(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_WEBHOOK_EVENTS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheWebhookEventsGetRequest) =>
+      wrap(async () => getWebhookEvent(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_WEBHOOK_EVENTS_INSERT,
+    (_e: IpcMainInvokeEvent, args: CacheWebhookEventsInsertRequest) =>
+      wrap(async () => { insertWebhookEvent({ ...args, integration: args.integration ?? null, connection: args.connection ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_WEBHOOK_EVENTS_MARK_PROCESSED,
+    (_e: IpcMainInvokeEvent, args: CacheWebhookEventsMarkProcessedRequest) =>
+      wrap(async () => { markWebhookEventProcessed(args.id); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_WEBHOOK_EVENTS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheWebhookEventsDeleteRequest) =>
+      wrap(async () => { deleteWebhookEvent(args.id); return null; }));
+
+  // dryrun_runs
+  ipcMain.handle(IPC_CHANNELS.CACHE_DRYRUN_RUNS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheDryrunRunsListRequest) =>
+      wrap(async () => listDryrunRuns(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_DRYRUN_RUNS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheDryrunRunsGetRequest) =>
+      wrap(async () => getDryrunRun(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_DRYRUN_RUNS_INSERT,
+    (_e: IpcMainInvokeEvent, args: CacheDryrunRunsInsertRequest) =>
+      wrap(async () => { insertDryrunRun({ ...args, completed_at: args.completed_at ?? null, result: args.result ?? null, error: args.error ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_DRYRUN_RUNS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheDryrunRunsDeleteRequest) =>
+      wrap(async () => { deleteDryrunRun(args.id); return null; }));
+
+  // mcp_tool_calls (F1 Tool Call Log)
+  ipcMain.handle(IPC_CHANNELS.CACHE_MCP_TOOL_CALLS_LIST,
+    (_e: IpcMainInvokeEvent, args?: CacheMcpToolCallsListRequest) =>
+      wrap(async () => listMcpToolCalls(args ?? {})));
+  ipcMain.handle(IPC_CHANNELS.CACHE_MCP_TOOL_CALLS_GET,
+    (_e: IpcMainInvokeEvent, args: CacheMcpToolCallsGetRequest) =>
+      wrap(async () => getMcpToolCall(args.id)));
+  ipcMain.handle(IPC_CHANNELS.CACHE_MCP_TOOL_CALLS_INSERT,
+    (_e: IpcMainInvokeEvent, args: CacheMcpToolCallsInsertRequest) =>
+      wrap(async () => { insertMcpToolCall({ ...args, result: args.result ?? null, error: args.error ?? null, completed_at: args.completed_at ?? null, duration_ms: args.duration_ms ?? null }); return null; }));
+  ipcMain.handle(IPC_CHANNELS.CACHE_MCP_TOOL_CALLS_DELETE,
+    (_e: IpcMainInvokeEvent, args: CacheMcpToolCallsDeleteRequest) =>
+      wrap(async () => { deleteMcpToolCall(args.id); return null; }));
 }

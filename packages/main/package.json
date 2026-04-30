@@ -12,15 +12,19 @@
     "./logger.js": "./src/logger.ts",
     "./auto-updater.js": "./src/auto-updater.ts",
     "./cli-runner.js": "./src/cli-runner.ts",
-    "./webhook-server.js": "./src/webhook-server.ts"
+    "./webhook-server.js": "./src/webhook-server.ts",
+    "./cache/cache-db.js": "./src/cache/cache-db.ts",
+    "./cache/index.js": "./src/cache/index.ts"
   },
   "dependencies": {
     "@nango-gui/shared": "workspace:*",
     "@nangohq/node": "^0.70.1",
+    "better-sqlite3": "^12.9.0",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.3",
     "electron": "35.7.5",
     "typescript": "~5.8.3",

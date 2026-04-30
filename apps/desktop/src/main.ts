@@ -5,6 +5,7 @@ import { registerIpcHandlers } from "@nango-gui/main/ipc-handlers.js";
 import { credentialStore } from "@nango-gui/main/credential-store.js";
 import { initNangoClient } from "@nango-gui/main/nango-client.js";
 import { initAutoUpdater, downloadUpdate, installUpdate } from "@nango-gui/main/auto-updater.js";
+import { openCacheDb } from "@nango-gui/main/cache/cache-db.js";
 import { IPC_CHANNELS } from "@nango-gui/shared";
 
 // Catch-all handlers — no unhandled rejections or exceptions should crash the app.
@@ -51,6 +52,14 @@ function createWindow(startRoute: "/" | "/setup" = "/"): void {
 }
 
 async function bootstrap(): Promise<void> {
+  // Open the encrypted cache DB and run migrations before registering IPC handlers.
+  // safeStorage (used by SecretStore to load the key) requires app.whenReady().
+  try {
+    openCacheDb();
+  } catch (err) {
+    log.error("[Bootstrap] Failed to open cache DB:", err);
+  }
+
   registerIpcHandlers();
 
   // In E2E test mode (NANGO_E2E=true) skip the credential gate entirely so
