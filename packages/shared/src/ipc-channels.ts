@@ -132,6 +132,47 @@ export const IPC_CHANNELS = {
 
   // AI-powered OAuth2 scope discovery
   NANGO_SUGGEST_SCOPES: "nango:suggestScopes",
+
+  // ── Encrypted SQLite cache (NANA-265) ─────────────────────────────────────
+  // Per-table CRUD channels follow the pattern cache:{table}:{op}.
+  CACHE_CONNECTIONS_LIST: "cache:connections:list",
+  CACHE_CONNECTIONS_GET: "cache:connections:get",
+  CACHE_CONNECTIONS_UPSERT: "cache:connections:upsert",
+  CACHE_CONNECTIONS_DELETE: "cache:connections:delete",
+
+  CACHE_SYNCS_LIST: "cache:syncs:list",
+  CACHE_SYNCS_GET: "cache:syncs:get",
+  CACHE_SYNCS_UPSERT: "cache:syncs:upsert",
+  CACHE_SYNCS_DELETE: "cache:syncs:delete",
+
+  CACHE_RECORDS_LIST: "cache:records:list",
+  CACHE_RECORDS_GET: "cache:records:get",
+  CACHE_RECORDS_UPSERT: "cache:records:upsert",
+  CACHE_RECORDS_DELETE: "cache:records:delete",
+  CACHE_RECORDS_DELETE_BY_SYNC: "cache:records:deleteBySync",
+
+  CACHE_LOGS_LIST: "cache:logs:list",
+  CACHE_LOGS_GET: "cache:logs:get",
+  CACHE_LOGS_INSERT: "cache:logs:insert",
+
+  CACHE_WEBHOOK_EVENTS_LIST: "cache:webhookEvents:list",
+  CACHE_WEBHOOK_EVENTS_GET: "cache:webhookEvents:get",
+  CACHE_WEBHOOK_EVENTS_INSERT: "cache:webhookEvents:insert",
+  CACHE_WEBHOOK_EVENTS_MARK_PROCESSED: "cache:webhookEvents:markProcessed",
+  CACHE_WEBHOOK_EVENTS_DELETE: "cache:webhookEvents:delete",
+
+  CACHE_DRYRUN_RUNS_LIST: "cache:dryrunRuns:list",
+  CACHE_DRYRUN_RUNS_GET: "cache:dryrunRuns:get",
+  CACHE_DRYRUN_RUNS_INSERT: "cache:dryrunRuns:insert",
+  CACHE_DRYRUN_RUNS_DELETE: "cache:dryrunRuns:delete",
+
+  CACHE_MCP_TOOL_CALLS_LIST: "cache:mcpToolCalls:list",
+  CACHE_MCP_TOOL_CALLS_GET: "cache:mcpToolCalls:get",
+  CACHE_MCP_TOOL_CALLS_INSERT: "cache:mcpToolCalls:insert",
+  CACHE_MCP_TOOL_CALLS_DELETE: "cache:mcpToolCalls:delete",
+
+  /** Clear all data from every cache table (wired to Settings UI). */
+  CACHE_CLEAR: "cache:clear",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -1047,3 +1088,132 @@ export interface NangoLogsMessagesResult {
     cursor: string | null;
   };
 }
+
+// ── Cache IPC types (NANA-265) ────────────────────────────────────────────────
+
+export interface CacheListOptions {
+  limit?: number;
+  offset?: number;
+}
+
+// connections
+export interface CacheConnectionsListRequest extends CacheListOptions {
+  environment_id?: string;
+  integration_id?: string;
+}
+export interface CacheConnectionsGetRequest { id: string; }
+export interface CacheConnectionsUpsertRequest {
+  id: string;
+  integration_id: string;
+  environment_id: string;
+  display_name?: string | null;
+  status: string;
+  metadata?: Record<string, unknown> | null;
+  synced_at: number;
+  updated_at: number;
+}
+export interface CacheConnectionsDeleteRequest { id: string; }
+
+// syncs
+export interface CacheSyncsListRequest extends CacheListOptions {
+  connection_id?: string;
+  integration_id?: string;
+}
+export interface CacheSyncsGetRequest { id: string; }
+export interface CacheSyncsUpsertRequest {
+  id: string;
+  connection_id: string;
+  integration_id: string;
+  name: string;
+  status: string;
+  frequency?: string | null;
+  last_sync_date?: string | null;
+  next_sync_date?: string | null;
+  synced_at: number;
+}
+export interface CacheSyncsDeleteRequest { id: string; }
+
+// records
+export interface CacheRecordsListRequest extends CacheListOptions {
+  sync_id?: string;
+  connection_id?: string;
+  model?: string;
+}
+export interface CacheRecordsGetRequest { id: string; }
+export interface CacheRecordsUpsertRequest {
+  id: string;
+  sync_id: string;
+  connection_id: string;
+  model: string;
+  data: Record<string, unknown>;
+  external_id?: string | null;
+  synced_at: number;
+}
+export interface CacheRecordsDeleteRequest { id: string; }
+export interface CacheRecordsDeleteBySyncRequest { sync_id: string; }
+
+// logs
+export interface CacheLogsListRequest extends CacheListOptions { level?: string; }
+export interface CacheLogsGetRequest { id: string; }
+export interface CacheLogsInsertRequest {
+  level: string;
+  message: string;
+  context?: Record<string, unknown> | null;
+  created_at: number;
+}
+export interface CacheLogsInsertResult { id: string; }
+
+// webhook_events
+export interface CacheWebhookEventsListRequest extends CacheListOptions {
+  type?: string;
+  processed?: number;
+}
+export interface CacheWebhookEventsGetRequest { id: string; }
+export interface CacheWebhookEventsInsertRequest {
+  id: string;
+  received_at: number;
+  type: string;
+  integration?: string | null;
+  connection?: string | null;
+  payload: Record<string, unknown>;
+}
+export interface CacheWebhookEventsMarkProcessedRequest { id: string; }
+export interface CacheWebhookEventsDeleteRequest { id: string; }
+
+// dryrun_runs
+export interface CacheDryrunRunsListRequest extends CacheListOptions {
+  integration_id?: string;
+  connection_id?: string;
+}
+export interface CacheDryrunRunsGetRequest { id: string; }
+export interface CacheDryrunRunsInsertRequest {
+  id: string;
+  integration_id: string;
+  sync_name: string;
+  connection_id: string;
+  status: string;
+  started_at: number;
+  completed_at?: number | null;
+  result?: unknown | null;
+  error?: string | null;
+}
+export interface CacheDryrunRunsDeleteRequest { id: string; }
+
+// mcp_tool_calls
+export interface CacheMcpToolCallsListRequest extends CacheListOptions {
+  session_id?: string;
+  tool_name?: string;
+}
+export interface CacheMcpToolCallsGetRequest { id: string; }
+export interface CacheMcpToolCallsInsertRequest {
+  id: string;
+  session_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  result?: unknown | null;
+  error?: string | null;
+  started_at: number;
+  completed_at?: number | null;
+  duration_ms?: number | null;
+}
+export interface CacheMcpToolCallsDeleteRequest { id: string; }
