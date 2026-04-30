@@ -4,6 +4,7 @@ import { useConnectionsStore } from "@/store/connectionsStore";
 import { useActionsStore } from "@/store/actionsStore";
 import { useSyncsStore } from "@/store/syncsStore";
 import { useEnvironmentStore } from "@/store/environmentStore";
+import { PermissionGate } from "@/components/common/PermissionGate";
 import { cn } from "@/lib/utils";
 import {
   SearchIcon,
@@ -279,23 +280,28 @@ function ActionsTab({
       </div>
 
       {/* Trigger button */}
-      <button
-        onClick={handleTrigger}
-        disabled={!canTrigger}
-        className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+      <PermissionGate
+        permission="production_actions"
+        tooltipText="Triggering actions in production requires Full Access role"
       >
-        {isExecutingAction ? (
-          <>
-            <SpinnerIcon />
-            Executing…
-          </>
-        ) : (
-          <>
-            <PlayIcon />
-            Trigger Action
-          </>
-        )}
-      </button>
+        <button
+          onClick={handleTrigger}
+          disabled={!canTrigger}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isExecutingAction ? (
+            <>
+              <SpinnerIcon />
+              Executing…
+            </>
+          ) : (
+            <>
+              <PlayIcon />
+              Trigger Action
+            </>
+          )}
+        </button>
+      </PermissionGate>
 
       {/* Result */}
       {(actionResult !== null || actionError) && (
@@ -423,23 +429,28 @@ function SyncsTab({
           </label>
 
           {/* Trigger */}
-          <button
-            onClick={handleTrigger}
-            disabled={!selectedSync || isBusy}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          <PermissionGate
+            permission="production_actions"
+            tooltipText="Triggering syncs in production requires Full Access role"
           >
-            {isBusy ? (
-              <>
-                <SpinnerIcon />
-                Triggering…
-              </>
-            ) : (
-              <>
-                <PlayIcon />
-                Trigger Sync
-              </>
-            )}
-          </button>
+            <button
+              onClick={handleTrigger}
+              disabled={!selectedSync || isBusy}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isBusy ? (
+                <>
+                  <SpinnerIcon />
+                  Triggering…
+                </>
+              ) : (
+                <>
+                  <PlayIcon />
+                  Trigger Sync
+                </>
+              )}
+            </button>
+          </PermissionGate>
 
           {/* Sync detail */}
           {selectedSyncRecord && (

@@ -357,6 +357,20 @@ export interface AppSettings {
   isProduction: boolean;
   /** Subscription tier of the connected Nango account (e.g. "free", "enterprise"). */
   tier: string | null;
+  /**
+   * Effective RBAC role of the desktop user.
+   *
+   * Source of truth (in order):
+   * 1. `NANGO_USER_ROLE` environment variable (`full_access` | `support` |
+   *    `contributor` | `custom`) — lets QA / dev exercise every badge and
+   *    gate variant without standing up an enterprise backend.
+   * 2. Defaults to `full_access` — the inherent capability of a Nango
+   *    account-level secret key, which is what the desktop app uses.
+   *    Per-user roles in Nango Cloud are tied to user JWTs, not secret
+   *    keys, so we cannot derive a non-admin role from `/environments`
+   *    or any other endpoint reachable with the credentials we hold.
+   */
+  userRole: UserRole;
 }
 
 export interface AppUpdateSettingsRequest {
