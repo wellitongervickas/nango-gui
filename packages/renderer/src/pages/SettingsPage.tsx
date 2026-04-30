@@ -52,6 +52,7 @@ export function SettingsPage() {
           onUpdateTheme={updateConnectUiTheme}
           onUpdatePrimaryColor={updateConnectUiPrimaryColor}
         />
+        <LogExportSection environment={environment} />
         <AboutSection
           appVersion={appVersion}
           electronVersion={electronVersion}
@@ -452,6 +453,81 @@ function ConnectUiSection({
         </p>
         {colorError && <p className="mt-1 text-xs text-[var(--color-error)]">{colorError}</p>}
       </div>
+    </Section>
+  );
+}
+
+// ── Log Export (Observability) ─────────────────────────────────────────────
+
+const LOG_EXPORT_DASHBOARD_PATHS: Record<NangoEnvironment, string> = {
+  development: "https://app.nango.dev/dev/environment-settings#log-exports",
+  staging: "https://app.nango.dev/staging/environment-settings#log-exports",
+  production: "https://app.nango.dev/prod/environment-settings#log-exports",
+};
+
+const LOG_EXPORT_PROVIDERS = [
+  "Datadog",
+  "New Relic",
+  "Custom HTTP endpoint",
+];
+
+function LogExportSection({ environment }: { environment: NangoEnvironment }) {
+  const dashboardUrl = LOG_EXPORT_DASHBOARD_PATHS[environment];
+
+  return (
+    <Section title="Log Export · Observability">
+      <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+        Stream Nango logs in real time to your observability stack.
+      </p>
+
+      <div className="mb-4 rounded-md border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-500)]/5 px-3 py-2 text-xs text-[var(--color-text-muted)]">
+        <span className="font-medium text-[var(--color-brand-400)]">Growth plan required.</span>{" "}
+        Log export is a paid add-on. Free and Starter accounts will see this section in the dashboard but cannot enable export targets.
+      </div>
+
+      <div className="mb-4">
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
+          Supported providers
+        </p>
+        <ul className="text-sm text-[var(--color-text)]">
+          {LOG_EXPORT_PROVIDERS.map((provider) => (
+            <li key={provider} className="flex items-center gap-2 py-0.5">
+              <span className="h-1 w-1 rounded-full bg-[var(--color-text-muted)]" />
+              {provider}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="mb-3 text-xs text-[var(--color-text-muted)]">
+        The Nango SDK does not yet expose log-export configuration. Configure your destination,
+        API key, enable/disable state, and send a test event from the Nango dashboard. Changes
+        take effect immediately and apply to all logs in this environment.
+      </p>
+
+      <a
+        href={dashboardUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-brand-500)]/40 bg-[var(--color-brand-500)]/10 px-3 py-1.5 text-xs font-medium text-[var(--color-brand-400)] transition-colors hover:bg-[var(--color-brand-500)]/20"
+      >
+        Configure in Nango dashboard
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M7 17 17 7" />
+          <path d="M7 7h10v10" />
+        </svg>
+      </a>
     </Section>
   );
 }
