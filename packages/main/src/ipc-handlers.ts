@@ -112,13 +112,15 @@ import { runAiBuilder } from "./ai-builder-service.js";
 import { mcpManager } from "./mcp-manager.js";
 import { logsService } from "./logs-service.js";
 import {
-  getNangoClient,
-  initNangoClient,
-  isNangoClientReady,
-  resetNangoClient,
+  getActiveClient,
+  registerEnvironmentClient,
+  isActiveClientReady,
+  clearAllEnvironmentClients,
   validateNangoKey,
+  probeReachability,
 } from "./nango-client.js";
 import { credentialStore } from "./credential-store.js";
+import type { NangoReachabilityResult } from "@nango-gui/shared";
 
 /** Classify an error into an IpcErrorCode for the renderer to act on. */
 function classifyError(err: unknown): {
@@ -126,7 +128,7 @@ function classifyError(err: unknown): {
   message: string;
   fieldErrors?: Record<string, string>;
 } {
-  if (err instanceof Error && err.message === "Nango client not initialized. Call initNangoClient() first.") {
+  if (err instanceof Error && /^Nango client not initialized/.test(err.message)) {
     return { code: "CLIENT_NOT_READY", message: "Nango client not initialized. Please configure your API key in Settings." };
   }
 
@@ -399,7 +401,7 @@ interface SyncStatsResult {
 }
 
 async function aggregateSyncStats(
-  client: ReturnType<typeof getNangoClient>,
+  client: ReturnType<typeof getActiveClient>,
   connections: ConnectionRow[],
 ): Promise<SyncStatsResult> {
   let totalSyncs = 0;
@@ -632,7 +634,7 @@ export function registerIpcHandlers(): void {
       args?: NangoListConnectionsRequest
     ): Promise<IpcResponse<NangoConnectionSummary[]>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.listConnections({
           ...(args?.integrationId
             ? { integrationId: args.integrationId }
@@ -649,7 +651,7 @@ export function registerIpcHandlers(): void {
       args: NangoGetConnectionRequest
     ): Promise<IpcResponse<NangoConnectionDetail>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.getConnection(
           args.providerConfigKey,
           args.connectionId,
@@ -666,7 +668,7 @@ export function registerIpcHandlers(): void {
       args: NangoDeleteConnectionRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.deleteConnection(args.providerConfigKey, args.connectionId);
       })
   );
@@ -678,7 +680,7 @@ export function registerIpcHandlers(): void {
       args: NangoSetMetadataRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.setMetadata(args.providerConfigKey, args.connectionId, args.metadata);
       })
   );
@@ -690,7 +692,7 @@ export function registerIpcHandlers(): void {
       args: NangoPatchConnectionRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         // Pass args.tags directly: {} clears all tags, a populated object sets them.
         await client.patchConnection(
           { connectionId: args.connectionId, provider_config_key: args.providerConfigKey },
@@ -706,7 +708,7 @@ export function registerIpcHandlers(): void {
       args: NangoCreateReconnectSessionRequest
     ): Promise<IpcResponse<NangoCreateReconnectSessionResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         // Build per-integration config defaults from the advanced connection config.
         const integrations_config_defaults = buildIntegrationsConfigDefaults(
           args.integrationsConfigDefaults
@@ -752,7 +754,7 @@ export function registerIpcHandlers(): void {
       args: NangoCreateConnectSessionRequest
     ): Promise<IpcResponse<NangoCreateConnectSessionResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         // Build per-integration config defaults from the advanced connection config.
         const integrations_config_defaults = buildIntegrationsConfigDefaults(
           args.integrationsConfigDefaults
@@ -800,7 +802,7 @@ export function registerIpcHandlers(): void {
         const now = Date.now();
         // Refresh cache if stale or forced by a search term.
         if (!_providersCache || now - _providersCacheAt > PROVIDERS_TTL_MS) {
-          const client = getNangoClient();
+          const client = getActiveClient();
           const search = args?.search?.trim() || undefined;
           const result = await client.listProviders(search ? { search } : {});
           _providersCache = (result.data as NangoProvider[]).map((p) => ({
@@ -832,7 +834,7 @@ export function registerIpcHandlers(): void {
       args: NangoGetProviderRequest
     ): Promise<IpcResponse<NangoProvider>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.getProvider({ provider: args.provider });
         const p = result.data as NangoProvider & { categories?: string[]; docs?: string };
         return {
@@ -889,7 +891,7 @@ export function registerIpcHandlers(): void {
       _event: IpcMainInvokeEvent
     ): Promise<IpcResponse<NangoIntegrationSummary[]>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.listIntegrations();
         const configs = (result.configs ?? []) as unknown[];
         const integrations = configs.map(toIntegration);
@@ -936,7 +938,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const include = args.include?.length
           ? { include: args.include }
           : undefined;
@@ -958,7 +960,7 @@ export function registerIpcHandlers(): void {
         if (!args?.provider || !args?.unique_key) {
           throw new Error("provider and unique_key are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const body: NangoCreateIntegrationRequest = {
           provider: args.provider,
           unique_key: args.unique_key,
@@ -983,7 +985,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const body: Omit<NangoUpdateIntegrationRequest, "uniqueKey"> = {
           ...(args.unique_key !== undefined ? { unique_key: args.unique_key } : {}),
           ...(args.display_name !== undefined ? { display_name: args.display_name } : {}),
@@ -1010,7 +1012,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.deleteIntegration(args.uniqueKey);
       })
   );
@@ -1027,7 +1029,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !args?.connectionId) {
           throw new Error("providerConfigKey and connectionId are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.syncStatus(
           args.providerConfigKey,
           [],
@@ -1048,7 +1050,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !Array.isArray(args?.syncs)) {
           throw new Error("providerConfigKey and syncs array are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.syncStatus(
           args.providerConfigKey,
           args.syncs,
@@ -1069,7 +1071,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
           throw new Error("providerConfigKey and at least one sync name are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.triggerSync(
           args.providerConfigKey,
           args.syncs,
@@ -1089,7 +1091,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
           throw new Error("providerConfigKey and at least one sync name are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.pauseSync(
           args.providerConfigKey,
           args.syncs,
@@ -1108,7 +1110,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !Array.isArray(args?.syncs) || args.syncs.length === 0) {
           throw new Error("providerConfigKey and at least one sync name are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.startSync(
           args.providerConfigKey,
           args.syncs,
@@ -1127,7 +1129,7 @@ export function registerIpcHandlers(): void {
         if (!args?.providerConfigKey || !args?.syncName || !args?.connectionId) {
           throw new Error("providerConfigKey, syncName, and connectionId are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.updateSyncConnectionFrequency(
           args.providerConfigKey,
           args.syncName,
@@ -1151,7 +1153,7 @@ export function registerIpcHandlers(): void {
         if (!Array.isArray(args.entries) || args.entries.length === 0) {
           throw new Error("entries must be a non-empty array");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
 
         // Run sequentially: the Nango API is rate-limited per environment,
         // and parallel fan-out on a large batch can trip 429s. Each entry's
@@ -1207,7 +1209,7 @@ export function registerIpcHandlers(): void {
       args: NangoListRecordsRequest
     ): Promise<IpcResponse<NangoListRecordsResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.listRecords({
           providerConfigKey: args.providerConfigKey,
           connectionId: args.connectionId,
@@ -1237,7 +1239,7 @@ export function registerIpcHandlers(): void {
       args: NangoTriggerActionRequest
     ): Promise<IpcResponse<NangoTriggerActionResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.triggerAction(
           args.integrationId,
           args.connectionId,
@@ -1257,7 +1259,7 @@ export function registerIpcHandlers(): void {
       args: NangoTriggerActionAsyncRequest
     ): Promise<IpcResponse<NangoTriggerActionAsyncResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.triggerActionAsync(
           args.integrationId,
           args.connectionId,
@@ -1277,7 +1279,7 @@ export function registerIpcHandlers(): void {
       args: NangoGetAsyncActionResultRequest
     ): Promise<IpcResponse<NangoAsyncActionResultData>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.getAsyncActionResult(args);
         return result as NangoAsyncActionResultData;
       })
@@ -1292,7 +1294,7 @@ export function registerIpcHandlers(): void {
       args: NangoProxyRequest
     ): Promise<IpcResponse<NangoProxyResult>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const response = await client.proxy({
           method: args.method,
           endpoint: args.endpoint,
@@ -1327,7 +1329,7 @@ export function registerIpcHandlers(): void {
     IPC_CHANNELS.NANGO_GET_DASHBOARD,
     async (): Promise<IpcResponse<NangoDashboardData>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
 
         const connResult = await client.listConnections();
         const connections =
@@ -1356,7 +1358,7 @@ export function registerIpcHandlers(): void {
       args: NangoGetConnectionHealthRequest
     ): Promise<IpcResponse<NangoConnectionHealthData>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
 
         // Fetch connection detail for token/credential age
         const connDetail = await client.getConnection(
@@ -1480,7 +1482,9 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         credentialStore.save(args.secretKey);
         credentialStore.saveEnvironment(args.environment);
-        await initNangoClient(args.secretKey);
+        // Register a per-environment client. The active environment is
+        // implicitly set to the one being saved.
+        await registerEnvironmentClient(args.environment, args.secretKey);
       })
   );
 
@@ -1495,7 +1499,7 @@ export function registerIpcHandlers(): void {
     async (): Promise<IpcResponse<void>> =>
       wrap(async () => {
         credentialStore.clear();
-        resetNangoClient();
+        clearAllEnvironmentClients();
       })
   );
 
@@ -1529,6 +1533,14 @@ export function registerIpcHandlers(): void {
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
         credentialStore.saveEnvironment(args.environment);
+        // Re-bind the active Nango client to the newly selected environment.
+        // Today the credential store holds a single shared secret; NANA-264
+        // will introduce per-env secrets and replace this branch with a
+        // per-env credential lookup.
+        const secretKey = credentialStore.load();
+        if (secretKey) {
+          await registerEnvironmentClient(args.environment, secretKey);
+        }
       })
   );
 
@@ -1546,8 +1558,8 @@ export function registerIpcHandlers(): void {
         let isProduction = false;
         let tier: string | null = null;
         try {
-          if (isNangoClientReady()) {
-            const client = getNangoClient() as unknown as {
+          if (isActiveClientReady()) {
+            const client = getActiveClient() as unknown as {
               serverUrl: string;
               secretKey: string;
             };
@@ -1602,10 +1614,11 @@ export function registerIpcHandlers(): void {
       wrap(async () => {
         if (args.environment !== undefined) {
           credentialStore.saveEnvironment(args.environment);
-          // Re-initialize the Nango client so subsequent API calls use the new environment
+          // Re-bind the active Nango client to the new environment so
+          // subsequent API calls go to the correct Nango env.
           const secretKey = credentialStore.load();
           if (secretKey) {
-            await initNangoClient(secretKey);
+            await registerEnvironmentClient(args.environment, secretKey);
           }
         }
         if (args.theme !== undefined) {
@@ -1619,8 +1632,8 @@ export function registerIpcHandlers(): void {
           // Best-effort: sync the primary color to the Nango server so the
           // Connect UI hosted iframe picks it up automatically on next open.
           const secretKey = credentialStore.load();
-          if (secretKey && isNangoClientReady()) {
-            const client = getNangoClient();
+          if (secretKey && isActiveClientReady()) {
+            const client = getActiveClient();
             const serverUrl = (client as unknown as { serverUrl: string }).serverUrl;
             const environment = credentialStore.loadEnvironment();
             syncConnectUiPrimaryColorToNango(
@@ -1948,7 +1961,7 @@ export function registerIpcHandlers(): void {
         async function listProviders(search?: string) {
           const now = Date.now();
           if (!_providersCache || now - _providersCacheAt > PROVIDERS_TTL_MS) {
-            const client = getNangoClient();
+            const client = getActiveClient();
             const result = await client.listProviders(search ? { search } : {});
             _providersCache = (result.data as NangoProvider[]).map((p) => ({
               name: p.name,
@@ -2115,7 +2128,7 @@ export function registerIpcHandlers(): void {
           throw new Error("providerKey is required");
         }
 
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.getProvider({ provider: args.providerKey });
         const provider = result.data as {
           auth_mode?: string;
@@ -2147,6 +2160,31 @@ export function registerIpcHandlers(): void {
         ];
 
         return { supported: true, scopes };
+      })
+  );
+
+  // ── Reachability heuristic (Feature 7 offline detection) ───────────────
+  //
+  // Renderer calls this at intervals (and on focus) to distinguish a "true
+  // offline" state from "Nango is having issues". This is intentionally
+  // separate from the per-call IpcResponse error envelope: a NETWORK_ERROR
+  // on a normal call can happen for many reasons (Nango blip, bad URL,
+  // proxy hiccup) — the reachability probe is the authoritative source for
+  // the offline banner.
+
+  ipcMain.handle(
+    IPC_CHANNELS.NANGO_REACHABILITY,
+    async (): Promise<IpcResponse<NangoReachabilityResult>> =>
+      wrap(async () => {
+        // Probe the active client's server URL when available so self-hosted
+        // Nango deployments are evaluated against the right host. Fall back
+        // to the public control plane for first-launch / pre-config cases.
+        let baseUrl = "https://api.nango.dev";
+        if (isActiveClientReady()) {
+          const serverUrl = (getActiveClient() as unknown as { serverUrl?: string }).serverUrl;
+          if (serverUrl) baseUrl = serverUrl;
+        }
+        return probeReachability(baseUrl);
       })
   );
 

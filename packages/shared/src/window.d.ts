@@ -77,6 +77,7 @@ import type {
   NangoLogsSearchResult,
   NangoLogsMessagesRequest,
   NangoLogsMessagesResult,
+  NangoReachabilityResult,
 } from "./ipc-channels.js";
 
 declare global {
@@ -150,6 +151,11 @@ declare global {
       searchLogs(args: NangoLogsSearchRequest): Promise<IpcResponse<NangoLogsSearchResult>>;
       /** Get detailed messages for a specific log operation. */
       getLogMessages(args: NangoLogsMessagesRequest): Promise<IpcResponse<NangoLogsMessagesResult>>;
+      /**
+       * Probe Nango's control plane to distinguish "true offline" from "API
+       * unreachable but online". Used by Feature 7 for the offline banner.
+       */
+      checkReachability(): Promise<IpcResponse<NangoReachabilityResult>>;
     };
     credentials: {
       save(

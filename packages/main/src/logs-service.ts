@@ -7,7 +7,7 @@ import type {
   NangoLogMessage,
 } from "@nango-gui/shared";
 import { credentialStore } from "./credential-store.js";
-import { getNangoClient, isNangoClientReady } from "./nango-client.js";
+import { getActiveClient, isActiveClientReady } from "./nango-client.js";
 import log from "./logger.js";
 
 /**
@@ -15,8 +15,8 @@ import log from "./logger.js";
  * Falls back to Nango Cloud if the client is not ready.
  */
 function getServerUrl(): string {
-  if (isNangoClientReady()) {
-    const client = getNangoClient();
+  if (isActiveClientReady()) {
+    const client = getActiveClient();
     return (client as unknown as { serverUrl: string }).serverUrl;
   }
   return "https://api.nango.dev";

@@ -13,7 +13,10 @@ vi.mock("electron", () => ({
   ipcMain: { handle: vi.fn() },
 }));
 
-import { initNangoClient, resetNangoClient } from "../nango-client.js";
+import {
+  registerEnvironmentClient,
+  clearAllEnvironmentClients,
+} from "../nango-client.js";
 
 // Extract the handler function registered for a given channel by capturing
 // ipcMain.handle calls after registerIpcHandlers() runs.
@@ -35,11 +38,11 @@ async function captureHandler(channel: string) {
 describe("nango:createConnectSession IPC handler", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    await initNangoClient("test-secret-key");
+    await registerEnvironmentClient("development", "test-secret-key");
   });
 
   afterEach(() => {
-    resetNangoClient();
+    clearAllEnvironmentClients();
   });
 
   it("returns a token, connect_link and expiry on success", async () => {
@@ -47,7 +50,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "sess_abc123", connect_link: "https://connect.nango.dev/abc", expires_at: "2026-01-01T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     expect(handler).toBeDefined();
 
     const result = await handler!(
@@ -75,7 +78,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_xyz", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!({}, { endUserId: "u2", allowedIntegrations: ["github", "slack"] });
 
     expect(mockCreateConnectSession).toHaveBeenCalledWith({
@@ -89,7 +92,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_min", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!({}, { endUserId: "u3" });
 
     expect(mockCreateConnectSession).toHaveBeenCalledWith({
@@ -111,7 +114,7 @@ describe("nango:createConnectSession IPC handler", () => {
     });
     mockCreateConnectSession.mockRejectedValueOnce(apiError);
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     const result = await handler!({}, { endUserId: "" });
 
     expect(result).toMatchObject({
@@ -128,7 +131,7 @@ describe("nango:createConnectSession IPC handler", () => {
   it("wraps SDK errors in the error envelope", async () => {
     mockCreateConnectSession.mockRejectedValueOnce(new Error("Nango API error"));
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     const result = await handler!({}, { endUserId: "user-1" });
 
     expect(result).toEqual({
@@ -144,7 +147,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_adv", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!(
       {},
       {
@@ -180,7 +183,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_dev", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!(
       {},
       {
@@ -210,9 +213,9 @@ describe("nango:createConnectSession IPC handler", () => {
   });
 
   it("returns error envelope when client is not initialized", async () => {
-    resetNangoClient();
+    clearAllEnvironmentClients();
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     const result = await handler!({}, { endUserId: "user-1" });
 
     expect(result).toMatchObject({

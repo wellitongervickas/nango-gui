@@ -67,7 +67,10 @@ vi.mock("fs", async () => ({
   unlinkSync: vi.fn(),
 }));
 
-import { initNangoClient, resetNangoClient } from "../nango-client.js";
+import {
+  registerEnvironmentClient,
+  clearAllEnvironmentClients,
+} from "../nango-client.js";
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
@@ -92,17 +95,17 @@ describe("IPC handlers", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    await initNangoClient("test-secret-key");
+    await registerEnvironmentClient("development", "test-secret-key");
     handlers = await captureHandlers();
   });
 
   afterEach(() => {
-    resetNangoClient();
+    clearAllEnvironmentClients();
   });
 
   // ── Connection handlers ──────────────────────────────────────────────────
 
-  describe("nango:listConnections", () => {
+  describe("nango:connections:list", () => {
     it("returns mapped connection summaries", async () => {
       mockListConnections.mockResolvedValueOnce({
         connections: [
@@ -117,7 +120,7 @@ describe("IPC handlers", () => {
         ],
       });
 
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
 
       expect(result).toMatchObject({
@@ -137,20 +140,20 @@ describe("IPC handlers", () => {
 
     it("passes integrationId filter when provided", async () => {
       mockListConnections.mockResolvedValueOnce({ connections: [] });
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       await handler({}, { integrationId: "slack" });
       expect(mockListConnections).toHaveBeenCalledWith({ integrationId: "slack" });
     });
 
     it("wraps errors with errorCode", async () => {
       mockListConnections.mockRejectedValueOnce(Object.assign(new Error("Unauthorized"), { status: 401 }));
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "AUTH_INVALID" });
     });
   });
 
-  describe("nango:getConnection", () => {
+  describe("nango:connections:get", () => {
     it("returns connection detail", async () => {
       mockGetConnection.mockResolvedValueOnce({
         id: 42,
@@ -161,7 +164,7 @@ describe("IPC handlers", () => {
         created: "2024-01-01",
       });
 
-      const handler = handlers.get("nango:getConnection")!;
+      const handler = handlers.get("nango:connections:get")!;
       const result = await handler({}, { providerConfigKey: "gh", connectionId: "conn-42" });
 
       expect(result).toMatchObject({
@@ -172,10 +175,10 @@ describe("IPC handlers", () => {
     });
   });
 
-  describe("nango:deleteConnection", () => {
+  describe("nango:connections:delete", () => {
     it("deletes and returns ok", async () => {
       mockDeleteConnection.mockResolvedValueOnce(undefined);
-      const handler = handlers.get("nango:deleteConnection")!;
+      const handler = handlers.get("nango:connections:delete")!;
       const result = await handler({}, { providerConfigKey: "gh", connectionId: "conn-1" });
       expect(result).toMatchObject({ status: "ok" });
       expect(mockDeleteConnection).toHaveBeenCalledWith("gh", "conn-1");
@@ -184,7 +187,7 @@ describe("IPC handlers", () => {
 
   // ── Provider handlers ────────────────────────────────────────────────────
 
-  describe("nango:listProviders", () => {
+  describe("nango:providers:list", () => {
     it("returns provider list", async () => {
       mockListProviders.mockResolvedValueOnce({
         data: [
@@ -192,7 +195,7 @@ describe("IPC handlers", () => {
         ],
       });
 
-      const handler = handlers.get("nango:listProviders")!;
+      const handler = handlers.get("nango:providers:list")!;
       const result = await handler({});
 
       expect(result).toMatchObject({
@@ -203,19 +206,19 @@ describe("IPC handlers", () => {
 
     it("wraps 429 as RATE_LIMITED", async () => {
       mockListProviders.mockRejectedValueOnce(Object.assign(new Error("Too Many Requests"), { status: 429 }));
-      const handler = handlers.get("nango:listProviders")!;
+      const handler = handlers.get("nango:providers:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "RATE_LIMITED" });
     });
   });
 
-  describe("nango:getProvider", () => {
+  describe("nango:providers:get", () => {
     it("returns a single provider", async () => {
       mockGetProvider.mockResolvedValueOnce({
         data: { name: "slack", display_name: "Slack", logo_url: "sl.png", auth_mode: "OAUTH2" },
       });
 
-      const handler = handlers.get("nango:getProvider")!;
+      const handler = handlers.get("nango:providers:get")!;
       const result = await handler({}, { provider: "slack" });
 
       expect(result).toMatchObject({ status: "ok", data: { name: "slack" } });
@@ -225,7 +228,7 @@ describe("IPC handlers", () => {
 
   // ── Sync handlers ────────────────────────────────────────────────────────
 
-  describe("nango:listSyncs", () => {
+  describe("nango:syncs:list", () => {
     it("returns mapped sync records", async () => {
       mockSyncStatus.mockResolvedValueOnce({
         syncs: [
@@ -242,7 +245,7 @@ describe("IPC handlers", () => {
         ],
       });
 
-      const handler = handlers.get("nango:listSyncs")!;
+      const handler = handlers.get("nango:syncs:list")!;
       const result = await handler({}, { connectionId: "conn-1", providerConfigKey: "gh" });
 
       expect(result).toMatchObject({
@@ -260,19 +263,19 @@ describe("IPC handlers", () => {
     });
   });
 
-  describe("nango:getSyncStatus", () => {
+  describe("nango:syncs:status", () => {
     it("passes specific sync names", async () => {
       mockSyncStatus.mockResolvedValueOnce({ syncs: [] });
-      const handler = handlers.get("nango:getSyncStatus")!;
+      const handler = handlers.get("nango:syncs:status")!;
       await handler({}, { providerConfigKey: "gh", syncs: ["sync-a", "sync-b"], connectionId: "c1" });
       expect(mockSyncStatus).toHaveBeenCalledWith("gh", ["sync-a", "sync-b"], "c1");
     });
   });
 
-  describe("nango:triggerSync", () => {
+  describe("nango:syncs:trigger", () => {
     it("triggers a sync successfully", async () => {
       mockTriggerSync.mockResolvedValueOnce(undefined);
-      const handler = handlers.get("nango:triggerSync")!;
+      const handler = handlers.get("nango:syncs:trigger")!;
       const result = await handler({}, {
         providerConfigKey: "gh",
         syncs: ["get-repos"],
@@ -284,20 +287,20 @@ describe("IPC handlers", () => {
     });
   });
 
-  describe("nango:pauseSync", () => {
+  describe("nango:syncs:pause", () => {
     it("pauses a sync successfully", async () => {
       mockPauseSync.mockResolvedValueOnce(undefined);
-      const handler = handlers.get("nango:pauseSync")!;
+      const handler = handlers.get("nango:syncs:pause")!;
       const result = await handler({}, { providerConfigKey: "gh", syncs: ["s1"], connectionId: "c1" });
       expect(result).toMatchObject({ status: "ok" });
       expect(mockPauseSync).toHaveBeenCalledWith("gh", ["s1"], "c1");
     });
   });
 
-  describe("nango:startSync", () => {
+  describe("nango:syncs:start", () => {
     it("starts a sync successfully", async () => {
       mockStartSync.mockResolvedValueOnce(undefined);
-      const handler = handlers.get("nango:startSync")!;
+      const handler = handlers.get("nango:syncs:start")!;
       const result = await handler({}, { providerConfigKey: "gh", syncs: ["s1"], connectionId: "c1" });
       expect(result).toMatchObject({ status: "ok" });
       expect(mockStartSync).toHaveBeenCalledWith("gh", ["s1"], "c1");
@@ -306,7 +309,7 @@ describe("IPC handlers", () => {
 
   // ── Records handler ──────────────────────────────────────────────────────
 
-  describe("nango:listRecords", () => {
+  describe("nango:records:list", () => {
     it("returns records with next_cursor", async () => {
       mockListRecords.mockResolvedValueOnce({
         records: [
@@ -315,7 +318,7 @@ describe("IPC handlers", () => {
         next_cursor: "cursor-2",
       });
 
-      const handler = handlers.get("nango:listRecords")!;
+      const handler = handlers.get("nango:records:list")!;
       const result = await handler({}, { providerConfigKey: "gh", connectionId: "c1", model: "contacts", limit: 50 });
 
       expect(result).toMatchObject({
@@ -329,7 +332,7 @@ describe("IPC handlers", () => {
 
     it("passes optional filter and cursor", async () => {
       mockListRecords.mockResolvedValueOnce({ records: [], next_cursor: null });
-      const handler = handlers.get("nango:listRecords")!;
+      const handler = handlers.get("nango:records:list")!;
       await handler({}, {
         providerConfigKey: "gh",
         connectionId: "c1",
@@ -346,11 +349,11 @@ describe("IPC handlers", () => {
 
   // ── Action & Proxy handlers ──────────────────────────────────────────────
 
-  describe("nango:triggerAction", () => {
+  describe("nango:actions:trigger", () => {
     it("returns action result", async () => {
       mockTriggerAction.mockResolvedValueOnce({ id: 123, title: "Created" });
 
-      const handler = handlers.get("nango:triggerAction")!;
+      const handler = handlers.get("nango:actions:trigger")!;
       const result = await handler({}, {
         integrationId: "gh",
         connectionId: "c1",
@@ -363,7 +366,7 @@ describe("IPC handlers", () => {
     });
   });
 
-  describe("nango:proxyRequest", () => {
+  describe("nango:proxy:request", () => {
     it("returns proxy response", async () => {
       mockProxy.mockResolvedValueOnce({
         status: 200,
@@ -371,7 +374,7 @@ describe("IPC handlers", () => {
         data: { repos: [] },
       });
 
-      const handler = handlers.get("nango:proxyRequest")!;
+      const handler = handlers.get("nango:proxy:request")!;
       const result = await handler({}, {
         integrationId: "gh",
         connectionId: "c1",
@@ -387,7 +390,7 @@ describe("IPC handlers", () => {
 
     it("passes headers and data for POST", async () => {
       mockProxy.mockResolvedValueOnce({ status: 201, headers: {}, data: {} });
-      const handler = handlers.get("nango:proxyRequest")!;
+      const handler = handlers.get("nango:proxy:request")!;
       await handler({}, {
         integrationId: "gh",
         connectionId: "c1",
@@ -411,7 +414,7 @@ describe("IPC handlers", () => {
 
   // ── Dashboard handler ────────────────────────────────────────────────────
 
-  describe("nango:getDashboard", () => {
+  describe("nango:dashboard:get", () => {
     it("aggregates dashboard data", async () => {
       mockListConnections.mockResolvedValueOnce({
         connections: [
@@ -430,7 +433,7 @@ describe("IPC handlers", () => {
           syncs: [{ name: "messages", status: "PAUSED", finishedAt: null }],
         });
 
-      const handler = handlers.get("nango:getDashboard")!;
+      const handler = handlers.get("nango:dashboard:get")!;
       const result = await handler({});
 
       expect(result).toMatchObject({
@@ -453,7 +456,7 @@ describe("IPC handlers", () => {
       });
       mockSyncStatus.mockRejectedValueOnce(new Error("No syncs"));
 
-      const handler = handlers.get("nango:getDashboard")!;
+      const handler = handlers.get("nango:dashboard:get")!;
       const result = await handler({});
 
       expect(result).toMatchObject({
@@ -523,7 +526,7 @@ describe("IPC handlers", () => {
 
   // ── Scope discovery handler ──────────────────────────────────────────────
 
-  describe("nango:suggestScopes", () => {
+  describe("nango:scopes:suggest", () => {
     it("returns supported scopes for an OAuth2 provider", async () => {
       mockGetProvider.mockResolvedValueOnce({
         data: {
@@ -534,7 +537,7 @@ describe("IPC handlers", () => {
         },
       });
 
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, { providerKey: "github" });
 
       expect(result).toMatchObject({ status: "ok" });
@@ -561,7 +564,7 @@ describe("IPC handlers", () => {
         },
       });
 
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, { providerKey: "some-api-key-provider" });
 
       expect(result).toMatchObject({ status: "ok" });
@@ -579,7 +582,7 @@ describe("IPC handlers", () => {
         },
       });
 
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, { providerKey: "no-scope-provider" });
 
       expect(result).toMatchObject({ status: "ok" });
@@ -596,7 +599,7 @@ describe("IPC handlers", () => {
         },
       });
 
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, { providerKey: "google" });
 
       expect(result).toMatchObject({ status: "ok" });
@@ -612,14 +615,14 @@ describe("IPC handlers", () => {
     });
 
     it("returns error when providerKey is missing", async () => {
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, {});
       expect(result).toMatchObject({ status: "error" });
     });
 
     it("wraps API errors with errorCode", async () => {
       mockGetProvider.mockRejectedValueOnce(Object.assign(new Error("Not found"), { status: 500 }));
-      const handler = handlers.get("nango:suggestScopes")!;
+      const handler = handlers.get("nango:scopes:suggest")!;
       const result = await handler({}, { providerKey: "unknown" });
       expect(result).toMatchObject({ status: "error", errorCode: "SERVER_ERROR" });
     });
@@ -627,7 +630,7 @@ describe("IPC handlers", () => {
 
   // ── Integration handlers ─────────────────────────────────────────────────
 
-  describe("nango:listIntegrations connection-count enrichment", () => {
+  describe("nango:integrations:list connection-count enrichment", () => {
     it("groups listConnections by provider_config_key in a single call", async () => {
       mockListIntegrations.mockResolvedValueOnce({
         configs: [
@@ -648,7 +651,7 @@ describe("IPC handlers", () => {
         ],
       });
 
-      const handler = handlers.get("nango:listIntegrations")!;
+      const handler = handlers.get("nango:integrations:list")!;
       const result = (await handler({})) as {
         status: string;
         data: Array<{ unique_key: string; connectionCount: number }>;
@@ -672,7 +675,7 @@ describe("IPC handlers", () => {
       });
       mockListConnections.mockRejectedValueOnce(new Error("nango is sad"));
 
-      const handler = handlers.get("nango:listIntegrations")!;
+      const handler = handlers.get("nango:integrations:list")!;
       const result = (await handler({})) as {
         status: string;
         data: Array<{ unique_key: string; connectionCount: number }>;
@@ -700,7 +703,7 @@ describe("IPC handlers", () => {
         ],
       });
 
-      const handler = handlers.get("nango:listIntegrations")!;
+      const handler = handlers.get("nango:integrations:list")!;
       const result = (await handler({})) as {
         status: string;
         data: Array<{ unique_key: string; connectionCount: number }>;
@@ -715,28 +718,28 @@ describe("IPC handlers", () => {
   describe("error classification", () => {
     it("classifies 500 as SERVER_ERROR", async () => {
       mockListConnections.mockRejectedValueOnce(Object.assign(new Error("Internal"), { status: 500 }));
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "SERVER_ERROR" });
     });
 
     it("classifies fetch failures as NETWORK_ERROR", async () => {
       mockListConnections.mockRejectedValueOnce(new Error("fetch failed"));
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "NETWORK_ERROR" });
     });
 
     it("classifies ECONNREFUSED as NETWORK_ERROR", async () => {
       mockListConnections.mockRejectedValueOnce(new Error("connect ECONNREFUSED 127.0.0.1:443"));
-      const handler = handlers.get("nango:listConnections")!;
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "NETWORK_ERROR" });
     });
 
     it("classifies client not initialized as CLIENT_NOT_READY", async () => {
-      resetNangoClient();
-      const handler = handlers.get("nango:listConnections")!;
+      clearAllEnvironmentClients();
+      const handler = handlers.get("nango:connections:list")!;
       const result = await handler({});
       expect(result).toMatchObject({ status: "error", errorCode: "CLIENT_NOT_READY" });
     });

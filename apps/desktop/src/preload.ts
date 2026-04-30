@@ -144,6 +144,9 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LOGS_SEARCH, args),
   getLogMessages: (args: NangoLogsMessagesRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LOGS_MESSAGES, args),
+  /** Reachability heuristic — distinguishes true offline from API-down for F7. */
+  checkReachability: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_REACHABILITY),
 });
 
 // Expose window.credentials — secure credential storage

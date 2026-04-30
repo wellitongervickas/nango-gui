@@ -15,7 +15,10 @@ vi.mock("electron", () => ({
   ipcMain: { handle: vi.fn() },
 }));
 
-import { initNangoClient, resetNangoClient } from "../nango-client.js";
+import {
+  registerEnvironmentClient,
+  clearAllEnvironmentClients,
+} from "../nango-client.js";
 
 async function captureHandler(channel: string) {
   const { ipcMain } = await import("electron");
@@ -35,11 +38,11 @@ async function captureHandler(channel: string) {
 describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    await initNangoClient("test-secret-key");
+    await registerEnvironmentClient("development", "test-secret-key");
   });
 
   afterEach(() => {
-    resetNangoClient();
+    clearAllEnvironmentClients();
   });
 
   it("applies every entry sequentially and returns ok results in request order", async () => {
@@ -47,7 +50,7 @@ describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
       .mockResolvedValueOnce({ frequency: "every 5m" })
       .mockResolvedValueOnce({ frequency: "every 1h" });
 
-    const handler = await captureHandler("nango:bulkUpdateSyncSchedule");
+    const handler = await captureHandler("nango:syncs:bulkUpdateSchedule");
     const result = await handler!(
       {},
       {
@@ -94,7 +97,7 @@ describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
       .mockRejectedValueOnce(new Error("sync not found"))
       .mockResolvedValueOnce({ frequency: "every 30m" });
 
-    const handler = await captureHandler("nango:bulkUpdateSyncSchedule");
+    const handler = await captureHandler("nango:syncs:bulkUpdateSchedule");
     const result = await handler!(
       {},
       {
@@ -124,7 +127,7 @@ describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
   });
 
   it("rejects an empty entries array via the error envelope", async () => {
-    const handler = await captureHandler("nango:bulkUpdateSyncSchedule");
+    const handler = await captureHandler("nango:syncs:bulkUpdateSchedule");
     const result = await handler!(
       {},
       { providerConfigKey: "github", connectionId: "conn-1", entries: [] },
@@ -139,7 +142,7 @@ describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
   });
 
   it("requires providerConfigKey and connectionId", async () => {
-    const handler = await captureHandler("nango:bulkUpdateSyncSchedule");
+    const handler = await captureHandler("nango:syncs:bulkUpdateSchedule");
     const result = await handler!(
       {},
       { entries: [{ syncName: "issues", frequency: "every 5m" }] },
@@ -157,7 +160,7 @@ describe("nango:bulkUpdateSyncSchedule IPC handler", () => {
       frequency: "every 1d",
     });
 
-    const handler = await captureHandler("nango:bulkUpdateSyncSchedule");
+    const handler = await captureHandler("nango:syncs:bulkUpdateSchedule");
     await handler!(
       {},
       {
