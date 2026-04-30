@@ -692,7 +692,7 @@ export function registerIpcHandlers(): void {
       args: NangoPatchConnectionRequest
     ): Promise<IpcResponse<void>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         // Pass args.tags directly: {} clears all tags, a populated object sets them.
         await client.patchConnection(
           { connectionId: args.connectionId, provider_config_key: args.providerConfigKey },
@@ -891,7 +891,7 @@ export function registerIpcHandlers(): void {
       _event: IpcMainInvokeEvent
     ): Promise<IpcResponse<NangoIntegrationSummary[]>> =>
       wrap(async () => {
-        const client = getNangoClient();
+        const client = getActiveClient();
         const result = await client.listIntegrations();
         const configs = (result.configs ?? []) as unknown[];
         const integrations = configs.map(toIntegration);
@@ -938,7 +938,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const include = args.include?.length
           ? { include: args.include }
           : undefined;
@@ -960,7 +960,7 @@ export function registerIpcHandlers(): void {
         if (!args?.provider || !args?.unique_key) {
           throw new Error("provider and unique_key are required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const body: NangoCreateIntegrationRequest = {
           provider: args.provider,
           unique_key: args.unique_key,
@@ -985,7 +985,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         const body: Omit<NangoUpdateIntegrationRequest, "uniqueKey"> = {
           ...(args.unique_key !== undefined ? { unique_key: args.unique_key } : {}),
           ...(args.display_name !== undefined ? { display_name: args.display_name } : {}),
@@ -1012,7 +1012,7 @@ export function registerIpcHandlers(): void {
         if (!args?.uniqueKey) {
           throw new Error("uniqueKey is required");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
         await client.deleteIntegration(args.uniqueKey);
       })
   );
@@ -1153,7 +1153,7 @@ export function registerIpcHandlers(): void {
         if (!Array.isArray(args.entries) || args.entries.length === 0) {
           throw new Error("entries must be a non-empty array");
         }
-        const client = getNangoClient();
+        const client = getActiveClient();
 
         // Run sequentially: the Nango API is rate-limited per environment,
         // and parallel fan-out on a large batch can trip 429s. Each entry's

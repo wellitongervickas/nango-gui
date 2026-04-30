@@ -114,7 +114,7 @@ describe("nango:createConnectSession IPC handler", () => {
     });
     mockCreateConnectSession.mockRejectedValueOnce(apiError);
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     const result = await handler!({}, { endUserId: "" });
 
     expect(result).toMatchObject({
@@ -147,7 +147,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_adv", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!(
       {},
       {
@@ -183,7 +183,7 @@ describe("nango:createConnectSession IPC handler", () => {
       data: { token: "tok_dev", connect_link: "", expires_at: "2026-12-31T00:00:00Z" },
     });
 
-    const handler = await captureHandler("nango:createConnectSession");
+    const handler = await captureHandler("nango:connect:createSession");
     await handler!(
       {},
       {
