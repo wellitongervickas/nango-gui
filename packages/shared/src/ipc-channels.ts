@@ -11,6 +11,13 @@ export const IPC_CHANNELS = {
   NANGO_LIST_PROVIDERS: "nango:listProviders",
   NANGO_GET_PROVIDER: "nango:getProvider",
 
+  // Integration CRUD (configured integrations on the user's Nango account)
+  NANGO_LIST_INTEGRATIONS: "nango:listIntegrations",
+  NANGO_GET_INTEGRATION: "nango:getIntegration",
+  NANGO_CREATE_INTEGRATION: "nango:createIntegration",
+  NANGO_UPDATE_INTEGRATION: "nango:updateIntegration",
+  NANGO_DELETE_INTEGRATION: "nango:deleteIntegration",
+
   // Sync operations
   NANGO_LIST_SYNCS: "nango:listSyncs",
   NANGO_GET_SYNC_STATUS: "nango:getSyncStatus",
@@ -334,6 +341,114 @@ export interface NangoProvider {
 
 export interface NangoGetProviderRequest {
   provider: string;
+}
+
+// ── Integration CRUD ────────────────────────────────────────────────────────
+
+/** OAuth1/OAuth2/TBA credential shape returned by the Nango integrations API. */
+export interface NangoOAuthIntegrationCredentials {
+  type: "OAUTH1" | "OAUTH2" | "TBA";
+  /** OAuth client ID (returned masked from getIntegration; full when revealed). */
+  client_id: string | null;
+  /** OAuth client secret (always masked from getIntegration; null otherwise). */
+  client_secret: string | null;
+  /** Space-separated OAuth scopes. */
+  scopes: string | null;
+  /** Webhook signing secret for incoming provider webhooks. */
+  webhook_secret: string | null;
+}
+
+/** GitHub App credential shape. */
+export interface NangoAppIntegrationCredentials {
+  type: "APP";
+  app_id: string | null;
+  private_key: string | null;
+  app_link: string | null;
+}
+
+export type NangoIntegrationCredentials =
+  | NangoOAuthIntegrationCredentials
+  | NangoAppIntegrationCredentials;
+
+/** A configured integration on the user's Nango account. */
+export interface NangoIntegration {
+  /** The provider config key (e.g. "github-prod"). */
+  unique_key: string;
+  /** The provider template name (e.g. "github"). */
+  provider: string;
+  /** Human-readable display name (falls back to unique_key on Nango). */
+  display_name: string;
+  /** Provider logo URL. */
+  logo: string;
+  /** ISO timestamp when the integration was created. */
+  created_at: string;
+  /** ISO timestamp of the last update. */
+  updated_at: string;
+  /** Whether incoming provider webhooks are forwarded to this integration. */
+  forward_webhooks: boolean;
+  /** Webhook URL Nango exposes for this integration. Null if not retrieved. */
+  webhook_url: string | null;
+  /** OAuth/auth credentials. Null if the include flag wasn't set or auth is unconfigured. */
+  credentials: NangoIntegrationCredentials | null;
+}
+
+/** A list-view summary for an integration row, with derived connection count. */
+export interface NangoIntegrationSummary {
+  unique_key: string;
+  provider: string;
+  display_name: string;
+  logo: string;
+  created_at: string;
+  updated_at: string;
+  forward_webhooks: boolean;
+  /** Number of active connections that reference this integration. */
+  connectionCount: number;
+}
+
+export interface NangoGetIntegrationRequest {
+  uniqueKey: string;
+  /** Server-side include flags: pull credentials and/or webhook URL alongside the integration. */
+  include?: ("credentials" | "webhook")[];
+}
+
+/** Public credential payload accepted by createIntegration/updateIntegration. */
+export type NangoIntegrationCredentialsInput =
+  | {
+      type: "OAUTH1" | "OAUTH2" | "TBA";
+      client_id: string;
+      client_secret: string;
+      scopes?: string;
+      webhook_secret?: string;
+    }
+  | {
+      type: "APP";
+      app_id: string;
+      app_link: string;
+      private_key: string;
+    };
+
+export interface NangoCreateIntegrationRequest {
+  /** Provider template (e.g. "github"). */
+  provider: string;
+  /** Stable, user-chosen unique key (becomes the provider config key). */
+  unique_key: string;
+  display_name?: string;
+  credentials?: NangoIntegrationCredentialsInput;
+  forward_webhooks?: boolean;
+}
+
+export interface NangoUpdateIntegrationRequest {
+  /** The current unique key of the integration to update. */
+  uniqueKey: string;
+  /** Optional rename to a new unique key. */
+  unique_key?: string;
+  display_name?: string;
+  credentials?: NangoIntegrationCredentialsInput;
+  forward_webhooks?: boolean;
+}
+
+export interface NangoDeleteIntegrationRequest {
+  uniqueKey: string;
 }
 
 export type AppTheme = "light" | "dark" | "system";

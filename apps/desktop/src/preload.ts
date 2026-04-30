@@ -56,6 +56,10 @@ import type {
   NangoCreateReconnectSessionRequest,
   NangoLogsSearchRequest,
   NangoLogsMessagesRequest,
+  NangoGetIntegrationRequest,
+  NangoCreateIntegrationRequest,
+  NangoUpdateIntegrationRequest,
+  NangoDeleteIntegrationRequest,
 } from "@nango-gui/shared";
 
 // Expose window.nango — Nango SDK operations (proxied through main process)
@@ -74,6 +78,16 @@ contextBridge.exposeInMainWorld("nango", {
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_PROVIDERS, args),
   getProvider: (args: NangoGetProviderRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_PROVIDER, args),
+  listIntegrations: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_INTEGRATIONS),
+  getIntegration: (args: NangoGetIntegrationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_GET_INTEGRATION, args),
+  createIntegration: (args: NangoCreateIntegrationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_CREATE_INTEGRATION, args),
+  updateIntegration: (args: NangoUpdateIntegrationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_UPDATE_INTEGRATION, args),
+  deleteIntegration: (args: NangoDeleteIntegrationRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.NANGO_DELETE_INTEGRATION, args),
   listSyncs: (args: NangoListSyncsRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.NANGO_LIST_SYNCS, args),
   getSyncStatus: (args: NangoGetSyncStatusRequest) =>

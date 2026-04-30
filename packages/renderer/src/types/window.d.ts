@@ -92,6 +92,12 @@ import type {
   NangoLogsSearchResult,
   NangoLogsMessagesRequest,
   NangoLogsMessagesResult,
+  NangoIntegration,
+  NangoIntegrationSummary,
+  NangoGetIntegrationRequest,
+  NangoCreateIntegrationRequest,
+  NangoUpdateIntegrationRequest,
+  NangoDeleteIntegrationRequest,
 } from "@nango-gui/shared";
 
 declare global {
@@ -118,6 +124,19 @@ declare global {
       getProvider(
         args: NangoGetProviderRequest
       ): Promise<IpcResponse<NangoProvider>>;
+      listIntegrations(): Promise<IpcResponse<NangoIntegrationSummary[]>>;
+      getIntegration(
+        args: NangoGetIntegrationRequest
+      ): Promise<IpcResponse<NangoIntegration>>;
+      createIntegration(
+        args: NangoCreateIntegrationRequest
+      ): Promise<IpcResponse<NangoIntegration>>;
+      updateIntegration(
+        args: NangoUpdateIntegrationRequest
+      ): Promise<IpcResponse<NangoIntegration>>;
+      deleteIntegration(
+        args: NangoDeleteIntegrationRequest
+      ): Promise<IpcResponse<void>>;
       listSyncs(
         args: NangoListSyncsRequest
       ): Promise<IpcResponse<NangoSyncRecord[]>>;
