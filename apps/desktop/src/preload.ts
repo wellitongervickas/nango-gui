@@ -251,6 +251,12 @@ contextBridge.exposeInMainWorld("mcp", {
     ipcRenderer.removeAllListeners(IPC_CHANNELS.MCP_STATUS_CHANGED),
 });
 
+// Expose window.cacheDb — encrypted local cache operations (NANA-265)
+contextBridge.exposeInMainWorld("cacheDb", {
+  /** Clear all rows from every cache table. Preserves the schema. Destructive — confirm before calling. */
+  clear: () => ipcRenderer.invoke(IPC_CHANNELS.CACHE_CLEAR),
+});
+
 // Expose window.aiBuilder — AI Integration Builder v2 (tool-calling loop)
 contextBridge.exposeInMainWorld("aiBuilder", {
   run: (args: AiBuilderRunRequest) =>

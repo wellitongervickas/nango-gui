@@ -52,6 +52,7 @@ export function SettingsPage() {
           onUpdateTheme={updateConnectUiTheme}
           onUpdatePrimaryColor={updateConnectUiPrimaryColor}
         />
+        <ClearCacheSection />
         <AboutSection
           appVersion={appVersion}
           electronVersion={electronVersion}
@@ -452,6 +453,60 @@ function ConnectUiSection({
         </p>
         {colorError && <p className="mt-1 text-xs text-[var(--color-error)]">{colorError}</p>}
       </div>
+    </Section>
+  );
+}
+
+// ── Clear Cache ────────────────────────────────────────────────────────────
+
+function ClearCacheSection() {
+  const [confirm, setConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cleared, setCleared] = useState(false);
+
+  async function handleClear() {
+    if (!window.cacheDb) return;
+    setClearing(true);
+    setError(null);
+    try {
+      const res = await window.cacheDb.clear();
+      if (res.status === "error") {
+        setError(res.error);
+      } else {
+        setCleared(true);
+        setTimeout(() => setCleared(false), 3000);
+      }
+    } catch {
+      setError("Failed to clear cache. Please try again.");
+    } finally {
+      setClearing(false);
+      setConfirm(false);
+    }
+  }
+
+  return (
+    <Section title="Local Cache">
+      <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+        Clear all locally cached data (connections, syncs, records, logs, webhook events). The schema is preserved and data will re-populate on next sync.
+      </p>
+      <div className="flex items-center gap-2">
+        {confirm ? (
+          <>
+            <span className="text-xs text-[var(--color-text-muted)]">This will delete all cached rows. Continue?</span>
+            <ActionButton variant="destructive" onClick={handleClear} disabled={clearing}>
+              {clearing ? "Clearing…" : "Yes, clear cache"}
+            </ActionButton>
+            <ActionButton onClick={() => setConfirm(false)} disabled={clearing}>Cancel</ActionButton>
+          </>
+        ) : (
+          <ActionButton variant="destructive" onClick={() => setConfirm(true)}>
+            Clear local cache
+          </ActionButton>
+        )}
+        {cleared && <span className="text-xs text-[var(--color-text-muted)]">Cache cleared.</span>}
+      </div>
+      {error && <p className="mt-2 text-xs text-[var(--color-error)]">{error}</p>}
     </Section>
   );
 }

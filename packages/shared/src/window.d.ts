@@ -223,6 +223,10 @@ declare global {
       /** Remove all status change listeners (call on component unmount). */
       removeAllStatusChangeListeners(): void;
     };
+    cacheDb: {
+      /** Clear all rows from every cache table. Preserves schema. Destructive — always confirm before calling. */
+      clear(): Promise<IpcResponse<null>>;
+    };
     aiBuilder: {
       /** Run the AI builder conversation loop with tool-calling. */
       run(args: AiBuilderRunRequest): Promise<IpcResponse<AiBuilderRunResult>>;
