@@ -12,7 +12,10 @@ interface SettingsState {
   connectUiPrimaryColor: string | null;
   /**
    * True when the connected Nango server has RBAC enabled (e.g. enterprise tier).
-   * When false, all permission gates are no-ops and the role badge is hidden.
+   * Together with `isProduction`, drives whether the production environment
+   * banner is rendered. We deliberately do not derive per-user role gating
+   * from this flag — the desktop app authenticates with a secret key and has
+   * no way of knowing which Nango user is at the keyboard.
    */
   hasRbac: boolean;
   /** Whether the currently selected Nango environment is flagged as production. */
@@ -116,9 +119,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set({ environment: prev });
         throw new Error(res.error);
       }
-      // Per F6 spec: re-fetch tier/is_production/role when the environment switches.
-      // Re-pulling settings refreshes hasRbac/isProduction/tier; the rbac store is
-      // notified separately via the environment subscription wired in App.tsx.
+      // Re-fetch settings on environment switch so hasRbac / isProduction /
+      // tier reflect the newly-selected environment.
       await get().fetchSettings();
     } catch (err) {
       set({ environment: prev });

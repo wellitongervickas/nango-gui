@@ -37,7 +37,6 @@ import { ConnectionDetailPage } from "./pages/ConnectionDetailPage";
 import { IntegrationDetailPage } from "./pages/IntegrationDetailPage";
 import { useSettingsStore } from "./store/settingsStore";
 import { useEnvironmentStore } from "./store/environmentStore";
-import { useRbacStore } from "./store/rbacStore";
 import { useErrorStore } from "./store/errorStore";
 import { useHashRoute } from "./lib/router";
 import "./index.css";
@@ -75,29 +74,17 @@ function App() {
   const aiBuilderOpen = useAiBuilderPanelStore((s) => s.isOpen);
   const closeAiBuilder = useAiBuilderPanelStore((s) => s.close);
 
-  // Apply persisted theme preference and initialize environment as early as possible.
-  // Also bootstrap settings (which carries hasRbac/tier/isProduction) and the RBAC
-  // user so the role badge and permission gates have the data they need.
+  // Apply persisted theme preference and initialize environment as early as
+  // possible. Settings carries hasRbac/isProduction/tier from the Nango
+  // /environments endpoint, which is what the production banner consults.
   useEffect(() => {
     void useSettingsStore.getState().fetchSettings();
-    void useRbacStore.getState().fetchCurrentUser();
     useEnvironmentStore.getState().initialize();
   }, []);
 
-  // Per F6 spec, re-fetch the RBAC user when the environment changes so the
-  // role badge/gates reflect the active environment's tier and is_production.
-  useEffect(() => {
-    const unsub = useSettingsStore.subscribe((state, prev) => {
-      if (state.environment !== prev.environment) {
-        void useRbacStore.getState().fetchCurrentUser();
-      }
-    });
-    return unsub;
-  }, []);
-
-  // Per F6 spec, a 403 mid-session means the user's role may have changed —
-  // refetch settings + the current user so the badge and gates update without
-  // requiring a manual page refresh. Triggered by AUTH_INVALID error toasts.
+  // A 403 mid-session means the underlying environment scope may have
+  // changed — refetch settings so hasRbac/isProduction reflect the current
+  // server state without requiring a manual page refresh.
   useEffect(() => {
     let lastSeenId: string | null = null;
     const unsub = useErrorStore.subscribe((state) => {
@@ -106,7 +93,6 @@ function App() {
       lastSeenId = latest.id;
       if (latest.errorCode === "AUTH_INVALID") {
         void useSettingsStore.getState().fetchSettings();
-        void useRbacStore.getState().fetchCurrentUser();
       }
     });
     return unsub;

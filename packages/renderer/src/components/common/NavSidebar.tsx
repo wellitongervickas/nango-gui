@@ -1,6 +1,5 @@
 import { useHashRoute, navigate } from "../../lib/router";
 import { cn } from "../../lib/utils";
-import { UserRoleBadge } from "./UserRoleBadge";
 
 interface NavItem {
   label: string;
@@ -103,7 +102,6 @@ export function NavSidebar() {
 
       {/* Bottom-anchored Settings */}
       <div className="px-2 pb-3 border-t border-[var(--color-border)] pt-2">
-        <UserRoleBadge />
         <button
           onClick={() => navigate("settings")}
           className={cn(

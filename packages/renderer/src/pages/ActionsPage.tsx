@@ -18,7 +18,6 @@ import {
   ChevronIcon,
 } from "@/components/icons";
 import { ErrorBanner } from "../components/common/ErrorBanner";
-import { PermissionGate } from "../components/common/PermissionGate";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -374,19 +373,14 @@ function ActionsRunnerTab({
 
       {/* Run Button row */}
       <div className="flex items-center gap-3">
-        <PermissionGate
-          permission="production_actions"
-          tooltipText="Running actions in production requires Full Access role"
+        <button
+          onClick={handleRun}
+          disabled={!selectedConnection || !actionName.trim() || !jsonValid || isInFlight}
+          className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
         >
-          <button
-            onClick={handleRun}
-            disabled={!selectedConnection || !actionName.trim() || !jsonValid || isInFlight}
-            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
-          >
-            {isInFlight ? <SpinnerIcon /> : <PlayIcon />}
-            {asyncMode ? "Run Async" : "Run Action"}
-          </button>
-        </PermissionGate>
+          {isInFlight ? <SpinnerIcon /> : <PlayIcon />}
+          {asyncMode ? "Run Async" : "Run Action"}
+        </button>
         {showClear && (
           <button
             onClick={clearActionResult}
@@ -561,24 +555,19 @@ function ProxyTesterTab({
 
       {/* Send Button */}
       <div className="flex items-center gap-3">
-        <PermissionGate
-          permission="production_actions"
-          tooltipText="Sending proxy requests in production requires Full Access role"
+        <button
+          onClick={handleSend}
+          disabled={
+            !selectedConnection ||
+            !endpoint.trim() ||
+            (showBody && !bodyJsonValid) ||
+            isExecutingProxy
+          }
+          className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
         >
-          <button
-            onClick={handleSend}
-            disabled={
-              !selectedConnection ||
-              !endpoint.trim() ||
-              (showBody && !bodyJsonValid) ||
-              isExecutingProxy
-            }
-            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-brand-500)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
-          >
-            {isExecutingProxy ? <SpinnerIcon /> : <SendIcon />}
-            Send
-          </button>
-        </PermissionGate>
+          {isExecutingProxy ? <SpinnerIcon /> : <SendIcon />}
+          Send
+        </button>
         {(proxyStatus !== null || proxyError) && (
           <button
             onClick={clearProxyResult}

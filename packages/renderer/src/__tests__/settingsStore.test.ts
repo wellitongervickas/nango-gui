@@ -113,8 +113,24 @@ describe("fetchSettings", () => {
     expect(state.nangoSdkVersion).toBe("0.70.1");
     expect(state.connectUiTheme).toBe("system");
     expect(state.connectUiPrimaryColor).toBeNull();
+    expect(state.hasRbac).toBe(false);
+    expect(state.isProduction).toBe(false);
+    expect(state.tier).toBeNull();
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
+  });
+
+  it("propagates hasRbac/isProduction/tier from IPC response", async () => {
+    mockGetSettings.mockResolvedValueOnce({
+      status: "ok",
+      data: { ...mockSettings, hasRbac: true, isProduction: true, tier: "enterprise" },
+      error: null,
+    } as IpcResponse<AppSettings>);
+    await useSettingsStore.getState().fetchSettings();
+    const state = useSettingsStore.getState();
+    expect(state.hasRbac).toBe(true);
+    expect(state.isProduction).toBe(true);
+    expect(state.tier).toBe("enterprise");
   });
 
   it("sets error on IPC error response", async () => {
@@ -166,9 +182,9 @@ describe("updateTheme", () => {
 describe("updateEnvironment", () => {
   it("optimistically sets environment and calls IPC", async () => {
     useSettingsStore.setState({ environment: "development" });
-    // Per F6 spec, updateEnvironment re-fetches settings after success so role-aware
-    // state (tier/is_production/hasRbac) reflects the new environment. Stub the
-    // post-switch fetch to return production so the test reflects the spec'd flow.
+    // updateEnvironment re-fetches settings after success so hasRbac /
+    // isProduction / tier reflect the new environment. Stub the post-switch
+    // fetch to return production so the test reflects that flow.
     mockGetSettings.mockResolvedValueOnce({
       status: "ok",
       data: { ...mockSettings, environment: "production", isProduction: true },

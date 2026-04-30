@@ -11,7 +11,6 @@ import { ConnectModal } from "@/components/connections/ConnectModal";
 import { cn, searchInputClass } from "@/lib/utils";
 import { SearchIcon, ChevronIcon, XIcon, TrashIcon, RefreshIcon, PlugIcon, SpinnerIcon } from "@/components/icons";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
-import { PermissionGate } from "@/components/common/PermissionGate";
 
 function FilterIcon() {
   return (
@@ -299,15 +298,13 @@ function DetailPanel({ connection, onClose, onDelete }: DetailPanelProps) {
               </button>
             )}
           </ConnectModal>
-          <PermissionGate permission="delete_connection">
-            <button
-              onClick={() => onDelete(connection)}
-              className="px-3 py-2 text-sm rounded-lg border border-[var(--color-error)]/40 text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors cursor-pointer flex items-center gap-2"
-            >
-              <TrashIcon />
-              Delete
-            </button>
-          </PermissionGate>
+          <button
+            onClick={() => onDelete(connection)}
+            className="px-3 py-2 text-sm rounded-lg border border-[var(--color-error)]/40 text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors cursor-pointer flex items-center gap-2"
+          >
+            <TrashIcon />
+            Delete
+          </button>
         </div>
       </aside>
     </>

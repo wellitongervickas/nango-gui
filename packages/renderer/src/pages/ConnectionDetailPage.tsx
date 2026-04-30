@@ -6,7 +6,6 @@ import { navigate } from "@/lib/router";
 import { getFriendlyErrorMessage, getErrorTitle } from "@/lib/auth-errors";
 import { useConnectionsStore } from "@/store/connectionsStore";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
-import { PermissionGate } from "@/components/common/PermissionGate";
 import { StatusBadge } from "@/components/syncs/StatusBadge";
 import { TagsSection } from "@/components/connections/TagsSection";
 import {
@@ -327,37 +326,27 @@ function SyncMiniRow({
           {formatDate(sync.finishedAt)}
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <PermissionGate
-            permission="production_actions"
-            tooltipText="Triggering syncs in production requires Full Access role"
+          <button
+            onClick={handleTrigger}
+            disabled={isBusy}
+            title="Trigger sync"
+            className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
           >
-            <button
-              onClick={handleTrigger}
-              disabled={isBusy}
-              title="Trigger sync"
-              className="flex items-center justify-center w-6 h-6 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-brand-500)] hover:bg-[var(--color-brand-500)]/10 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isBusy ? <SpinnerIcon /> : <PlayIcon />}
-            </button>
-          </PermissionGate>
-          <PermissionGate
-            permission="production_actions"
-            tooltipText="Pausing or resuming syncs in production requires Full Access role"
+            {isBusy ? <SpinnerIcon /> : <PlayIcon />}
+          </button>
+          <button
+            onClick={handleTogglePause}
+            disabled={isBusy || sync.status === "STOPPED"}
+            title={sync.status === "PAUSED" ? "Resume" : "Pause"}
+            className={cn(
+              "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
+              sync.status === "PAUSED"
+                ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
+                : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
+            )}
           >
-            <button
-              onClick={handleTogglePause}
-              disabled={isBusy || sync.status === "STOPPED"}
-              title={sync.status === "PAUSED" ? "Resume" : "Pause"}
-              className={cn(
-                "flex items-center justify-center w-6 h-6 rounded transition-all cursor-pointer disabled:opacity-50",
-                sync.status === "PAUSED"
-                  ? "text-[var(--color-success)] hover:bg-[var(--color-success)]/10"
-                  : "text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10"
-              )}
-            >
-              {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
-            </button>
-          </PermissionGate>
+            {sync.status === "PAUSED" ? <PlayIcon /> : <PauseIcon />}
+          </button>
         </div>
       </div>
 
@@ -637,15 +626,13 @@ function DangerZoneSection({ connectionId, onDelete, isDeleting }: DangerZoneSec
               Permanently removes all credentials and synced data. This cannot be undone.
             </p>
           </div>
-          <PermissionGate permission="delete_connection">
-            <button
-              onClick={handleBeginDelete}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-[var(--color-error)]/40 text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors cursor-pointer shrink-0"
-            >
-              <TrashIcon />
-              Delete connection
-            </button>
-          </PermissionGate>
+          <button
+            onClick={handleBeginDelete}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-[var(--color-error)]/40 text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors cursor-pointer shrink-0"
+          >
+            <TrashIcon />
+            Delete connection
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
