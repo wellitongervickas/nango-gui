@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useRbacStore } from "../store/rbacStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { ROLE_STYLES } from "../components/common/UserRoleBadge";
 
-// Reset rbac store between tests so derived permission flags don't leak.
+// Reset rbac + settings stores between tests so derived permission flags
+// and settings-sourced role don't leak. fetchCurrentUser depends on
+// settingsStore.userRole, so seeding settings before each case is required.
 beforeEach(() => {
   useRbacStore.setState({
     currentUser: null,
@@ -14,6 +17,22 @@ beforeEach(() => {
     canDeleteConnection: true,
     canDeployProduction: true,
     canTriggerDevActions: true,
+  });
+  useSettingsStore.setState({
+    theme: "system",
+    environment: "development",
+    maskedKey: null,
+    appVersion: "",
+    electronVersion: "",
+    nangoSdkVersion: "",
+    connectUiTheme: "system",
+    connectUiPrimaryColor: null,
+    hasRbac: false,
+    isProduction: false,
+    tier: null,
+    userRole: "full_access",
+    isLoading: false,
+    error: null,
   });
 });
 
@@ -53,13 +72,19 @@ describe("UserRoleBadge label mapping", () => {
   });
 });
 
-// ── derivePermissions via fetchCurrentUser ──────────────────────────────────
-// fetchCurrentUser is the only public entry point that re-derives permission
-// flags from a role. Verifying it covers the deriver since they share a code
-// path; if either drifts, the assertions below catch it.
+// ── fetchCurrentUser sources role from settingsStore ────────────────────────
+// Per NANA-261 D1 fix, fetchCurrentUser must NOT hardcode `full_access` — it
+// reads `userRole` from the settingsStore, which is populated by the main
+// process (which honours the `NANGO_USER_ROLE` env override and otherwise
+// defaults to `full_access`). The tests below seed settingsStore directly
+// and verify that the rbacStore reflects the seeded role and re-derives
+// permissions accordingly. window.electronApp is intentionally undefined in
+// the vitest env, so fetchCurrentUser skips its IPC call and reads the
+// seeded settings synchronously.
 
-describe("rbacStore.fetchCurrentUser", () => {
-  it("populates currentUser and grants all permissions for full_access", async () => {
+describe("rbacStore.fetchCurrentUser sources role from settings", () => {
+  it("propagates 'full_access' from settings and grants every permission", async () => {
+    useSettingsStore.setState({ userRole: "full_access" });
     await useRbacStore.getState().fetchCurrentUser();
     const state = useRbacStore.getState();
     expect(state.currentUser?.role).toBe("full_access");
@@ -70,6 +95,53 @@ describe("rbacStore.fetchCurrentUser", () => {
     expect(state.canTriggerDevActions).toBe(true);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
+  });
+
+  it("propagates 'support' from settings and gates production actions only", async () => {
+    useSettingsStore.setState({ userRole: "support" });
+    await useRbacStore.getState().fetchCurrentUser();
+    const state = useRbacStore.getState();
+    expect(state.currentUser?.role).toBe("support");
+    expect(state.canTriggerProductionActions).toBe(false);
+    expect(state.canManageTeam).toBe(false);
+    expect(state.canDeleteConnection).toBe(false);
+    expect(state.canDeployProduction).toBe(false);
+    expect(state.canTriggerDevActions).toBe(true);
+  });
+
+  it("propagates 'contributor' from settings and denies every guarded action", async () => {
+    useSettingsStore.setState({ userRole: "contributor" });
+    await useRbacStore.getState().fetchCurrentUser();
+    const state = useRbacStore.getState();
+    expect(state.currentUser?.role).toBe("contributor");
+    expect(state.canTriggerProductionActions).toBe(false);
+    expect(state.canManageTeam).toBe(false);
+    expect(state.canDeleteConnection).toBe(false);
+    expect(state.canDeployProduction).toBe(false);
+    expect(state.canTriggerDevActions).toBe(false);
+  });
+
+  it("propagates 'custom' from settings — all gates default to denied", async () => {
+    useSettingsStore.setState({ userRole: "custom" });
+    await useRbacStore.getState().fetchCurrentUser();
+    const state = useRbacStore.getState();
+    expect(state.currentUser?.role).toBe("custom");
+    expect(state.canTriggerProductionActions).toBe(false);
+    expect(state.canManageTeam).toBe(false);
+    expect(state.canDeleteConnection).toBe(false);
+    expect(state.canDeployProduction).toBe(false);
+    expect(state.canTriggerDevActions).toBe(false);
+  });
+
+  it("does not regress to a hardcoded role when settings change between calls", async () => {
+    useSettingsStore.setState({ userRole: "support" });
+    await useRbacStore.getState().fetchCurrentUser();
+    expect(useRbacStore.getState().currentUser?.role).toBe("support");
+
+    useSettingsStore.setState({ userRole: "full_access" });
+    await useRbacStore.getState().fetchCurrentUser();
+    expect(useRbacStore.getState().currentUser?.role).toBe("full_access");
+    expect(useRbacStore.getState().canTriggerProductionActions).toBe(true);
   });
 });
 

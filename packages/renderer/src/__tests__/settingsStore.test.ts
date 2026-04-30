@@ -30,6 +30,7 @@ const mockSettings: AppSettings = {
   hasRbac: false,
   isProduction: false,
   tier: null,
+  userRole: "full_access",
 };
 
 const mockGetSettings = vi.fn((): Promise<IpcResponse<AppSettings>> =>
@@ -63,6 +64,7 @@ beforeEach(() => {
     hasRbac: false,
     isProduction: false,
     tier: null,
+    userRole: "full_access",
     isLoading: false,
     error: null,
   });

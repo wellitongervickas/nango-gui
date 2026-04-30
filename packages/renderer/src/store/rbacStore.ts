@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { UserRole, RbacUser, TeamMember } from "@nango-gui/shared";
+import { useSettingsStore } from "./settingsStore";
 
 interface RbacState {
   currentUser: RbacUser | null;
@@ -50,17 +51,25 @@ export const useRbacStore = create<RbacState>((set, get) => ({
   fetchCurrentUser: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Desktop app uses secret key — always full_access.
-      // In a web context, this would call a real user endpoint.
+      // Role is resolved by the main process (env override or `full_access`
+      // default — see AppSettings.userRole docs). Refresh settings first so
+      // we read the role that matches the currently selected environment;
+      // settingsStore.fetchSettings() is the only place that reaches the
+      // main-process IPC, so we depend on it rather than re-implementing
+      // the resolution here.
+      if (typeof window !== "undefined" && window.electronApp) {
+        await useSettingsStore.getState().fetchSettings();
+      }
+      const role = useSettingsStore.getState().userRole;
       const user: RbacUser = {
         id: "desktop-user",
         email: "",
         name: "You",
-        role: "full_access",
+        role,
       };
       set({
         currentUser: user,
-        ...derivePermissions(user.role),
+        ...derivePermissions(role),
         isLoading: false,
       });
     } catch (err) {

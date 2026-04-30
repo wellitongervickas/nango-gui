@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppTheme, NangoEnvironment } from "@nango-gui/shared";
+import type { AppTheme, NangoEnvironment, UserRole } from "@nango-gui/shared";
 
 interface SettingsState {
   theme: AppTheme;
@@ -19,6 +19,11 @@ interface SettingsState {
   isProduction: boolean;
   /** Subscription tier of the connected Nango account. */
   tier: string | null;
+  /**
+   * Effective RBAC role of the desktop user. Resolved by the main process
+   * (env override or `full_access` default — see AppSettings docs).
+   */
+  userRole: UserRole;
   isLoading: boolean;
   error: string | null;
 
@@ -41,6 +46,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   hasRbac: false,
   isProduction: false,
   tier: null,
+  userRole: "full_access",
   isLoading: false,
   error: null,
 
@@ -65,6 +71,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         hasRbac,
         isProduction,
         tier,
+        userRole,
       } = res.data;
       set({
         theme,
@@ -78,6 +85,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         hasRbac,
         isProduction,
         tier,
+        userRole,
         isLoading: false,
       });
       applyTheme(theme);

@@ -591,6 +591,28 @@ function buildIntegrationsConfigDefaults(
 }
 
 /**
+ * Resolve the desktop user's effective RBAC role.
+ *
+ * The Nango desktop app authenticates with an account-level secret key, which
+ * grants full administrative capability — there is no per-user role concept
+ * reachable from the credentials we hold (Nango per-user roles are tied to
+ * user JWTs in the cloud UI, not secret keys).
+ *
+ * To keep all four badge variants reachable for QA and developers, we honour
+ * a `NANGO_USER_ROLE` env var override. Anything else falls back to the
+ * inherent `full_access` capability of the secret key. This is a deliberate
+ * scope decision documented on NANA-261 — when Nango introduces user-scoped
+ * tokens for desktop, this helper is the single place to wire the real fetch.
+ */
+function resolveUserRole(): "full_access" | "support" | "contributor" | "custom" {
+  const raw = (process.env.NANGO_USER_ROLE ?? "").trim().toLowerCase();
+  if (raw === "support" || raw === "contributor" || raw === "custom" || raw === "full_access") {
+    return raw;
+  }
+  return "full_access";
+}
+
+/**
  * Register all IPC handlers. Call once from the main process after app ready.
  */
 export function registerIpcHandlers(): void {
@@ -1390,6 +1412,7 @@ export function registerIpcHandlers(): void {
           hasRbac,
           isProduction,
           tier,
+          userRole: resolveUserRole(),
         };
       })
   );
